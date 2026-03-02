@@ -39,41 +39,37 @@ function reducer(s,a){
   }
 }
 
+/* ═══ Confirm (3-button) ═══ */
 function Confirm({msg,sub,okLabel,cancelLabel,thirdLabel,onOk,onCancel,onThird}){
-  return(<div style={SS.ov}><div style={{background:"#fff",borderRadius:20,padding:"32px 28px",maxWidth:480,width:"100%",textAlign:"center",boxShadow:"0 10px 36px rgba(0,0,0,0.25)"}}>
+  return(<div style={SS.ov}><div style={{background:"#fff",borderRadius:20,padding:"32px 28px",maxWidth:440,width:"100%",textAlign:"center",boxShadow:"0 10px 36px rgba(0,0,0,0.25)"}}>
     <div style={{fontSize:44,marginBottom:8}}>⚠️</div>
-    <div style={{fontSize:22,fontWeight:800,color:"#14365a",marginBottom:6,whiteSpace:"pre-line"}}>{msg}</div>
-    {sub&&<div style={{fontSize:16,color:"#888",marginBottom:14,whiteSpace:"pre-line"}}>{sub}</div>}
-    <div style={{display:"flex",gap:10,flexDirection:"column"}}>
-      <div style={{display:"flex",gap:10}}>
-        <button onClick={onOk} style={{flex:1,padding:"16px 0",border:"none",borderRadius:12,background:"#14365a",color:"#fff",fontSize:18,fontWeight:700,cursor:"pointer"}}>{okLabel||"確定"}</button>
-        <button onClick={onCancel} style={{flex:1,padding:"16px 0",border:"2px solid #14365a",borderRadius:12,background:"transparent",color:"#14365a",fontSize:18,fontWeight:700,cursor:"pointer"}}>{cancelLabel||"キャンセル"}</button>
-      </div>
-      {onThird&&<button onClick={onThird} style={{padding:"14px 0",border:"2px solid #ccc",borderRadius:12,background:"transparent",color:"#888",fontSize:16,fontWeight:600,cursor:"pointer"}}>{thirdLabel||"戻る"}</button>}
-    </div>
+    <div style={{fontSize:20,fontWeight:800,color:"#14365a",marginBottom:6,whiteSpace:"pre-line"}}>{msg}</div>
+    {sub&&<div style={{fontSize:15,color:"#888",marginBottom:14,whiteSpace:"pre-line"}}>{sub}</div>}
+    <div style={{display:"flex",gap:10,flexDirection:"column"}}><div style={{display:"flex",gap:10}}>
+      <button onClick={onOk} style={{flex:1,padding:"14px 0",border:"none",borderRadius:12,background:"#14365a",color:"#fff",fontSize:17,fontWeight:700,cursor:"pointer"}}>{okLabel||"確定"}</button>
+      <button onClick={onCancel} style={{flex:1,padding:"14px 0",border:"2px solid #14365a",borderRadius:12,background:"transparent",color:"#14365a",fontSize:17,fontWeight:700,cursor:"pointer"}}>{cancelLabel||"キャンセル"}</button>
+    </div>{onThird&&<button onClick={onThird} style={{padding:"12px 0",border:"2px solid #ccc",borderRadius:12,background:"transparent",color:"#888",fontSize:15,fontWeight:600,cursor:"pointer"}}>{thirdLabel||"戻る"}</button>}</div>
   </div></div>);
 }
 
+/* ═══ FavDropdown ═══ */
 function FavDropdown({favs,addF,rmF,onPick,usedNames}){
   const[open,setOpen]=useState(false);const[newN,setNewN]=useState("");const[delTarget,setDelTarget]=useState(null);
   const longRef=useRef(null);const wrapRef=useRef(null);
   const available=favs.filter(f=>!(usedNames||[]).includes(f));
   useEffect(()=>{if(!open)return;const h=e=>{if(wrapRef.current&&!wrapRef.current.contains(e.target))setOpen(false);};document.addEventListener("pointerdown",h);return()=>document.removeEventListener("pointerdown",h);},[open]);
-  const startLP=name=>{longRef.current=setTimeout(()=>setDelTarget(name),600);};
-  const cancelLP=()=>{if(longRef.current)clearTimeout(longRef.current);};
-  return(
-    <div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
-      <button onClick={()=>{setOpen(!open);setDelTarget(null);}} style={{width:40,height:40,border:"1px solid #d0dff0",borderRadius:8,background:open?"#2b7de9":"#f0f6ff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:open?"#fff":"#d9a83a"}}>⭐</button>
-      {open&&(<div style={{position:"absolute",top:"100%",right:0,marginTop:4,background:"#fff",border:"1px solid #ccc",borderRadius:12,boxShadow:"0 6px 20px rgba(0,0,0,0.18)",zIndex:50,minWidth:220,maxWidth:300,padding:10}}>
-        {available.length===0&&<div style={{padding:12,textAlign:"center",color:"#aaa",fontSize:16}}>{favs.length===0?"登録なし":"全員配置済み"}</div>}
-        <div style={{maxHeight:220,overflow:"auto"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid #f0f0f0",background:delTarget===f?"#fde8e8":"transparent",fontSize:18,fontWeight:600,color:"#14365a",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<span onClick={e=>{e.stopPropagation();rmF(f);setDelTarget(null);}} style={{padding:"5px 12px",background:"#e74c3c",color:"#fff",borderRadius:6,fontSize:13,fontWeight:700}}>削除</span>}</button></div>))}</div>
-        <div style={{borderTop:"1px solid #eee",paddingTop:10,marginTop:4}}><div style={{display:"flex",gap:6}}>
-          <input value={newN} onChange={e=>setNewN(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder={"新規登録("+MAX_NAME+"文字)"} style={{flex:1,padding:"10px 12px",border:"1px solid #ddd",borderRadius:8,fontSize:16,outline:"none"}}/>
-          <button onClick={()=>{if(newN.trim()){addF(newN.trim());setNewN("");}}} style={{padding:"10px 16px",border:"none",borderRadius:8,background:"#2b7de9",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",opacity:newN.trim()?1:0.3}}>登録</button>
-        </div></div>
-      </div>)}
-    </div>
-  );
+  const startLP=name=>{longRef.current=setTimeout(()=>setDelTarget(name),600);};const cancelLP=()=>{if(longRef.current)clearTimeout(longRef.current);};
+  return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
+    <button onClick={()=>{setOpen(!open);setDelTarget(null);}} style={{width:44,height:44,border:"1px solid #d0dff0",borderRadius:8,background:open?"#2b7de9":"#f0f6ff",fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:open?"#fff":"#d9a83a"}}>⭐</button>
+    {open&&(<div style={{position:"absolute",top:"100%",right:0,marginTop:4,background:"#fff",border:"1px solid #ccc",borderRadius:10,boxShadow:"0 6px 20px rgba(0,0,0,0.18)",zIndex:50,minWidth:220,maxWidth:300,padding:10}}>
+      {available.length===0&&<div style={{padding:12,textAlign:"center",color:"#aaa",fontSize:16}}>{favs.length===0?"登録なし":"全員配置済み"}</div>}
+      <div style={{maxHeight:220,overflow:"auto"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid #f0f0f0",background:delTarget===f?"#fde8e8":"transparent",fontSize:18,fontWeight:600,color:"#14365a",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<span onClick={e=>{e.stopPropagation();rmF(f);setDelTarget(null);}} style={{padding:"5px 12px",background:"#e74c3c",color:"#fff",borderRadius:6,fontSize:14,fontWeight:700}}>削除</span>}</button></div>))}</div>
+      <div style={{borderTop:"1px solid #eee",paddingTop:10,marginTop:6}}><div style={{display:"flex",gap:5}}>
+        <input value={newN} onChange={e=>setNewN(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder={"新規登録("+MAX_NAME+"文字)"} style={{flex:1,padding:"10px 12px",border:"1px solid #ddd",borderRadius:8,fontSize:16,outline:"none"}}/>
+        <button onClick={()=>{if(newN.trim()){addF(newN.trim());setNewN("");}}} style={{padding:"10px 16px",border:"none",borderRadius:8,background:"#2b7de9",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",opacity:newN.trim()?1:0.3}}>登録</button>
+      </div></div>
+    </div>)}
+  </div>);
 }
 
 const VT={writingMode:"vertical-rl",WebkitWritingMode:"vertical-rl",textOrientation:"upright",WebkitTextOrientation:"upright",letterSpacing:"-1px",lineHeight:1,margin:"0 auto",whiteSpace:"nowrap",overflow:"hidden",display:"inline-block"};
@@ -86,44 +82,37 @@ function ScoreTable({teams,history,teamOrder,highlightLast,fontSize,colW,roundW,
   const totalCols=1+ordered.reduce((s,o)=>s+o.ap.length+1,0);
   const showRows=activeCell&&activeCell.turn>maxT?activeCell.turn:maxT;
   useEffect(()=>{ensureBlink();},[]);
-  return(
-    <table style={{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",borderSpacing:0}}>
-      <colgroup><col style={{width:rw}}/>{ordered.map(o=><React.Fragment key={o.idx}>{o.ap.map((_,pi)=><col key={pi} style={{width:cw}}/>)}<col style={{width:cw}}/></React.Fragment>)}</colgroup>
-      <thead>
-        <tr style={{height:H1}}>
-          <th style={{background:"#14365a",color:"#fff",fontWeight:700,fontSize:fs*0.8,textAlign:"center",position:forCapture?"static":"sticky",top:0,zIndex:7,padding:0,lineHeight:H1+"px",borderBottom:"none"}}>R</th>
-          {ordered.map(o=>(<th key={o.idx} colSpan={o.ap.length+1} style={{background:C[o.idx].bg,color:"#fff",fontWeight:700,fontSize:fs*0.75,textAlign:"center",borderLeft:"3px solid "+C[o.idx].ac,position:forCapture?"static":"sticky",top:0,zIndex:7,padding:0,lineHeight:H1+"px",borderBottom:"none",whiteSpace:"nowrap",overflow:"hidden"}}>{o.team.name}</th>))}
-        </tr>
-        <tr>
-          <th style={{background:"#1e4a72",position:forCapture?"static":"sticky",top:H1,zIndex:7,padding:0,borderTop:"none",borderBottom:"2px solid #0d2a48"}}/>
-          {ordered.map(o=><React.Fragment key={o.idx}>
-            {o.ap.map((p,pi)=>(<th key={pi} style={{background:"linear-gradient(180deg,"+C[o.idx].bg+",#1e4a72)",color:C[o.idx].nm,fontWeight:800,fontSize:fs*0.78,textAlign:"center",verticalAlign:"top",borderLeft:pi===0?"3px solid "+C[o.idx].ac:"1px solid rgba(255,255,255,0.15)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:"5px 2px",letterSpacing:1,textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:800}}>{p.name.slice(0,MAX_NAME)}</span></th>))}
-            <th style={{background:"#0d2a48",color:"#ffd700",fontWeight:900,textAlign:"center",verticalAlign:"top",borderLeft:"1px solid rgba(255,255,255,0.2)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:"5px 2px",textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>計</span></th>
-          </React.Fragment>)}
-        </tr>
-      </thead>
-      <tbody>
-        {showRows===0?(<tr><td colSpan={totalCols} style={{color:"#bbb",padding:24,fontSize:fs*0.8,textAlign:"center",borderBottom:"1px solid #eee"}}>スコアを入力してください</td></tr>):(
-          Array.from({length:showRows},(_,i)=>i+1).map(turn=>{
-            const isLast=highlightLast&&turn===maxT&&turn<=maxT;
-            return(<tr key={turn} style={isLast?{background:"#fffde6"}:{}}>
-              <td style={{padding:"5px 3px",textAlign:"center",borderBottom:"1px solid #ddd",fontWeight:800,color:"#666",fontSize:fs*0.85}}>{turn}</td>
-              {ordered.map(o=>{const e=history.find(h=>h.turn===turn&&h.teamIndex===o.idx);const cf=e?getFA(history,o.idx,turn):0;
-                return(<React.Fragment key={o.idx}>{o.ap.map((p,pi)=>{
-                  const isP=e&&e.playerIndex===pi;const isAct=activeCell&&activeCell.turn===turn&&activeCell.teamIndex===o.idx&&activeCell.playerIndex===pi&&!e;
-                  let txt="",clr="#333",bg="transparent",fw=400;
-                  if(isP){if((e.type==="miss"||e.type==="fault")&&cf===1)bg="#fff9db";if((e.type==="miss"||e.type==="fault")&&cf>=2)bg="#ffe0e0";if(e.type==="miss"){txt="−";clr="#bf6900";fw=800;}else if(e.type==="fault"&&e.faultReset){txt="F↓";clr="#c0392b";fw=800;}else if(e.type==="fault"){txt="F";clr="#c0392b";fw=800;}else if(e.reset25){txt=e.score+"↓";clr="#d93a5e";fw=800;}else{txt=e.score;clr=C[o.idx].tx;fw=700;}if(e.consecutiveFails>=MF)txt+="✕";}
-                  const cs={padding:"5px 3px",textAlign:"center",borderBottom:"1px solid #ddd",color:clr,fontWeight:fw,background:bg,borderLeft:pi===0?"3px solid "+C[o.idx].ac+"33":"1px solid #eee",fontSize:fs};
-                  if(isAct)cs.animation="mk-blink 1s ease-in-out infinite";
-                  return <td key={pi} style={cs}>{txt}</td>;
-                })}<td style={{padding:"5px 3px",textAlign:"center",borderBottom:"1px solid #ddd",fontWeight:900,color:C[o.idx].tx,background:e?"#f0f3f8":"transparent",borderLeft:"2px solid #d0d0d0",fontSize:fs}}>{e?e.runningTotal:""}</td></React.Fragment>);
-              })}
-            </tr>);
-          })
-        )}
-      </tbody>
-    </table>
-  );
+  return(<table style={{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",borderSpacing:0}}>
+    <colgroup><col style={{width:rw}}/>{ordered.map(o=><React.Fragment key={o.idx}>{o.ap.map((_,pi)=><col key={pi} style={{width:cw}}/>)}<col style={{width:cw}}/></React.Fragment>)}</colgroup>
+    <thead>
+      <tr style={{height:H1}}>
+        <th style={{background:"#14365a",color:"#fff",fontWeight:700,fontSize:fs*0.8,textAlign:"center",position:forCapture?"static":"sticky",top:0,zIndex:7,padding:0,lineHeight:H1+"px",borderBottom:"none"}}>R</th>
+        {ordered.map(o=>(<th key={o.idx} colSpan={o.ap.length+1} style={{background:C[o.idx].bg,color:"#fff",fontWeight:700,fontSize:fs*0.75,textAlign:"center",borderLeft:"3px solid "+C[o.idx].ac,position:forCapture?"static":"sticky",top:0,zIndex:7,padding:0,lineHeight:H1+"px",borderBottom:"none",whiteSpace:"nowrap",overflow:"hidden"}}>{o.team.name}</th>))}
+      </tr>
+      <tr>
+        <th style={{background:"#1e4a72",position:forCapture?"static":"sticky",top:H1,zIndex:7,padding:0,borderTop:"none",borderBottom:"2px solid #0d2a48"}}/>
+        {ordered.map(o=><React.Fragment key={o.idx}>
+          {o.ap.map((p,pi)=>(<th key={pi} style={{background:"linear-gradient(180deg,"+C[o.idx].bg+",#1e4a72)",color:C[o.idx].nm,fontWeight:800,fontSize:fs*0.78,textAlign:"center",verticalAlign:"top",borderLeft:pi===0?"3px solid "+C[o.idx].ac:"1px solid rgba(255,255,255,0.15)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:"5px 2px",letterSpacing:1,textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:800}}>{p.name.slice(0,MAX_NAME)}</span></th>))}
+          <th style={{background:"#0d2a48",color:"#ffd700",fontWeight:900,textAlign:"center",verticalAlign:"top",borderLeft:"1px solid rgba(255,255,255,0.2)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:"5px 2px",textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>計</span></th>
+        </React.Fragment>)}
+      </tr>
+    </thead>
+    <tbody>{showRows===0?(<tr><td colSpan={totalCols} style={{color:"#bbb",padding:24,fontSize:fs*0.8,textAlign:"center",borderBottom:"1px solid #eee"}}>スコアを入力してください</td></tr>):(
+      Array.from({length:showRows},(_,i)=>i+1).map(turn=>{const isLast=highlightLast&&turn===maxT&&turn<=maxT;
+        return(<tr key={turn} style={isLast?{background:"#fffde6"}:{}}>
+          <td style={{padding:"5px 3px",textAlign:"center",borderBottom:"1px solid #ddd",fontWeight:800,color:"#666",fontSize:fs*0.85}}>{turn}</td>
+          {ordered.map(o=>{const e=history.find(h=>h.turn===turn&&h.teamIndex===o.idx);const cf=e?getFA(history,o.idx,turn):0;
+            return(<React.Fragment key={o.idx}>{o.ap.map((p,pi)=>{
+              const isP=e&&e.playerIndex===pi;const isAct=activeCell&&activeCell.turn===turn&&activeCell.teamIndex===o.idx&&activeCell.playerIndex===pi&&!e;
+              let txt="",clr="#333",bg="transparent",fw=400;
+              if(isP){if((e.type==="miss"||e.type==="fault")&&getFA(history,o.idx,turn)===1)bg="#fff9db";if((e.type==="miss"||e.type==="fault")&&getFA(history,o.idx,turn)>=2)bg="#ffe0e0";if(e.type==="miss"){txt="−";clr="#bf6900";fw=800;}else if(e.type==="fault"&&e.faultReset){txt="F↓";clr="#c0392b";fw=800;}else if(e.type==="fault"){txt="F";clr="#c0392b";fw=800;}else if(e.reset25){txt=e.score+"↓";clr="#d93a5e";fw=800;}else{txt=e.score;clr=C[o.idx].tx;fw=700;}if(e.consecutiveFails>=MF)txt+="✕";}
+              const st={padding:"5px 3px",textAlign:"center",borderBottom:"1px solid #ddd",color:clr,fontWeight:fw,background:bg,borderLeft:pi===0?"3px solid "+C[o.idx].ac+"33":"1px solid #eee",fontSize:fs};
+              if(isAct)st.animation="mk-blink 1s ease-in-out infinite";
+              return <td key={pi} style={st}>{txt}</td>;
+            })}<td style={{padding:"5px 3px",textAlign:"center",borderBottom:"1px solid #ddd",fontWeight:900,color:C[o.idx].tx,background:e?"#f0f3f8":"transparent",borderLeft:"2px solid #d0d0d0",fontSize:fs}}>{e?e.runningTotal:""}</td></React.Fragment>);
+          })}</tr>);})
+    )}</tbody>
+  </table>);
 }
 
 function GameSheet({teams,history,currentTurn,teamOrder,activeCell}){
@@ -132,10 +121,9 @@ function GameSheet({teams,history,currentTurn,teamOrder,activeCell}){
   return(<div ref={ref} style={{height:"100%",overflow:"auto",WebkitOverflowScrolling:"touch"}}><ScoreTable teams={teams} history={history} teamOrder={teamOrder} highlightLast={true} fontSize={20} colW={0} roundW={48} nameH={110} activeCell={activeCell}/></div>);
 }
 
-/* ═══ Setup — 1.5x bigger ═══ */
+/* ═══ Setup — 1.5× scaled ═══ */
 function SetupScreen({onStart,savedTeams}){
-  const{favs,addF,rmF}=useFavs();
-  const[mode,setMode]=useState("manual");const[tc,setTc]=useState(savedTeams?savedTeams.length:2);
+  const{favs,addF,rmF}=useFavs();const[mode,setMode]=useState("manual");const[tc,setTc]=useState(savedTeams?savedTeams.length:2);
   const[om,setOm]=useState("normal");const[numGames,setNumGames]=useState(1);const[bestOf,setBestOf]=useState(0);const[dqEnd,setDqEnd]=useState(true);
   const[teams,setTeams]=useState(()=>{if(savedTeams){const base=savedTeams.map(t=>({name:t.name,players:t.players.length>0?t.players:[""]}));while(base.length<MAX_TEAMS)base.push({name:"チーム"+(base.length+1),players:[""]});return base.slice(0,MAX_TEAMS);}return Array.from({length:MAX_TEAMS},(_,i)=>({name:"チーム"+(i+1),players:[""]}));});
   const[mems,setMems]=useState(Array(4).fill(""));const[sp,setSp]=useState(null);
@@ -144,138 +132,125 @@ function SetupScreen({onStart,savedTeams}){
   const aP=ti=>setTeams(p=>p.map((t,i)=>i===ti&&t.players.length<MAX_PL?{...t,players:[...t.players,""]}:t));
   const rP=(ti,pi)=>setTeams(p=>p.map((t,i)=>i===ti&&t.players.length>1?{...t,players:t.players.filter((_,j)=>j!==pi)}:t));
   const uM=(i,v)=>setMems(p=>p.map((m,j)=>j===i?v.slice(0,MAX_NAME):m));
-  const aM=()=>{if(mems.length<MAX_SHUF)setMems(p=>[...p,""]);};
-  const rM=i=>{if(mems.length>2)setMems(p=>p.filter((_,j)=>j!==i));};
+  const aM=()=>{if(mems.length<MAX_SHUF)setMems(p=>[...p,""]);};const rM=i=>{if(mems.length>2)setMems(p=>p.filter((_,j)=>j!==i));};
   const doShuf=()=>{const names=mems.filter(m=>m.trim());if(names.length<tc)return;const s=shuf(names);const r=Array.from({length:tc},(_,i)=>({name:"チーム"+(i+1),players:[]}));s.forEach((n,i)=>r[i%tc].players.push(n));setSp(r);};
-  const okM=teams.slice(0,tc).every(t=>t.name.trim()&&t.players.some(p=>p.trim()));
-  const okS=mems.filter(m=>m.trim()).length>=tc;
+  const okM=teams.slice(0,tc).every(t=>t.name.trim()&&t.players.some(p=>p.trim()));const okS=mems.filter(m=>m.trim()).length>=tc;
   const go=()=>{let ft;if(mode==="manual")ft=teams.slice(0,tc).map(t=>({...t,players:t.players.filter(p=>p.trim())}));else{if(!sp)return;ft=sp;}let ord=Array.from({length:ft.length},(_,i)=>i);if(om==="random")ord=shuf(ord);onStart(ft,ord,numGames,bestOf,dqEnd);};
   const usedManual=teams.slice(0,tc).flatMap(t=>t.players).filter(p=>p.trim()).map(p=>p.trim());
-  const usedShuffle=mems.filter(m=>m.trim()).map(m=>m.trim());
-  const used=mode==="manual"?usedManual:usedShuffle;
-  /* 1.5x styles */
-  const SL={display:"block",fontSize:14,fontWeight:700,color:"rgba(255,255,255,0.5)",letterSpacing:3,marginBottom:8};
-  const CH={flex:1,padding:"16px 0",border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"transparent",color:"#fff",fontSize:20,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"};
-  const CHA={background:"#2b7de9",borderColor:"#2b7de9"};
-  const SEL={width:"100%",padding:"14px 16px",border:"1px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.92)",color:"#14365a",fontSize:18,fontWeight:600,cursor:"pointer",outline:"none",WebkitAppearance:"none",appearance:"none",backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M0 0l6 7 6-7z' fill='%23999'/%3E%3C/svg%3E\")",backgroundRepeat:"no-repeat",backgroundPosition:"right 14px center",paddingRight:"34px"};
-  const CARD={background:"rgba(255,255,255,0.96)",borderRadius:14,padding:"16px 18px 14px",marginBottom:12};
-  const PIN={flex:1,border:"1px solid #e0e0e0",borderRadius:10,padding:"12px 14px",fontSize:20,outline:"none",background:"#fafafa"};
-  const TIN={flex:1,border:"none",borderBottom:"2px solid #ddd",padding:"6px 4px",fontSize:22,fontWeight:700,outline:"none",background:"transparent"};
-  return(
-    <div style={{height:"100dvh",display:"flex",flexDirection:"column",overflow:"auto",background:"linear-gradient(170deg,#0f1f30,#14365a)",WebkitOverflowScrolling:"touch"}}>
-      <div style={{padding:"36px 20px 8px",textAlign:"center"}}>
-        <div style={{fontSize:56}}>🪵</div>
-        <h1 style={{fontSize:38,fontWeight:900,color:"#fff",letterSpacing:4}}>モルック スコアラー</h1>
-        <div style={{fontSize:13,color:"rgba(255,255,255,0.3)",fontWeight:600,letterSpacing:5}}>MÖLKKY SCORER</div>
-      </div>
-      <div style={{flex:1,padding:"0 20px 36px",maxWidth:720,margin:"0 auto",width:"100%"}}>
-        <div style={{marginBottom:14}}><label style={SL}>入力モード</label><div style={{display:"flex",gap:8}}>{[["manual","✏️ 手動"],["shuffle","🎲 ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>{setMode(k);setSp(null);}} style={{...CH,...(mode===k?CHA:{})}}>{l}</button>))}</div></div>
-        <div style={{display:"flex",gap:14,marginBottom:14}}>
-          <div style={{flex:1}}><label style={SL}>チーム数</label><div style={{display:"flex",gap:8}}>{[2,3,4].map(n=>(<button key={n} onClick={()=>{setTc(n);setSp(null);}} style={{...CH,...(tc===n?CHA:{}),padding:"16px 0"}}>{n}</button>))}</div></div>
-          <div style={{flex:1}}><label style={SL}>投げ順</label><div style={{display:"flex",gap:8}}>{[["normal","通常"],["random","ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>setOm(k)} style={{...CH,...(om===k?CHA:{})}}>{l}</button>))}</div></div>
-        </div>
-        <div style={{display:"flex",gap:8,marginBottom:14}}>
-          <div style={{flex:"1 1 0"}}><label style={SL}>ゲーム数</label><select value={numGames} onChange={e=>setNumGames(+e.target.value)} style={SEL}>{Array.from({length:10},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}ゲーム</option>)}</select></div>
-          <div style={{flex:"1 1 0"}}><label style={SL}>先取機能</label><select value={bestOf} onChange={e=>setBestOf(+e.target.value)} style={SEL}><option value={0}>なし</option>{Array.from({length:11},(_,i)=>i+2).map(n=><option key={n} value={n}>{n}先取</option>)}</select></div>
-          <div style={{flex:"1 1 0"}}><label style={SL}>失格時</label><select value={dqEnd?"end":"cont"} onChange={e=>setDqEnd(e.target.value==="end")} style={SEL}><option value="end">即終了</option><option value="cont">継続</option></select></div>
-        </div>
-        <div style={{padding:"12px 16px",background:"rgba(43,125,233,0.12)",borderRadius:12,border:"1px solid rgba(43,125,233,0.2)",marginBottom:14}}>
-          <div style={{fontWeight:800,fontSize:16,color:"#fff",marginBottom:3}}>📋 公式ルール</div>
-          <div style={{fontSize:13,color:"rgba(255,255,255,0.6)",lineHeight:1.8}}>50点で勝利 / 超過→25点 / 37点以上でフォルト→25点 / ミス＝倒れず / フォルト＝反則 / 3連続→失格</div>
-        </div>
-        {mode==="manual"&&(<>{teams.slice(0,tc).map((team,ti)=>(
-          <div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac}}>
-            <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
-              <div style={{width:34,height:34,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900,fontSize:18,flexShrink:0,background:C[ti].ac}}>{ti+1}</div>
-              <input value={team.name} onChange={e=>uN(ti,e.target.value)} style={TIN} placeholder={"チーム"+(ti+1)}/>
-            </div>
-            <div style={{paddingLeft:44}}>
-              {team.players.map((p,pi)=>(<div key={pi} style={{display:"flex",alignItems:"center",gap:6,marginBottom:7}}>
-                <span style={{width:20,fontSize:16,color:"#aaa",fontWeight:700,textAlign:"center"}}>{pi+1}</span>
-                <input value={p} onChange={e=>uP(ti,pi,e.target.value)} maxLength={MAX_NAME} style={PIN} placeholder={"名前("+MAX_NAME+"文字)"}/>
-                <FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uP(ti,pi,name)} usedNames={used}/>
-              </div>))}
-              {team.players.length<MAX_PL&&<button style={{width:"100%",padding:10,border:"2px dashed #ddd",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer"}} onClick={()=>aP(ti)}>＋ 追加</button>}
-              {team.players.length>1&&<button style={{width:"100%",padding:10,border:"2px dashed #f0b0b0",borderRadius:8,background:"transparent",color:"#c0392b",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:4}} onClick={()=>rP(ti,team.players.length-1)}>− 最後を削除</button>}
-            </div>
-          </div>))}
-          <button style={{width:"100%",padding:20,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"#fff",fontSize:22,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:6,boxShadow:"0 3px 16px rgba(43,125,233,0.3)"}} onClick={okM?go:undefined} disabled={!okM}>🎯 ゲーム開始</button>
-        </>)}
-        {mode==="shuffle"&&(<>
-          <div style={CARD}>
-            <div style={{fontWeight:700,fontSize:18,marginBottom:6,color:"#14365a"}}>参加メンバー（最大{MAX_SHUF}人）</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>{mems.map((m,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:4}}>
-              <span style={{width:20,fontSize:14,color:"#aaa",fontWeight:700,textAlign:"right"}}>{i+1}</span>
-              <input value={m} onChange={e=>uM(i,e.target.value)} maxLength={MAX_NAME} style={{...PIN,padding:"10px 12px",fontSize:18}} placeholder="メンバー"/>
-              <FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uM(i,name)} usedNames={used}/>
-            </div>))}</div>
-            {mems.length<MAX_SHUF&&<button style={{width:"100%",padding:10,border:"2px dashed #ddd",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:6}} onClick={aM}>＋</button>}
-            {mems.length>2&&<button style={{width:"100%",padding:10,border:"2px dashed #f0b0b0",borderRadius:8,background:"transparent",color:"#c0392b",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:4}} onClick={()=>rM(mems.length-1)}>− 最後を削除</button>}
-          </div>
-          <button style={{width:"100%",padding:16,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"#fff",fontSize:20,fontWeight:800,cursor:"pointer",opacity:okS?1:0.3}} onClick={okS?doShuf:undefined}>🎲 シャッフル</button>
-          {sp&&(<div style={{marginTop:8}}>
-            {sp.map((t,ti)=>(<div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac,padding:"10px 16px",marginBottom:6}}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:26,height:26,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900,fontSize:14,background:C[ti].ac}}>{ti+1}</div><input value={t.name} onChange={e=>setSp(p=>p.map((x,i)=>i===ti?{...x,name:e.target.value}:x))} style={{...TIN,fontSize:18}}/></div>
-              <div style={{paddingLeft:34,fontSize:16,color:"#555"}}>{t.players.join("、")}</div>
-            </div>))}
-            <button style={{width:"100%",padding:20,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"#fff",fontSize:22,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:4}} onClick={go}>🎯 開始</button>
-            <button style={{width:"100%",padding:14,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"#fff",fontSize:18,fontWeight:800,cursor:"pointer",marginTop:6}} onClick={doShuf}>🔄 再シャッフル</button>
-          </div>)}
-        </>)}
-      </div>
+  const usedShuffle=mems.filter(m=>m.trim()).map(m=>m.trim());const used=mode==="manual"?usedManual:usedShuffle;
+  /* 1.5× scale constants */
+  const F={label:15,btn:20,input:22,tinput:24,start:26,rule:18,ruleSub:15,badge:42,badgeF:22,plNum:18,add:20,sh:22};
+  const P={btn:"15px 0",card:"16px 18px 14px",input:"12px 16px",sel:"14px 16px"};
+  return(<div style={SS.setupW}>
+    <div style={{padding:"36px 20px 8px",textAlign:"center"}}>
+      <div style={{fontSize:72}}>🪵</div>
+      <h1 style={{fontSize:42,fontWeight:900,color:"#fff",letterSpacing:4}}>モルック スコアラー</h1>
+      <div style={{fontSize:15,color:"rgba(255,255,255,0.3)",fontWeight:600,letterSpacing:5}}>MÖLKKY SCORER</div>
     </div>
-  );
+    <div style={{flex:1,padding:"0 20px 36px",maxWidth:960,margin:"0 auto",width:"100%"}}>
+      <div style={{marginBottom:14}}><label style={{display:"block",fontSize:F.label,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:6}}>入力モード</label>
+        <div style={{display:"flex",gap:10}}>{[["manual","✏️ 手動"],["shuffle","🎲 ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>{setMode(k);setSp(null);}} style={{flex:1,padding:P.btn,border:"2px solid rgba(255,255,255,0.2)",borderRadius:10,background:mode===k?"#2b7de9":"transparent",borderColor:mode===k?"#2b7de9":"rgba(255,255,255,0.2)",color:"#fff",fontSize:F.btn,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}}>{l}</button>))}</div></div>
+      <div style={{display:"flex",gap:14,marginBottom:14}}>
+        <div style={{flex:1}}><label style={{display:"block",fontSize:F.label,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:6}}>チーム数</label><div style={{display:"flex",gap:8}}>{[2,3,4].map(n=>(<button key={n} onClick={()=>{setTc(n);setSp(null);}} style={{flex:1,padding:P.btn,border:"2px solid rgba(255,255,255,0.2)",borderRadius:10,background:tc===n?"#2b7de9":"transparent",borderColor:tc===n?"#2b7de9":"rgba(255,255,255,0.2)",color:"#fff",fontSize:F.btn,fontWeight:700,cursor:"pointer"}}>{n}</button>))}</div></div>
+        <div style={{flex:1}}><label style={{display:"block",fontSize:F.label,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:6}}>投げ順</label><div style={{display:"flex",gap:8}}>{[["normal","通常"],["random","ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>setOm(k)} style={{flex:1,padding:P.btn,border:"2px solid rgba(255,255,255,0.2)",borderRadius:10,background:om===k?"#2b7de9":"transparent",borderColor:om===k?"#2b7de9":"rgba(255,255,255,0.2)",color:"#fff",fontSize:F.btn,fontWeight:700,cursor:"pointer"}}>{l}</button>))}</div></div>
+      </div>
+      <div style={{display:"flex",gap:10,marginBottom:14}}>
+        <div style={{flex:"1 1 0"}}><label style={{display:"block",fontSize:F.label,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:6}}>ゲーム数</label><select value={numGames} onChange={e=>setNumGames(+e.target.value)} style={{width:"100%",padding:P.sel,border:"1px solid rgba(255,255,255,0.2)",borderRadius:10,background:"rgba(255,255,255,0.92)",color:"#14365a",fontSize:F.btn,fontWeight:600,cursor:"pointer",outline:"none",WebkitAppearance:"none",appearance:"none"}}>{Array.from({length:10},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}ゲーム</option>)}</select></div>
+        <div style={{flex:"1 1 0"}}><label style={{display:"block",fontSize:F.label,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:6}}>先取機能</label><select value={bestOf} onChange={e=>setBestOf(+e.target.value)} style={{width:"100%",padding:P.sel,border:"1px solid rgba(255,255,255,0.2)",borderRadius:10,background:"rgba(255,255,255,0.92)",color:"#14365a",fontSize:F.btn,fontWeight:600,cursor:"pointer",outline:"none",WebkitAppearance:"none",appearance:"none"}}><option value={0}>なし</option>{Array.from({length:11},(_,i)=>i+2).map(n=><option key={n} value={n}>{n}先取</option>)}</select></div>
+        <div style={{flex:"1 1 0"}}><label style={{display:"block",fontSize:F.label,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:6}}>失格時</label><select value={dqEnd?"end":"cont"} onChange={e=>setDqEnd(e.target.value==="end")} style={{width:"100%",padding:P.sel,border:"1px solid rgba(255,255,255,0.2)",borderRadius:10,background:"rgba(255,255,255,0.92)",color:"#14365a",fontSize:F.btn,fontWeight:600,cursor:"pointer",outline:"none",WebkitAppearance:"none",appearance:"none"}}><option value="end">即終了</option><option value="cont">継続</option></select></div>
+      </div>
+      <div style={{padding:"12px 18px",background:"rgba(43,125,233,0.12)",borderRadius:10,border:"1px solid rgba(43,125,233,0.2)",marginBottom:14}}>
+        <div style={{fontWeight:800,fontSize:F.rule,color:"#fff",marginBottom:3}}>📋 公式ルール</div>
+        <div style={{fontSize:F.ruleSub,color:"rgba(255,255,255,0.6)",lineHeight:1.8}}>50点で勝利 / 超過→25点 / 37点以上でフォルト→25点 / ミス＝倒れず / フォルト＝反則 / 3連続→失格</div>
+      </div>
+      {mode==="manual"&&(<>{teams.slice(0,tc).map((team,ti)=>(
+        <div key={ti} style={{background:"rgba(255,255,255,0.96)",borderRadius:12,padding:P.card,marginBottom:10,borderLeft:"6px solid "+C[ti].ac}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+            <div style={{width:F.badge,height:F.badge,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900,fontSize:F.badgeF,flexShrink:0,background:C[ti].ac}}>{ti+1}</div>
+            <input value={team.name} onChange={e=>uN(ti,e.target.value)} style={{flex:1,border:"none",borderBottom:"2px solid #ddd",padding:"6px 4px",fontSize:F.tinput,fontWeight:700,outline:"none",background:"transparent"}} placeholder={"チーム"+(ti+1)}/>
+          </div>
+          <div style={{paddingLeft:52}}>
+            {team.players.map((p,pi)=>(<div key={pi} style={{display:"flex",alignItems:"center",gap:6,marginBottom:7}}>
+              <span style={{width:22,fontSize:F.plNum,color:"#aaa",fontWeight:700,textAlign:"center"}}>{pi+1}</span>
+              <input value={p} onChange={e=>uP(ti,pi,e.target.value)} maxLength={MAX_NAME} style={{flex:1,border:"1px solid #e0e0e0",borderRadius:8,padding:P.input,fontSize:F.input,outline:"none",background:"#fafafa"}} placeholder={"名前("+MAX_NAME+"文字)"}/>
+              <FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uP(ti,pi,name)} usedNames={used}/>
+            </div>))}
+            {team.players.length<MAX_PL&&<button style={{width:"100%",padding:10,border:"2px dashed #ddd",borderRadius:8,background:"transparent",color:"#999",fontSize:F.add,fontWeight:600,cursor:"pointer"}} onClick={()=>aP(ti)}>＋ 追加</button>}
+            {team.players.length>1&&<button style={{width:"100%",padding:10,border:"2px dashed #f0b0b0",borderRadius:8,background:"transparent",color:"#c0392b",fontSize:F.add,fontWeight:600,cursor:"pointer",marginTop:4}} onClick={()=>rP(ti,team.players.length-1)}>− 最後を削除</button>}
+          </div>
+        </div>))}
+        <button style={{width:"100%",padding:21,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"#fff",fontSize:F.start,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:6,boxShadow:"0 2px 12px rgba(43,125,233,0.25)",opacity:okM?1:0.3}} onClick={okM?go:undefined}>🎯 ゲーム開始</button>
+      </>)}
+      {mode==="shuffle"&&(<>
+        <div style={{background:"rgba(255,255,255,0.96)",borderRadius:12,padding:P.card,marginBottom:10}}>
+          <div style={{fontWeight:700,fontSize:F.input,marginBottom:6,color:"#14365a"}}>参加メンバー（最大{MAX_SHUF}人）</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>{mems.map((m,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:4}}>
+            <span style={{width:22,fontSize:14,color:"#aaa",fontWeight:700,textAlign:"right"}}>{i+1}</span>
+            <input value={m} onChange={e=>uM(i,e.target.value)} maxLength={MAX_NAME} style={{flex:1,border:"1px solid #e0e0e0",borderRadius:8,padding:"10px 12px",fontSize:F.input,outline:"none",background:"#fafafa"}} placeholder="メンバー"/>
+            <FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uM(i,name)} usedNames={used}/>
+          </div>))}</div>
+          {mems.length<MAX_SHUF&&<button style={{width:"100%",padding:10,border:"2px dashed #ddd",borderRadius:8,background:"transparent",color:"#999",fontSize:F.add,fontWeight:600,cursor:"pointer",marginTop:6}} onClick={aM}>＋</button>}
+          {mems.length>2&&<button style={{width:"100%",padding:10,border:"2px dashed #f0b0b0",borderRadius:8,background:"transparent",color:"#c0392b",fontSize:F.add,fontWeight:600,cursor:"pointer",marginTop:4}} onClick={()=>rM(mems.length-1)}>− 最後を削除</button>}
+        </div>
+        <button style={{width:"100%",padding:16,border:"2px solid rgba(255,255,255,0.2)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"#fff",fontSize:F.sh,fontWeight:800,cursor:"pointer",opacity:okS?1:0.3}} onClick={okS?doShuf:undefined}>🎲 シャッフル</button>
+        {sp&&(<div style={{marginTop:8}}>
+          {sp.map((t,ti)=>(<div key={ti} style={{background:"rgba(255,255,255,0.96)",borderRadius:12,borderLeft:"6px solid "+C[ti].ac,padding:"12px 18px",marginBottom:6}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:30,height:30,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900,fontSize:16,background:C[ti].ac}}>{ti+1}</div>
+            <input value={t.name} onChange={e=>setSp(p=>p.map((x,i)=>i===ti?{...x,name:e.target.value}:x))} style={{flex:1,border:"none",borderBottom:"2px solid #ddd",padding:"4px 2px",fontSize:F.input,fontWeight:700,outline:"none",background:"transparent"}}/></div>
+            <div style={{paddingLeft:38,fontSize:17,color:"#555",marginTop:3}}>{t.players.join("、")}</div>
+          </div>))}
+          <button style={{width:"100%",padding:21,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"#fff",fontSize:F.start,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:6}} onClick={go}>🎯 開始</button>
+          <button style={{width:"100%",padding:16,border:"2px solid rgba(255,255,255,0.2)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"#fff",fontSize:F.sh,fontWeight:800,cursor:"pointer",marginTop:6}} onClick={doShuf}>🔄 再シャッフル</button>
+        </div>)}
+      </>)}
+    </div>
+  </div>);
 }
 
-/* ═══ Score Input — NEW LAYOUT: numpad left, big buttons right ═══ */
+/* ═══ Score Input — 1.5x numpad centered, right action buttons narrower ═══ */
 function ScoreInput({dispatch,canUndo,teamName,teamScore,teamColor,playerName,fails,onConfirm,minimized,onToggleMin}){
   const[sel,setSel]=useState(null);
   const pv=sel!=null?teamScore+sel:null;const over=pv!=null&&pv>WIN;const win=pv===WIN;
   const doScore=()=>{if(sel==null)return;if(win){onConfirm("score",sel,teamName+"が50点で上がりです。\n確定しますか？");setSel(null);return;}dispatch({type:"SCORE",score:sel});setSel(null);};
   const doMiss=()=>{if(fails>=MF-1){onConfirm("miss",0,teamName+"の"+MF+"回連続です。\n失格になります。確定しますか？");setSel(null);return;}dispatch({type:"MISS"});setSel(null);};
   const doFault=()=>{if(fails>=MF-1){onConfirm("fault",0,teamName+"の"+MF+"回連続です。\n失格になります。確定しますか？");setSel(null);return;}if(teamScore>=PEN){onConfirm("fault",0,teamName+"は"+teamScore+"点（37点以上）。\nフォルトで25点に戻ります。確定しますか？");setSel(null);return;}dispatch({type:"FAULT"});setSel(null);};
-  if(minimized){return(
-    <div onClick={onToggleMin} style={{background:"#14365a",padding:"12px 16px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-      <div style={{display:"flex",alignItems:"center",gap:10}}>
-        <span style={{fontSize:20,fontWeight:900,color:teamColor}}>{teamName}</span>
-        <span style={{fontSize:32,fontWeight:900,color:"#fff"}}>{teamScore}点</span>
-        {playerName&&<span style={{fontSize:16,fontWeight:600,color:"rgba(255,255,255,0.6)"}}>▶{playerName}</span>}
-        <div style={{display:"flex",gap:3}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:16,height:16,borderRadius:8,background:j<fails?"#e74c3c":"rgba(255,255,255,0.2)"}}/>))}</div>
-      </div>
-      <span style={{fontSize:26,color:"#fff",fontWeight:900}}>▲ 入力</span>
-    </div>);}
+  const NB=90,NG=8,NFS=38;
+  if(minimized){return(<div onClick={onToggleMin} style={{background:"#14365a",padding:"14px 20px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+    <div style={{display:"flex",alignItems:"center",gap:12}}><span style={{fontSize:22,fontWeight:900,color:teamColor}}>{teamName}</span><span style={{fontSize:36,fontWeight:900,color:"#fff"}}>{teamScore}点</span>{playerName&&<span style={{fontSize:18,fontWeight:600,color:"rgba(255,255,255,0.6)"}}>▶{playerName}</span>}<div style={{display:"flex",gap:4}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:18,height:18,borderRadius:9,background:j<fails?"#e74c3c":"rgba(255,255,255,0.2)"}}/>))}</div></div>
+    <span style={{fontSize:28,color:"#fff",fontWeight:900,padding:"12px 24px",background:"rgba(255,255,255,0.15)",borderRadius:12}}>▲ 入力</span></div>);}
   return(
-    <div style={{background:"#fff",borderTop:"3px solid #dde1e6",padding:"8px 12px 10px",flexShrink:0}}>
-      {/* Header: player info + minimize */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
-        <div style={{display:"flex",alignItems:"baseline",gap:8,flexWrap:"wrap"}}>
-          <span style={{fontSize:20,fontWeight:900,color:teamColor}}>(プレーヤー：{playerName||"−"})</span>
-          <span style={{fontSize:44,fontWeight:900,color:"#14365a",lineHeight:1}}>{teamScore}</span>
-          <span style={{fontSize:20,fontWeight:900,color:"#14365a"}}>点</span>
-          {fails>0&&<div style={{display:"flex",gap:4,alignItems:"center"}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:20,height:20,borderRadius:10,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:900,background:j<fails?"#e74c3c":"#ddd",color:j<fails?"#fff":"#999"}}>{j<fails?"✕":""}</span>))}</div>}
+    <div style={{background:"#fff",borderTop:"3px solid #dde1e6",padding:"14px 18px 20px",flexShrink:0}}>
+      {/* Header: 1.5x player info + 2x minimize */}
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+        <div style={{display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap"}}>
+          <span style={{fontSize:30,fontWeight:900,color:teamColor}}>(プレーヤー：{playerName||"−"})</span>
+          <span style={{fontSize:66,fontWeight:900,color:"#14365a",lineHeight:1}}>{teamScore}</span><span style={{fontSize:30,fontWeight:900,color:"#14365a"}}>点</span>
+          {fails>0&&<div style={{display:"flex",gap:5,alignItems:"center"}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:26,height:26,borderRadius:13,display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:900,background:j<fails?"#e74c3c":"#ddd",color:j<fails?"#fff":"#999"}}>{j<fails?"✕":""}</span>))}</div>}
         </div>
-        <button onClick={onToggleMin} style={{padding:"6px 14px",border:"2px solid #14365a",borderRadius:8,background:"transparent",color:"#14365a",fontSize:15,fontWeight:800,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>▼ 最小化</button>
+        <button onClick={onToggleMin} style={{padding:"14px 28px",border:"2px solid #14365a",borderRadius:12,background:"transparent",color:"#14365a",fontSize:22,fontWeight:800,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>▼ 最小化</button>
       </div>
-      {sel!=null&&<div style={{fontSize:16,fontWeight:700,marginBottom:2,color:over?"#d93a5e":win?"#22b566":"#14365a"}}>+{sel} → {over?"超過！25点に戻る":win?"🎉50点勝利！":pv+"点"}</div>}
-      {teamScore>=PEN&&<div style={{fontSize:13,fontWeight:700,color:"#e67700",marginBottom:2}}>⚠ フォルトで25点に戻ります</div>}
-      {/* Two-column layout: numpad left, action buttons right */}
-      <div style={{display:"flex",gap:10}}>
-        {/* Left: numpad + undo */}
-        <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"center"}}>
-          {[[7,9,8],[5,11,12,6],[3,10,4],[1,2]].map((row,ri)=>(<div key={ri} style={{display:"flex",gap:6,justifyContent:"center"}}>{row.map(n=>{const isSel=sel===n;return(<button key={n} onClick={()=>setSel(sel===n?null:n)} style={{width:76,height:76,borderRadius:38,border:isSel?"4px solid #14365a":"3px solid #b0bec5",background:isSel?"#14365a":"#fff",color:isSel?"#fff":"#14365a",fontSize:32,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.1s",boxShadow:isSel?"0 4px 16px rgba(20,54,90,0.3)":"none"}}>{n}</button>);})}</div>))}
-          <button style={{width:"100%",maxWidth:260,padding:"10px 0",border:"2px solid #ccc",borderRadius:10,background:"#f5f5f5",color:"#666",fontSize:16,fontWeight:800,cursor:"pointer",opacity:canUndo?1:0.2,marginTop:2}} onClick={canUndo?()=>dispatch({type:"UNDO"}):undefined}>↩ 戻る</button>
+      {sel!=null&&<div style={{fontSize:22,fontWeight:700,marginBottom:4,color:over?"#d93a5e":win?"#22b566":"#14365a"}}>+{sel} → {over?"超過！25点に戻る":win?"🎉50点勝利！":pv+"点"}</div>}
+      {teamScore>=PEN&&<div style={{fontSize:18,fontWeight:700,color:"#e67700",marginBottom:4}}>⚠ フォルトで25点に戻ります</div>}
+      {/* Two-column: numpad centered-left, action buttons right (narrow) */}
+      <div style={{display:"flex",gap:16,alignItems:"flex-start"}}>
+        {/* Left: 1.5x numpad + undo + bottom space */}
+        <div style={{display:"flex",flexDirection:"column",gap:NG,alignItems:"center",paddingLeft:24}}>
+          {[[7,9,8],[5,11,12,6],[3,10,4],[1,2]].map((row,ri)=>(<div key={ri} style={{display:"flex",gap:NG,justifyContent:"center"}}>{row.map(n=>{const isSel=sel===n;return(<button key={n} onClick={()=>setSel(sel===n?null:n)} style={{width:NB,height:NB,borderRadius:NB/2,border:isSel?"4px solid #14365a":"3px solid #b0bec5",background:isSel?"#14365a":"#fff",color:isSel?"#fff":"#14365a",fontSize:NFS,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.1s",boxShadow:isSel?"0 4px 16px rgba(20,54,90,0.3)":"none"}}>{n}</button>);})}</div>))}
+          <button style={{width:"100%",maxWidth:NB*3+NG*2,padding:"12px 0",border:"2px solid #ccc",borderRadius:10,background:"#f5f5f5",color:"#666",fontSize:18,fontWeight:800,cursor:"pointer",opacity:canUndo?1:0.2,marginTop:4}} onClick={canUndo?()=>dispatch({type:"UNDO"}):undefined}>↩ 戻る</button>
+          <div style={{height:16}}/>
         </div>
-        {/* Right: miss, fault, decide */}
-        <div style={{flex:1,display:"flex",flexDirection:"column",gap:8,minWidth:0}}>
-          <button style={{flex:1,minHeight:80,border:"2px solid #f0d4a0",borderRadius:14,background:"#fff3e0",color:"#bf6900",fontSize:28,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doMiss}>〇 ミス</button>
-          <button style={{padding:"12px 0",border:"2px solid #f0b0b0",borderRadius:10,background:"#fde8e8",color:"#c0392b",fontSize:16,fontWeight:800,cursor:"pointer"}} onClick={doFault}>✕ フォルト</button>
-          <button style={{flex:1.3,minHeight:100,border:"none",borderRadius:14,background:sel!=null?"#14365a":"#ccc",color:"#fff",fontSize:32,fontWeight:900,cursor:"pointer",boxShadow:sel!=null?"0 4px 16px rgba(20,54,90,0.3)":"none",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doScore}>決定</button>
+        {/* Right: 決定(top) → フォルト(mid,small) → ミス(bottom), half-width + bottom space */}
+        <div style={{width:200,display:"flex",flexDirection:"column",gap:8,flexShrink:0,paddingBottom:20}}>
+          <button style={{flex:1.3,minHeight:120,border:"none",borderRadius:16,background:sel!=null?"#14365a":"#ccc",color:"#fff",fontSize:34,fontWeight:900,cursor:"pointer",boxShadow:sel!=null?"0 4px 16px rgba(20,54,90,0.3)":"none",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doScore}>決定</button>
+          <button style={{padding:"14px 0",border:"2px solid #f0b0b0",borderRadius:10,background:"#fde8e8",color:"#c0392b",fontSize:18,fontWeight:800,cursor:"pointer",flexShrink:0}} onClick={doFault}>✕ フォルト</button>
+          <button style={{flex:1,minHeight:100,border:"2px solid #f0d4a0",borderRadius:16,background:"#fff3e0",color:"#bf6900",fontSize:30,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doMiss}>〇 ミス</button>
         </div>
       </div>
     </div>
   );
 }
 
+/* ═══ Player Modal ═══ */
 function PlModal({teams,dispatch,onClose}){
   const{favs,addF,rmF}=useFavs();const[name,setName]=useState("");
   const sizes=teams.map(t=>t.players.filter(p=>p.active).length);const mi=sizes.indexOf(Math.min(...sizes));const[sel,setSel]=useState(mi);
@@ -303,6 +278,7 @@ function PlModal({teams,dispatch,onClose}){
   </div></div>);
 }
 
+/* ═══ OrderPicker ═══ */
 function OrderPicker({teams,teamOrder,value,onChangeOrd,prevOrder}){
   const rev=[...teamOrder].reverse();const[man,setMan]=useState([...teamOrder]);const[randOrd,setRandOrd]=useState(()=>smartShuf([...teamOrder],prevOrder));
   const mvUp=i=>{if(i===0)return;const m=[...man];[m[i-1],m[i]]=[m[i],m[i-1]];setMan(m);onChangeOrd("manual",m);};
@@ -325,93 +301,77 @@ function OrderPicker({teams,teamOrder,value,onChangeOrd,prevOrder}){
   </>);
 }
 
-/* ═══ Canvas-based image save for iOS ═══ */
+/* ═══ Canvas image save for iPad ═══ */
 function drawScoreImage(teams,history,teamOrder,comments,gameNumber){
   const ordered=teamOrder.map(i=>({team:teams[i],idx:i,ap:teams[i].players.filter(p=>p.active)}));
   const maxT=history.length>0?Math.max(...history.map(h=>h.turn)):0;
-  const CW=52,RW=36,RH=32,HDR=28,NMH=80,PAD=16;
+  const CW=56,RW=40,RH=34,HDR=30,NMH=84,PAD=20;
   const totalW=RW+ordered.reduce((s,o)=>s+(o.ap.length+1)*CW,0)+PAD*2;
   const tableH=HDR+NMH+Math.max(maxT,1)*RH+4;
-  const commentH=comments.length>0?(30+comments.length*26+10):0;
-  const totalH=PAD+32+8+tableH+commentH+PAD;
-  const c=document.createElement("canvas");c.width=totalW*2;c.height=totalH*2;
-  const ctx=c.getContext("2d");ctx.scale(2,2);
+  const commentH=comments.length>0?(34+comments.length*28+10):0;
+  const totalH=PAD+36+10+tableH+commentH+PAD;
+  const c=document.createElement("canvas");const sc=2;c.width=totalW*sc;c.height=totalH*sc;
+  const ctx=c.getContext("2d");ctx.scale(sc,sc);
   ctx.fillStyle="#fff";ctx.fillRect(0,0,totalW,totalH);
-  ctx.fillStyle="#14365a";ctx.font="bold 18px sans-serif";ctx.textAlign="center";
-  ctx.fillText("Game "+gameNumber+" スコア表",totalW/2,PAD+20);
-  let y=PAD+32+8,x=PAD;
-  /* Team name row */
-  ctx.fillStyle="#14365a";ctx.fillRect(x,y,RW,HDR);ctx.fillStyle="#fff";ctx.font="bold 12px sans-serif";ctx.textAlign="center";ctx.fillText("R",x+RW/2,y+19);
+  ctx.fillStyle="#14365a";ctx.font="bold 20px sans-serif";ctx.textAlign="center";ctx.fillText("Game "+gameNumber+" スコア表",totalW/2,PAD+24);
+  let y=PAD+36+10,x=PAD;
+  ctx.fillStyle="#14365a";ctx.fillRect(x,y,RW,HDR);ctx.fillStyle="#fff";ctx.font="bold 13px sans-serif";ctx.textAlign="center";ctx.fillText("R",x+RW/2,y+20);
   let cx=x+RW;
-  ordered.forEach(o=>{const w=(o.ap.length+1)*CW;ctx.fillStyle=C[o.idx].bg;ctx.fillRect(cx,y,w,HDR);ctx.fillStyle="#fff";ctx.font="bold 12px sans-serif";ctx.fillText(o.team.name,cx+w/2,y+19);cx+=w;});
+  ordered.forEach(o=>{const w=(o.ap.length+1)*CW;ctx.fillStyle=C[o.idx].bg;ctx.fillRect(cx,y,w,HDR);ctx.fillStyle="#fff";ctx.font="bold 13px sans-serif";ctx.fillText(o.team.name,cx+w/2,y+20);cx+=w;});
   y+=HDR;
-  /* Player names row */
-  ctx.fillStyle="#1e4a72";ctx.fillRect(x,y,RW,NMH);
-  cx=x+RW;
+  ctx.fillStyle="#1e4a72";ctx.fillRect(x,y,RW,NMH);cx=x+RW;
   ordered.forEach(o=>{
-    o.ap.forEach((p,pi)=>{ctx.fillStyle=C[o.idx].bg;ctx.fillRect(cx,y,CW,NMH);ctx.fillStyle=C[o.idx].nm;ctx.font="bold 12px sans-serif";ctx.textAlign="center";
-      const chars=p.name.slice(0,MAX_NAME).split("");chars.forEach((ch,ci)=>{ctx.fillText(ch,cx+CW/2,y+14+ci*12);});cx+=CW;});
-    ctx.fillStyle="#0d2a48";ctx.fillRect(cx,y,CW,NMH);ctx.fillStyle="#ffd700";ctx.font="bold 12px sans-serif";ctx.fillText("計",cx+CW/2,y+14);cx+=CW;
+    o.ap.forEach((p,pi)=>{ctx.fillStyle=C[o.idx].bg;ctx.fillRect(cx,y,CW,NMH);ctx.fillStyle=C[o.idx].nm;ctx.font="bold 13px sans-serif";ctx.textAlign="center";
+      p.name.slice(0,MAX_NAME).split("").forEach((ch,ci)=>{ctx.fillText(ch,cx+CW/2,y+16+ci*13);});cx+=CW;});
+    ctx.fillStyle="#0d2a48";ctx.fillRect(cx,y,CW,NMH);ctx.fillStyle="#ffd700";ctx.font="bold 13px sans-serif";ctx.fillText("計",cx+CW/2,y+16);cx+=CW;
   });
   y+=NMH;
-  /* Data rows */
   for(let turn=1;turn<=Math.max(maxT,1);turn++){
     ctx.fillStyle=turn%2===0?"#f8f9fb":"#fff";ctx.fillRect(x,y,totalW-PAD*2,RH);
     ctx.strokeStyle="#ddd";ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(x,y+RH);ctx.lineTo(x+totalW-PAD*2,y+RH);ctx.stroke();
-    ctx.fillStyle="#666";ctx.font="bold 12px sans-serif";ctx.textAlign="center";ctx.fillText(""+turn,x+RW/2,y+21);
+    ctx.fillStyle="#666";ctx.font="bold 13px sans-serif";ctx.textAlign="center";ctx.fillText(""+turn,x+RW/2,y+23);
     cx=x+RW;
-    ordered.forEach(o=>{
-      const e=history.find(h=>h.turn===turn&&h.teamIndex===o.idx);
-      o.ap.forEach((p,pi)=>{
-        const isP=e&&e.playerIndex===pi;let txt="";
+    ordered.forEach(o=>{const e=history.find(h=>h.turn===turn&&h.teamIndex===o.idx);
+      o.ap.forEach((p,pi)=>{const isP=e&&e.playerIndex===pi;let txt="";
         if(isP){if(e.type==="miss")txt="−";else if(e.type==="fault")txt=e.faultReset?"F↓":"F";else txt=e.reset25?e.score+"↓":""+e.score;if(e.consecutiveFails>=MF)txt+="✕";}
-        ctx.fillStyle=isP?(e.type==="miss"?"#bf6900":e.type==="fault"?"#c0392b":C[o.idx].tx):"#333";
-        ctx.font=(isP?"bold ":"")+"12px sans-serif";ctx.fillText(txt,cx+CW/2,y+21);cx+=CW;
-      });
-      ctx.fillStyle=e?C[o.idx].tx:"#ccc";ctx.font="bold 13px sans-serif";ctx.fillText(e?""+e.runningTotal:"",cx+CW/2,y+21);cx+=CW;
-    });
+        ctx.fillStyle=isP?(e.type==="miss"?"#bf6900":e.type==="fault"?"#c0392b":C[o.idx].tx):"#333";ctx.font=(isP?"bold ":"")+"13px sans-serif";ctx.fillText(txt,cx+CW/2,y+23);cx+=CW;});
+      ctx.fillStyle=e?C[o.idx].tx:"#ccc";ctx.font="bold 14px sans-serif";ctx.fillText(e?""+e.runningTotal:"",cx+CW/2,y+23);cx+=CW;});
     y+=RH;
   }
-  /* Comments */
-  if(comments.length>0){
-    y+=10;ctx.fillStyle="#14365a";ctx.font="bold 14px sans-serif";ctx.textAlign="left";ctx.fillText("💬 コメント",x,y+16);y+=28;
-    comments.forEach(c2=>{ctx.fillStyle="#444";ctx.font="13px sans-serif";ctx.fillText("• "+c2,x+4,y+14);y+=24;});
-  }
+  if(comments.length>0){y+=10;ctx.fillStyle="#14365a";ctx.font="bold 15px sans-serif";ctx.textAlign="left";ctx.fillText("💬 メモ",x,y+18);y+=30;
+    comments.forEach(c2=>{ctx.fillStyle="#444";ctx.font="14px sans-serif";ctx.fillText("• "+c2,x+6,y+16);y+=26;});}
   return c;
 }
-
 async function saveImage(canvas){
-  return new Promise((resolve,reject)=>{
-    canvas.toBlob(async blob=>{
-      if(!blob)return reject("blob failed");
-      const file=new File([blob],"molkky-score.png",{type:"image/png"});
+  return new Promise((res,rej)=>{canvas.toBlob(async blob=>{
+    if(!blob)return rej("no blob");
+    try{
+      const file=new File([blob],"molkky-score.png",{type:"image/png",lastModified:Date.now()});
       if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
-        try{await navigator.share({files:[file],title:"モルック スコア"});resolve("shared");}catch(e){if(e.name!=="AbortError")reject(e);else resolve("cancelled");}
-      }else{
-        const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="molkky-score.png";a.click();URL.revokeObjectURL(url);resolve("downloaded");
+        await navigator.share({files:[file],title:"モルック スコア"});return res("shared");
       }
-    },"image/png");
-  });
+    }catch(e){if(e.name==="AbortError")return res("cancelled");}
+    /* Fallback: open image in new tab for long-press save */
+    const url=URL.createObjectURL(blob);window.open(url,"_blank");res("opened");
+  },"image/png");});
 }
 
 /* ═══ Game Result — iPad full screen ═══ */
 function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gameNumber,onNext,onBack,onExtend}){
   const[comment,setComment]=useState("");const[comments,setComments]=useState([]);
   const[ordMode,setOrdMode]=useState("reverse");const[ordVal,setOrdVal]=useState([...teamOrder].reverse());
-  const[saving,setSaving]=useState(false);
-  const tw=gameWins||teams.map(()=>0);
-  const matchWin=bestOf>0?tw.findIndex(w=>w>=bestOf):-1;
+  const[saving,setSaving]=useState(false);const[saveMsg,setSaveMsg]=useState("");
+  const tw=gameWins||teams.map(()=>0);const matchWin=bestOf>0?tw.findIndex(w=>w>=bestOf):-1;
   const isMatchOver=matchWin>=0;const isLastGame=numGames>0&&gameNumber>=numGames&&!isMatchOver;
   const isAllDone=isMatchOver||isLastGame;const canContinue=!isAllDone;
   const addC=()=>{if(comment.trim()){setComments(p=>[...p,comment.trim()]);setComment("");}};
   const teamStats=teamOrder.map(ti=>{const th=history.filter(h=>h.teamIndex===ti);const sc=th.filter(h=>h.type==="score");return{ti,name:teams[ti].name,final:scoreOf(history,ti),totalPts:sc.reduce((s,h)=>s+h.score,0),misses:th.filter(h=>h.type==="miss").length,faults:th.filter(h=>h.type==="fault").length,turns:th.length};});
   const handleOrd=(m,v)=>{setOrdMode(m);setOrdVal(v);};
-  const doSave=async()=>{setSaving(true);try{const canvas=drawScoreImage(teams,history,teamOrder,comments,gameNumber);await saveImage(canvas);}catch(e){console.error(e);}setSaving(false);};
+  const doSave=async()=>{setSaving(true);setSaveMsg("");try{const canvas=drawScoreImage(teams,history,teamOrder,comments,gameNumber);const r=await saveImage(canvas);if(r==="shared")setSaveMsg("✅ 保存完了");else if(r==="opened")setSaveMsg("📋 長押しで画像を保存");}catch(e){setSaveMsg("❌ 失敗: スクリーンショットをご利用ください");}setSaving(false);};
   return(
     <div style={{position:"fixed",inset:0,background:"#f0f3f8",zIndex:100,display:"flex",flexDirection:"column",overflow:"hidden"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px",background:"#14365a",flexShrink:0}}>
-        <h2 style={{fontSize:24,fontWeight:900,color:"#fff",margin:0}}>🏆 Game {gameNumber} 結果</h2>
-        <div/>
+        <h2 style={{fontSize:24,fontWeight:900,color:"#fff",margin:0}}>🏆 Game {gameNumber} 結果</h2><div/>
       </div>
       <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:"14px 20px"}}>
         <div style={{textAlign:"center",marginBottom:12}}>
@@ -423,28 +383,25 @@ function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gam
           <div style={{fontSize:44,fontWeight:900,color:C[ti].ac,lineHeight:1.1}}>{tw[ti]}</div>
           <div style={{fontSize:13,fontWeight:800,color:"#888"}}>勝</div>
         </div>))}</div>
-
-        {/* Save button above score table */}
-        <button onClick={doSave} disabled={saving} style={{width:"100%",padding:"14px 0",border:"none",borderRadius:10,background:"#22b566",color:"#fff",fontSize:18,fontWeight:800,cursor:"pointer",marginBottom:10,opacity:saving?0.5:1}}>{saving?"保存中...":"📸 スコア表を画像保存"}</button>
-
-        <div style={{background:"#fff",borderRadius:14,padding:14,marginBottom:14,border:"1px solid #ddd"}}>
-          <div style={{fontSize:18,fontWeight:800,color:"#14365a",marginBottom:8}}>📋 スコア表</div>
-          <div style={{overflow:"auto",WebkitOverflowScrolling:"touch"}}>
-            <ScoreTable teams={teams} history={history} teamOrder={teamOrder} highlightLast={false} fontSize={16} colW={50} roundW={36} nameH={90} forCapture={true}/>
-          </div>
-          <div style={{marginTop:10}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:15}}><thead><tr style={{background:"#14365a",color:"#fff"}}><th style={{padding:"7px 8px",textAlign:"left"}}>チーム</th><th style={{padding:"7px"}}>最終</th><th style={{padding:"7px"}}>得点計</th><th style={{padding:"7px"}}>ミス</th><th style={{padding:"7px"}}>フォルト</th><th style={{padding:"7px"}}>ターン</th></tr></thead><tbody>{teamStats.map((ts,i)=>(<tr key={i} style={{background:ts.ti===winner?"#fffde6":"#fff",borderBottom:"1px solid #eee"}}><td style={{padding:"7px 8px",fontWeight:700,color:C[ts.ti].tx}}>{ts.ti===winner?"🏆":""}{ts.name}</td><td style={{padding:"7px",textAlign:"center",fontWeight:800,color:C[ts.ti].ac}}>{ts.final}</td><td style={{padding:"7px",textAlign:"center"}}>{ts.totalPts}</td><td style={{padding:"7px",textAlign:"center",color:"#bf6900"}}>{ts.misses}</td><td style={{padding:"7px",textAlign:"center",color:"#c0392b"}}>{ts.faults}</td><td style={{padding:"7px",textAlign:"center"}}>{ts.turns}</td></tr>))}</tbody></table>
-          </div>
-          {comments.length>0&&<div style={{marginTop:10,borderTop:"1px solid #eee",paddingTop:8}}>
-            <div style={{fontSize:15,fontWeight:700,color:"#14365a",marginBottom:4}}>💬 コメント</div>
-            {comments.map((c2,i)=><div key={i} style={{padding:"5px 10px",background:"#f8f9fa",borderRadius:6,marginBottom:3,fontSize:14,color:"#444"}}>{c2}</div>)}
-          </div>}
-        </div>
-        <div style={{marginBottom:14}}>
-          <div style={{fontSize:17,fontWeight:800,color:"#14365a",marginBottom:5}}>💬 コメント追加</div>
+        {/* Comment input */}
+        <div style={{marginBottom:12}}>
+          <div style={{fontSize:17,fontWeight:800,color:"#14365a",marginBottom:5}}>💬 コメント / メモ</div>
           <div style={{display:"flex",gap:6}}>
             <input value={comment} onChange={e=>setComment(e.target.value)} placeholder="コメント..." onKeyDown={e=>{if(e.key==="Enter")addC();}} style={{flex:1,padding:"12px 14px",border:"1px solid #ddd",borderRadius:10,fontSize:17,outline:"none"}}/>
             <button onClick={addC} style={{padding:"12px 20px",border:"none",borderRadius:10,background:"#2b7de9",color:"#fff",fontWeight:700,fontSize:16,cursor:"pointer",opacity:comment.trim()?1:0.3}}>追加</button>
+          </div>
+          {comments.length>0&&<div style={{marginTop:6}}>{comments.map((c2,i)=><div key={i} style={{padding:"6px 12px",background:"#f8f9fa",borderRadius:7,marginBottom:3,fontSize:15,color:"#444"}}>• {c2}</div>)}</div>}
+        </div>
+        {/* Save button — above score table */}
+        <button onClick={doSave} disabled={saving} style={{width:"100%",padding:"16px 0",border:"none",borderRadius:12,background:"#22b566",color:"#fff",fontSize:20,fontWeight:800,cursor:"pointer",marginBottom:8,opacity:saving?0.5:1}}>{saving?"保存中...":"📸 スコア表を画像保存（カメラロール）"}</button>
+        {saveMsg&&<div style={{textAlign:"center",fontSize:15,fontWeight:700,color:saveMsg.includes("✅")?"#22b566":saveMsg.includes("📋")?"#2b7de9":"#c0392b",marginBottom:8}}>{saveMsg}</div>}
+        {/* Score table + stats */}
+        <div style={{background:"#fff",borderRadius:14,padding:14,marginBottom:14,border:"1px solid #ddd"}}>
+          <div style={{fontSize:18,fontWeight:800,color:"#14365a",marginBottom:8}}>📋 スコア表</div>
+          <div style={{overflow:"auto",WebkitOverflowScrolling:"touch"}}><ScoreTable teams={teams} history={history} teamOrder={teamOrder} highlightLast={false} fontSize={16} colW={50} roundW={36} nameH={90} forCapture={true}/></div>
+          <div style={{marginTop:10}}>
+            <table style={{width:"100%",borderCollapse:"collapse",fontSize:15}}><thead><tr style={{background:"#14365a",color:"#fff"}}><th style={{padding:"7px 8px",textAlign:"left"}}>チーム</th><th style={{padding:"7px"}}>最終</th><th style={{padding:"7px"}}>得点計</th><th style={{padding:"7px"}}>ミス</th><th style={{padding:"7px"}}>フォルト</th><th style={{padding:"7px"}}>ターン</th></tr></thead>
+            <tbody>{teamStats.map((ts,i)=>(<tr key={i} style={{background:ts.ti===winner?"#fffde6":"#fff",borderBottom:"1px solid #eee"}}><td style={{padding:"7px 8px",fontWeight:700,color:C[ts.ti].tx}}>{ts.ti===winner?"🏆":""}{ts.name}</td><td style={{padding:"7px",textAlign:"center",fontWeight:800,color:C[ts.ti].ac}}>{ts.final}</td><td style={{padding:"7px",textAlign:"center"}}>{ts.totalPts}</td><td style={{padding:"7px",textAlign:"center",color:"#bf6900"}}>{ts.misses}</td><td style={{padding:"7px",textAlign:"center",color:"#c0392b"}}>{ts.faults}</td><td style={{padding:"7px",textAlign:"center"}}>{ts.turns}</td></tr>))}</tbody></table>
           </div>
         </div>
         {canContinue&&(<div style={{background:"#fff",borderRadius:14,padding:16,marginBottom:12,border:"1px solid #ddd"}}>
@@ -466,14 +423,12 @@ function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gam
   );
 }
 
+/* ═══ Game Screen ═══ */
 function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goBack}){
   const init={teams:initialTeams.map(t=>({...t,players:t.players.map(n=>({name:n,active:true}))})),history:[],currentOrderIdx:0,currentTurn:1,teamOrder:initialOrder,eliminated:initialTeams.map(()=>false),winner:null,gameNumber:1,dqEndGame:dqEnd,autoEnd:false};
-  const[st,dispatch]=useReducer(reducer,init);
-  const{teams,history,currentOrderIdx,currentTurn,teamOrder,eliminated,winner,gameNumber}=st;
-  const[showPl,setShowPl]=useState(false);const[showRes,setShowRes]=useState(false);
-  const[view,setView]=useState("both");const[conf,setConf]=useState(null);
-  const[gW,setGW]=useState(()=>initialTeams.map(()=>0));
-  const[numGames,setNumGames]=useState(iNg);const[bestOf,setBestOf]=useState(iBo);
+  const[st,dispatch]=useReducer(reducer,init);const{teams,history,currentOrderIdx,currentTurn,teamOrder,eliminated,winner,gameNumber}=st;
+  const[showPl,setShowPl]=useState(false);const[showRes,setShowRes]=useState(false);const[view,setView]=useState("both");const[conf,setConf]=useState(null);
+  const[gW,setGW]=useState(()=>initialTeams.map(()=>0));const[numGames,setNumGames]=useState(iNg);const[bestOf,setBestOf]=useState(iBo);
   const[saveDialog,setSaveDialog]=useState(false);const[inputMin,setInputMin]=useState(false);
   const ti=teamOrder[currentOrderIdx];const score=scoreOf(history,ti);const fails=failsOf(history,ti);
   const ap=teams[ti]?.players.filter(p=>p.active)||[];const td=history.filter(h=>h.teamIndex===ti).length;
@@ -484,8 +439,7 @@ function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goB
   const handleNext=order=>{dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);};
   const handleExtend=(type,order)=>{if(type==="game")setNumGames(p=>p+1);else if(type==="set")setBestOf(p=>p+1);dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);};
   const extractTeamInfo=()=>teams.map(t=>({name:t.name,players:t.players.map(p=>p.name)}));
-  const handleBack=()=>setSaveDialog(true);
-  const doBack=save=>{setSaveDialog(false);setShowRes(false);goBack(save?extractTeamInfo():null);};
+  const handleBack=()=>setSaveDialog(true);const doBack=save=>{setSaveDialog(false);setShowRes(false);goBack(save?extractTeamInfo():null);};
   const TeamBar=()=>(<div style={{display:"flex",background:"#fff",borderBottom:"2px solid #e0e0e0",flexShrink:0,overflow:"auto"}}>{teamOrder.map((tIdx,oi)=>{
     const t=teams[tIdx];const sc=scoreOf(history,tIdx);const f=failsOf(history,tIdx);const act=tIdx===ti;const el=eliminated[tIdx];
     const tap=t.players.filter(p=>p.active);const ttd=history.filter(h=>h.teamIndex===tIdx).length;const tcp=tap.length>0?tap[ttd%tap.length]:null;
@@ -528,6 +482,7 @@ export default function App(){
 }
 
 const SS={
+  setupW:{height:"100dvh",display:"flex",flexDirection:"column",overflow:"auto",background:"linear-gradient(170deg,#0f1f30,#14365a)",WebkitOverflowScrolling:"touch"},
   gW:{height:"100dvh",display:"flex",flexDirection:"column",background:"#eef1f5",overflow:"hidden"},
   tBtn:{padding:"6px 12px",border:"1px solid rgba(255,255,255,0.2)",borderRadius:6,background:"transparent",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer"},
   ov:{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:100,display:"flex",alignItems:"center",justifyContent:"center",padding:12},
