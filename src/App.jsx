@@ -548,6 +548,7 @@ function fmtSec(s){if(s==null)return"-";return s<60?s.toFixed(1)+"秒":Math.floo
 
 /* ═══ Stats Modal — enhanced periods + delete + per-game ═══ */
 function StatsModal({onClose,currentGameRecords,initialDelete}){
+  const isTab=typeof window!=="undefined"&&window.innerWidth>=768;
   const[stats,setStats]=useState(()=>loadStats());
   const favs=loadFavs();
   const[period,setPeriod]=useState("all");const[subSel,setSubSel]=useState(null);const[showSub,setShowSub]=useState(false);
@@ -577,8 +578,8 @@ function StatsModal({onClose,currentGameRecords,initialDelete}){
 
   const doDelete=(p)=>{deleteStatsByPeriod(p);setStats(loadStats());setDelStep(0);};
 
-  const PB=({k,label,sub2})=>(<button onClick={()=>{setPeriod(k);setSubSel(null);setShowSub(period===k?!showSub:true);}} style={{padding:"6px 10px",border:"1px solid #ddd",borderRadius:8,background:period===k?"#14365a":"#fff",color:period===k?"#fff":"#14365a",fontSize:13,fontWeight:700,cursor:"pointer",textAlign:"center",lineHeight:1.2,minWidth:0}}>
-    <div>{label}</div>{sub2&&<div style={{fontSize:10,fontWeight:500,opacity:0.7,marginTop:1}}>{sub2}</div>}
+  const PB=({k,label,sub2})=>(<button onClick={()=>{setPeriod(k);setSubSel(null);setShowSub(period===k?!showSub:true);}} style={{padding:isTab?"12px 20px":"6px 10px",border:"1px solid #ddd",borderRadius:isTab?14:8,background:period===k?"#14365a":"#fff",color:period===k?"#fff":"#14365a",fontSize:isTab?26:13,fontWeight:700,cursor:"pointer",textAlign:"center",lineHeight:1.2,minWidth:0}}>
+    <div>{label}</div>{sub2&&<div style={{fontSize:isTab?20:10,fontWeight:500,opacity:0.7,marginTop:1}}>{sub2}</div>}
   </button>);
 
   return(<div style={{position:"fixed",inset:0,background:"#f0f3f8",zIndex:150,display:"flex",flexDirection:"column",overflow:"hidden"}}>
@@ -607,7 +608,7 @@ function StatsModal({onClose,currentGameRecords,initialDelete}){
           {showSub&&period==="month"&&months.length>0&&(<div style={{background:"#fff",border:"1px solid #ddd",borderRadius:8,padding:6,marginBottom:6,maxHeight:150,overflow:"auto"}}>{months.map((m,i)=>(<button key={i} onClick={()=>{setSubSel(m.replace("-","/"));setShowSub(false);}} style={{display:"block",width:"100%",padding:"8px 10px",border:"none",background:"transparent",fontSize:14,fontWeight:600,color:"#14365a",cursor:"pointer",textAlign:"left",borderBottom:"1px solid #f0f0f0"}}>{m.replace("-","/")}</button>))}</div>)}
         </>)}
         {/* Player select chips */}
-        <div style={{display:"flex",gap:6,marginBottom:10,flexWrap:"wrap",marginTop:6}}>{names.map((nm,i)=>(<button key={nm} onClick={()=>toggleSel(nm)} style={{padding:"6px 14px",border:"2px solid "+(effectiveSelected.includes(nm)?PC[effectiveSelected.indexOf(nm)%PC.length]:"#ddd"),borderRadius:20,background:effectiveSelected.includes(nm)?PC[effectiveSelected.indexOf(nm)%PC.length]+"22":"#fff",color:effectiveSelected.includes(nm)?PC[effectiveSelected.indexOf(nm)%PC.length]:"#888",fontSize:14,fontWeight:700,cursor:"pointer"}}>{nm}</button>))}</div>
+        <div style={{display:"flex",gap:isTab?12:6,marginBottom:10,flexWrap:"wrap",marginTop:6}}>{names.map((nm,i)=>(<button key={nm} onClick={()=>toggleSel(nm)} style={{padding:isTab?"12px 28px":"6px 14px",border:"2px solid "+(effectiveSelected.includes(nm)?PC[effectiveSelected.indexOf(nm)%PC.length]:"#ddd"),borderRadius:isTab?36:20,background:effectiveSelected.includes(nm)?PC[effectiveSelected.indexOf(nm)%PC.length]+"22":"#fff",color:effectiveSelected.includes(nm)?PC[effectiveSelected.indexOf(nm)%PC.length]:"#888",fontSize:isTab?28:14,fontWeight:700,cursor:"pointer"}}>{nm}</button>))}</div>
         {playersData.length>0&&(<>
           <div style={{display:"flex",justifyContent:"center",marginBottom:8}}><RadarChart playersData={playersData} size={560}/></div>
           <div style={{display:"flex",gap:12,justifyContent:"center",marginBottom:16,flexWrap:"wrap"}}>{playersData.map(pd=>(<div key={pd.name} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:12,height:12,borderRadius:6,background:pd.color}}/><span style={{fontSize:13,fontWeight:700,color:"#333"}}>{pd.name}</span></div>))}</div>
