@@ -749,7 +749,7 @@ function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goB
     <div style={SS.gW}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"5px 10px",background:"#14365a",flexShrink:0,gap:6}}>
         <div style={{display:"flex",gap:5,flexShrink:0}}><button style={SS.tBtn} onClick={handleBack}>◀</button><button style={SS.tBtn} onClick={()=>setShowPl(true)}>👥</button></div>
-        <span style={{fontSize:32,fontWeight:900,color:"#fff",letterSpacing:0,textAlign:"center",flex:1,lineHeight:1.2}}>{gameNumber}試合目、{currentTurn}ターン{cp?"("+cp.name+")":""}{bestOf>0?" "+bestOf+"先取":""}{numGames>1?" /"+numGames+"G":""}</span>
+        <span style={{fontSize:32,fontWeight:900,color:"#fff",letterSpacing:0,textAlign:"center",flex:1,lineHeight:1.2}}>{gameNumber}試合目、{currentTurn}ターン{cp?"("+cp.name+")":""}{bestOf>0?" "+bestOf+"先取":""}</span>
         <div style={{display:"flex",background:"rgba(255,255,255,0.12)",borderRadius:7,padding:2,gap:2,flexShrink:0}}>{[["both","両方"],["sheet","表"],["input","入力"]].map(([k,l])=>(<button key={k} onClick={()=>setView(k)} style={{padding:"5px 11px",border:"none",borderRadius:5,background:view===k?"rgba(255,255,255,0.2)":"transparent",color:view===k?"#fff":"rgba(255,255,255,0.4)",fontSize:13,fontWeight:600,cursor:"pointer"}}>{l}</button>))}</div>
       </div>
       <TeamBar/>
