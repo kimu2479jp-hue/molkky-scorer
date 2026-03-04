@@ -62,16 +62,21 @@ export default async function handler(req, res) {
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-5-20250929",
         max_tokens: 250,
         messages: [{ role: "user", content: prompt }]
       })
     });
 
-    const data = await apiRes.json();
+    /* Safely parse response – Anthropic may return non-JSON on 5xx */
+    const rawBody = await apiRes.text();
+    let data;
+    try { data = JSON.parse(rawBody); }
+    catch (_) { return res.status(502).json({ error: "Anthropic returned non-JSON (HTTP " + apiRes.status + "): " + rawBody.slice(0, 200) }); }
 
-    if (data.error) {
-      return res.status(502).json({ error: data.error.message || "Anthropic API error" });
+    if (!apiRes.ok || data.error) {
+      const msg = data.error?.message || data.error?.type || "Anthropic API error (HTTP " + apiRes.status + ")";
+      return res.status(502).json({ error: msg });
     }
 
     const text = (data.content || [])
@@ -80,8 +85,10 @@ export default async function handler(req, res) {
       .join("")
       .trim();
 
+    if (!text) return res.status(502).json({ error: "Anthropic returned empty content" });
+
     return res.status(200).json({ text });
   } catch (e) {
-    return res.status(500).json({ error: e.message || "Internal server error" });
+    return res.status(500).json({ error: "[Server] " + (e.message || "Internal server error") });
   }
 }
