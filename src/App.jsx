@@ -797,26 +797,38 @@ function CalendarPicker({gameDates,onSelect,onSelectMonth,onSelectYear,mode,sele
 
 /* ═══ AI Player Analysis via /api/analyze ═══ */
 const _analysisCache={};
+const _analysisPending=new Set();
 function usePlayerAnalysis(name,m){
-  const[text,setText]=useState(null);const[loading,setLoading]=useState(false);
+  const[text,setText]=useState(null);const[loading,setLoading]=useState(false);const[error,setError]=useState(null);
   const gc=m?m.gameCount:0;
+  const keyRef=useRef("");
   useEffect(()=>{
-    if(!m||gc<3){setText(null);return;}
+    if(!m||gc<3){setText(null);setError(null);return;}
     const key=name+"|"+gc+"|"+m.missRate.toFixed(3)+"|"+m.finishRate.toFixed(3)+"|"+m.ojamaRate.toFixed(3)+"|"+m.winRate.toFixed(3)+"|"+m.avgPts.toFixed(2);
-    if(_analysisCache[key]){setText(_analysisCache[key]);return;}
-    let cancelled=false;setLoading(true);
+    keyRef.current=key;
+    /* Already cached */
+    if(_analysisCache[key]){setText(_analysisCache[key]);setLoading(false);setError(null);return;}
+    /* Already fetching (another instance or re-render) */
+    if(_analysisPending.has(key)){setLoading(true);
+      const poll=setInterval(()=>{if(_analysisCache[key]){setText(_analysisCache[key]);setLoading(false);setError(null);clearInterval(poll);}},500);
+      return()=>clearInterval(poll);
+    }
+    _analysisPending.add(key);setLoading(true);setError(null);
+    let active=true;
     (async()=>{try{
       const res=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({gameCount:gc,winRate:m.winRate,missRate:m.missRate,finishRate:m.finishRate,avgPts:m.avgPts,breakAvg:m.breakAvg,ojamaRate:m.ojamaRate,ojamaAttempts:m.ojamaAttempts||0,recAvg:m.recAvg,firstWinRate:m.firstWinRate!=null?m.firstWinRate:null,lastWinRate:m.lastWinRate!=null?m.lastWinRate:null})});
+      if(!res.ok){const err=await res.text();_analysisPending.delete(key);if(active){setError("API "+res.status);setLoading(false);}return;}
       const data=await res.json();
-      if(data.text&&!cancelled){_analysisCache[key]=data.text;setText(data.text);}
-    }catch(e){console.error("Analysis API error",e);}finally{if(!cancelled)setLoading(false);}})();
-    return()=>{cancelled=true;};
+      if(data.text){_analysisCache[key]=data.text;if(active){setText(data.text);setError(null);}}
+      else if(active){setError(data.error||"空のレスポンス");}
+    }catch(e){if(active)setError(e.message||"通信エラー");}finally{_analysisPending.delete(key);if(active)setLoading(false);}})();
+    return()=>{active=false;};
   },[name,gc,m?.missRate,m?.finishRate,m?.ojamaRate,m?.winRate]);
-  return{text,loading};
+  return{text,loading,error};
 }
 
 /* ═══ Score Distribution Component ═══ */
-function ScoreDistribution({playersData}){
+function ScoreDistribution({playersData,favs}){
   const hasSV=playersData.some(pd=>pd.metrics.scoreValues&&pd.metrics.scoreValues.length>0);
   if(!hasSV)return(<div style={{background:"#fff",borderRadius:14,padding:14,marginBottom:14,border:"1px solid #ddd"}}>
     <div style={{fontSize:16,fontWeight:800,color:"#14365a",marginBottom:8}}>🎯 スコア分布分析</div>
@@ -825,14 +837,15 @@ function ScoreDistribution({playersData}){
   const SCORE_COLORS=["#e8e8e8","#dbeafe","#bfdbfe","#93c5fd","#60a5fa","#3b82f6","#2563eb","#1d4ed8","#1e40af","#1e3a8a","#f59e0b","#ef4444"];
   return(<div style={{background:"#fff",borderRadius:14,padding:14,marginBottom:14,border:"1px solid #ddd"}}>
     <div style={{fontSize:16,fontWeight:800,color:"#14365a",marginBottom:12}}>🎯 スコア分布分析</div>
-    {playersData.map(pd=>(<ScoreDistPlayer key={pd.name} pd={pd} SCORE_COLORS={SCORE_COLORS}/>))}
+    {playersData.map(pd=>(<ScoreDistPlayer key={pd.name} pd={pd} SCORE_COLORS={SCORE_COLORS} isFav={(favs||[]).includes(pd.name)}/>))}
   </div>);
 }
 
-function ScoreDistPlayer({pd,SCORE_COLORS}){
+function ScoreDistPlayer({pd,SCORE_COLORS,isFav}){
   const sv=pd.metrics.scoreValues||[];
   const gc=pd.metrics.gameCount||0;
-  const{text:aiText,loading:aiLoading}=usePlayerAnalysis(pd.name,gc>=3?pd.metrics:null);
+  const shouldAnalyze=isFav&&gc>=3;
+  const{text:aiText,loading:aiLoading,error:aiError}=usePlayerAnalysis(pd.name,shouldAnalyze?pd.metrics:null);
   if(!sv.length)return null;
   const dist=Array(12).fill(0);sv.forEach(s=>{if(s>=1&&s<=12)dist[s-1]++;});
   const maxC=Math.max(...dist,1);
@@ -850,10 +863,12 @@ function ScoreDistPlayer({pd,SCORE_COLORS}){
       <div style={{fontSize:13,color:"#555"}}>よく獲得するスコア: {top3.length>0?top3.map(s=>s.score+"点").join(", "):"−"}</div>
       <div style={{fontSize:13,color:"#555",marginTop:4}}>
         <span style={{fontWeight:700}}>得点スタイル: </span>
-        {gc<3?<span style={{color:"#aaa"}}>No Data</span>
-        :aiLoading?<span style={{color:"#2b7de9"}}>分析中...</span>
+        {!isFav?<span style={{color:"#aaa"}}>お気に入り登録で分析可能</span>
+        :gc<3?<span style={{color:"#aaa"}}>3試合以上で分析可能（現在{gc}試合）</span>
+        :aiLoading?<span style={{color:"#2b7de9"}}>AI分析中...</span>
+        :aiError?<span style={{color:"#c0392b"}}>エラー: {aiError}</span>
         :aiText?<span style={{whiteSpace:"pre-line",lineHeight:1.6}}>{aiText}</span>
-        :<span style={{color:"#aaa"}}>No Data</span>}
+        :<span style={{color:"#aaa"}}>分析データなし</span>}
       </div>
     </div>
   </div>);
@@ -1084,7 +1099,7 @@ function StatsModal({onClose,currentGameRecords,initialDelete,source}){
             <tbody>{playersData.map(pd=>{const m=pd.metrics;return(<tr key={pd.name} style={{borderBottom:"1px solid #eee"}}><td style={{padding:"8px",fontWeight:700,color:pd.color}}>{pd.name}</td><td style={{padding:"8px",textAlign:"center"}}>{m.gameCount}</td><td style={{padding:"8px",textAlign:"center"}}>{m.winCount}</td><td style={{padding:"8px",textAlign:"center"}}>{m.turnCount}</td><td style={{padding:"8px",textAlign:"center",color:"#bf6900"}}>{m.missCount}</td><td style={{padding:"8px",textAlign:"center"}}>{(m.missRate*100).toFixed(1)}%</td><td style={{padding:"8px",textAlign:"center"}}>{(m.finishRate*100).toFixed(1)}%</td><td style={{padding:"8px",textAlign:"center",color:"#22b566",fontWeight:800}}>{m.ojamaCount}</td></tr>);})}</tbody></table>
           </div>
           {/* Score Distribution */}
-          <ScoreDistribution playersData={playersData}/>
+          <ScoreDistribution playersData={playersData} favs={favs}/>
           {/* Detailed metrics */}
           <div style={{background:"#fff",borderRadius:14,padding:14,border:"1px solid #ddd",marginBottom:14}}>
             <div style={{fontSize:16,fontWeight:800,color:"#14365a",marginBottom:8}}>📈 詳細指標</div>
