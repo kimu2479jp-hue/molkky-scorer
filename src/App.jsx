@@ -816,7 +816,7 @@ function usePlayerAnalysis(name,m){
     _analysisPending.add(key);setLoading(true);setError(null);
     let active=true;
     (async()=>{try{
-      const res=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({gameCount:gc,winRate:m.winRate,missRate:m.missRate,finishRate:m.finishRate,avgPts:m.avgPts,breakAvg:m.breakAvg,ojamaRate:m.ojamaRate,ojamaAttempts:m.ojamaAttempts||0,recAvg:m.recAvg,firstWinRate:m.firstWinRate!=null?m.firstWinRate:null,lastWinRate:m.lastWinRate!=null?m.lastWinRate:null})});
+      const res=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({gameCount:gc,winRate:m.winRate||0,missRate:m.missRate||0,finishRate:m.finishRate||0,avgPts:m.avgPts||0,breakAvg:m.breakAvg||0,ojamaRate:m.ojamaRate||0,ojamaAttempts:m.ojamaAttempts||0,recAvg:m.recAvg||0,firstWinRate:m.firstWinRate!=null?m.firstWinRate:null,lastWinRate:m.lastWinRate!=null?m.lastWinRate:null})});
       if(!res.ok){const err=await res.text();_analysisPending.delete(key);if(active){setError("API "+res.status);setLoading(false);}return;}
       const data=await res.json();
       if(data.text){_analysisCache[key]=data.text;if(active){setText(data.text);setError(null);}}
