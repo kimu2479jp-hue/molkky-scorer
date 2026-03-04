@@ -795,6 +795,26 @@ function CalendarPicker({gameDates,onSelect,onSelectMonth,onSelectYear,mode,sele
   </div>);
 }
 
+/* ═══ AI Player Analysis via /api/analyze ═══ */
+const _analysisCache={};
+function usePlayerAnalysis(name,m){
+  const[text,setText]=useState(null);const[loading,setLoading]=useState(false);
+  const gc=m?m.gameCount:0;
+  useEffect(()=>{
+    if(!m||gc<3){setText(null);return;}
+    const key=name+"|"+gc+"|"+m.missRate.toFixed(3)+"|"+m.finishRate.toFixed(3)+"|"+m.ojamaRate.toFixed(3)+"|"+m.winRate.toFixed(3)+"|"+m.avgPts.toFixed(2);
+    if(_analysisCache[key]){setText(_analysisCache[key]);return;}
+    let cancelled=false;setLoading(true);
+    (async()=>{try{
+      const res=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({gameCount:gc,winRate:m.winRate,missRate:m.missRate,finishRate:m.finishRate,avgPts:m.avgPts,breakAvg:m.breakAvg,ojamaRate:m.ojamaRate,ojamaAttempts:m.ojamaAttempts||0,recAvg:m.recAvg,firstWinRate:m.firstWinRate!=null?m.firstWinRate:null,lastWinRate:m.lastWinRate!=null?m.lastWinRate:null})});
+      const data=await res.json();
+      if(data.text&&!cancelled){_analysisCache[key]=data.text;setText(data.text);}
+    }catch(e){console.error("Analysis API error",e);}finally{if(!cancelled)setLoading(false);}})();
+    return()=>{cancelled=true;};
+  },[name,gc,m?.missRate,m?.finishRate,m?.ojamaRate,m?.winRate]);
+  return{text,loading};
+}
+
 /* ═══ Score Distribution Component ═══ */
 function ScoreDistribution({playersData}){
   const hasSV=playersData.some(pd=>pd.metrics.scoreValues&&pd.metrics.scoreValues.length>0);
@@ -805,31 +825,37 @@ function ScoreDistribution({playersData}){
   const SCORE_COLORS=["#e8e8e8","#dbeafe","#bfdbfe","#93c5fd","#60a5fa","#3b82f6","#2563eb","#1d4ed8","#1e40af","#1e3a8a","#f59e0b","#ef4444"];
   return(<div style={{background:"#fff",borderRadius:14,padding:14,marginBottom:14,border:"1px solid #ddd"}}>
     <div style={{fontSize:16,fontWeight:800,color:"#14365a",marginBottom:12}}>🎯 スコア分布分析</div>
-    {playersData.map(pd=>{
-      const sv=pd.metrics.scoreValues||[];if(!sv.length)return null;
-      const dist=Array(12).fill(0);sv.forEach(s=>{if(s>=1&&s<=12)dist[s-1]++;});
-      const maxC=Math.max(...dist,1);
-      const sorted=[...dist.map((c,i)=>({score:i+1,count:c}))].sort((a,b)=>b.count-a.count);
-      const top3=sorted.filter(s=>s.count>0).slice(0,3);
-      const highCount=sv.filter(s=>s>=10).length;const lowCount=sv.filter(s=>s<=3).length;
-      let pattern="バランス型のスタイルです";
-      if(highCount/sv.length>0.3)pattern="高得点を狙う積極的なスタイルです";
-      else if(lowCount/sv.length>0.4)pattern="確実に倒す堅実なスタイルです";
-      else if(sv.length>0){const avg=sv.reduce((a,b)=>a+b,0)/sv.length;if(avg>=7)pattern="中〜高得点を安定して狙うスタイルです";else if(avg<=4)pattern="手堅く点を重ねるスタイルです";}
-      return(<div key={pd.name} style={{marginBottom:16}}>
-        <div style={{fontSize:15,fontWeight:800,color:pd.color,marginBottom:8}}>{pd.name}</div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:4,marginBottom:10}}>
-          {dist.map((c,i)=>{const ratio=maxC>0?c/maxC:0;return(<div key={i} onClick={()=>{}} style={{textAlign:"center",padding:"10px 4px",borderRadius:8,background:c>0?SCORE_COLORS[i]:"#f5f5f5",color:c>0?(i>=6?"#fff":"#333"):"#ccc",fontWeight:700,fontSize:16,position:"relative",cursor:"default",border:c>0?"none":"1px solid #e8e8e8",opacity:c>0?0.5+ratio*0.5:0.4}}>
-            {i+1}<div style={{fontSize:10,fontWeight:500,marginTop:2}}>{c>0?c+"回":"-"}</div>
-          </div>);})}
-        </div>
-        <div style={{background:"#f8f9fa",borderRadius:8,padding:10}}>
-          <div style={{fontSize:13,fontWeight:700,color:"#14365a",marginBottom:4}}>分析結果</div>
-          <div style={{fontSize:13,color:"#555"}}>よく獲得するスコア: {top3.length>0?top3.map(s=>s.score+"点").join(", "):"−"}</div>
-          <div style={{fontSize:13,color:"#555",marginTop:2}}>得点パターン: {pattern}</div>
-        </div>
-      </div>);
-    })}
+    {playersData.map(pd=>(<ScoreDistPlayer key={pd.name} pd={pd} SCORE_COLORS={SCORE_COLORS}/>))}
+  </div>);
+}
+
+function ScoreDistPlayer({pd,SCORE_COLORS}){
+  const sv=pd.metrics.scoreValues||[];
+  const gc=pd.metrics.gameCount||0;
+  const{text:aiText,loading:aiLoading}=usePlayerAnalysis(pd.name,gc>=3?pd.metrics:null);
+  if(!sv.length)return null;
+  const dist=Array(12).fill(0);sv.forEach(s=>{if(s>=1&&s<=12)dist[s-1]++;});
+  const maxC=Math.max(...dist,1);
+  const sorted=[...dist.map((c,i)=>({score:i+1,count:c}))].sort((a,b)=>b.count-a.count);
+  const top3=sorted.filter(s=>s.count>0).slice(0,3);
+  return(<div style={{marginBottom:16}}>
+    <div style={{fontSize:15,fontWeight:800,color:pd.color,marginBottom:8}}>{pd.name}</div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:4,marginBottom:10}}>
+      {dist.map((c,i)=>{const ratio=maxC>0?c/maxC:0;return(<div key={i} style={{textAlign:"center",padding:"10px 4px",borderRadius:8,background:c>0?SCORE_COLORS[i]:"#f5f5f5",color:c>0?(i>=6?"#fff":"#333"):"#ccc",fontWeight:700,fontSize:16,position:"relative",cursor:"default",border:c>0?"none":"1px solid #e8e8e8",opacity:c>0?0.5+ratio*0.5:0.4}}>
+        {i+1}<div style={{fontSize:10,fontWeight:500,marginTop:2}}>{c>0?c+"回":"-"}</div>
+      </div>);})}
+    </div>
+    <div style={{background:"#f8f9fa",borderRadius:8,padding:10}}>
+      <div style={{fontSize:13,fontWeight:700,color:"#14365a",marginBottom:4}}>分析結果</div>
+      <div style={{fontSize:13,color:"#555"}}>よく獲得するスコア: {top3.length>0?top3.map(s=>s.score+"点").join(", "):"−"}</div>
+      <div style={{fontSize:13,color:"#555",marginTop:4}}>
+        <span style={{fontWeight:700}}>得点スタイル: </span>
+        {gc<3?<span style={{color:"#aaa"}}>No Data</span>
+        :aiLoading?<span style={{color:"#2b7de9"}}>分析中...</span>
+        :aiText?<span style={{whiteSpace:"pre-line",lineHeight:1.6}}>{aiText}</span>
+        :<span style={{color:"#aaa"}}>No Data</span>}
+      </div>
+    </div>
   </div>);
 }
 
