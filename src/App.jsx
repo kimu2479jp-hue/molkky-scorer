@@ -31,10 +31,12 @@ function loadFavs(){
   }catch(e){return[];}
 }
 function saveFavs(l){try{localStorage.setItem(LS_KEY,JSON.stringify(l));localStorage.setItem(LS_FAV_BK,JSON.stringify(l));}catch(e){}}
-function useFavs(){const[f,sF]=useState(()=>loadFavs());return{favs:f,addF:n=>{const x=n.trim().slice(0,MAX_NAME);if(x&&!f.includes(x)){const u=[...f,x];sF(u);saveFavs(u);}},rmF:n=>{const u=f.filter(v=>v!==n);sF(u);saveFavs(u);}};}
+const MAX_FAV=99;
+function useFavs(){const[f,sF]=useState(()=>loadFavs());return{favs:f,addF:n=>{const x=n.trim().slice(0,MAX_NAME);if(x&&!f.includes(x)&&f.length<MAX_FAV){const u=[...f,x];sF(u);saveFavs(u);}},rmF:n=>{const u=f.filter(v=>v!==n);sF(u);saveFavs(u);}};}
 
 /* ═══ Stats Storage ═══ */
 const STATS_KEY="mk-player-stats";
+const PROGRESS_KEY="mk-game-progress";
 function loadStats(){try{return JSON.parse(localStorage.getItem(STATS_KEY))||{};}catch(e){return{};}}
 function saveStats(d){try{localStorage.setItem(STATS_KEY,JSON.stringify(d));}catch(e){}}
 function deleteStatsByPeriod(period){
@@ -79,6 +81,13 @@ function buildGameRecord(teams,history,teamOrder,winner,timestamps,favs){
   const records=[];const d=new Date().toISOString();
   const gameStart=timestamps.length>0?timestamps[0].ts:null;
   const gameEnd=timestamps.length>0?timestamps[timestamps.length-1].ts:null;
+  /* Determine finish type */
+  const finishType=(()=>{
+    if(winner===null)return"unknown";
+    const ws=scoreOf(history,winner);
+    if(ws===WIN)return"50finish";
+    return"dq";
+  })();
   teams.forEach((t,ti)=>{t.players.forEach(p=>{
     const nm=typeof p==="object"?p.name:p;
     if(!favs.includes(nm))return;
@@ -89,19 +98,16 @@ function buildGameRecord(teams,history,teamOrder,winner,timestamps,favs){
     const faults=turns.filter(h=>h.type==="fault").length;
     const totalPts=scores.reduce((s2,h)=>s2+h.score,0);
     const highScores=scores.filter(h=>h.score>=10&&h.score<=12).length;
-    /* finish rate: 38点以上の全ターンが母数, 50点ぴったりのみ成功 */
+    const scoreValues=scores.map(h=>h.score);
     let finA=0,finS=0;
     turns.forEach(h=>{if(h.prevScore>=38){finA++;if(h.type==="score"&&h.runningTotal===WIN)finS++;}});
-    /* 2ミス後recovery */
     const rec=[];let consF=0;
     turns.forEach(h=>{if(h.type==="miss"||h.type==="fault"){consF++;}else{if(consF>=2)rec.push(h.score);consF=0;}});
-    /* break: 1ターン目・投げ順1番目のチーム・そのプレイヤーのスコアのみ */
     let breakScore=null;
     const firstTeam=teamOrder[0];
     if(ti===firstTeam){const t1=turns.find(h=>h.turn===1);if(t1&&t1.type==="score")breakScore=t1.score;}
     const ojama=calcOjama(history,nm,ti);
     const won=winner===ti;
-    /* throw timing */
     const times=[];
     turns.forEach(h=>{
       const hIdx=history.indexOf(h);
@@ -111,7 +117,9 @@ function buildGameRecord(teams,history,teamOrder,winner,timestamps,favs){
     const tMin=times.length>0?Math.min(...times):null;
     const tMax=times.length>0?Math.max(...times):null;
     const tAvg=times.length>0?times.reduce((a,b)=>a+b,0)/times.length:null;
-    records.push({nm,data:{d,de:gameEnd,t:turns.length,s:totalPts,m:misses,f:faults,w:won?1:0,o:ojama.success,oa:ojama.attempts,fa:finA,fs:finS,hs:highScores,rc:rec,br:breakScore,tMin,tMax,tAvg}});
+    /* winner name for display */
+    const winnerName=winner!==null?teams[winner].players.map(p2=>typeof p2==="object"?p2.name:p2).find((_,pi)=>{const wturns=history.filter(h=>h.teamIndex===winner);const last=wturns[wturns.length-1];return last&&last.playerIndex===pi;})||"":null;
+    records.push({nm,data:{d,de:gameEnd,t:turns.length,s:totalPts,m:misses,f:faults,w:won?1:0,o:ojama.success,oa:ojama.attempts,fa:finA,fs:finS,hs:highScores,rc:rec,br:breakScore,tMin,tMax,tAvg,ft:finishType,sv:scoreValues}});
   });});
   return records;
 }
@@ -176,8 +184,8 @@ function filterGames(games,period,subSel){
 
 function calcMetrics(games){
   if(!games.length)return null;
-  const tot={t:0,s:0,m:0,f:0,w:0,o:0,oa:0,fa:0,fs:0,hs:0,rc:[],br:[],tMin:[],tMax:[],tAvg:[]};
-  games.forEach(g=>{tot.t+=g.t;tot.s+=g.s;tot.m+=g.m;tot.f+=g.f;tot.w+=g.w;tot.o+=g.o;tot.oa+=(g.oa||0);tot.fa+=g.fa;tot.fs+=g.fs;tot.hs+=g.hs;if(g.rc)tot.rc.push(...g.rc);if(g.br!=null)tot.br.push(g.br);if(g.tMin!=null)tot.tMin.push(g.tMin);if(g.tMax!=null)tot.tMax.push(g.tMax);if(g.tAvg!=null)tot.tAvg.push(g.tAvg);});
+  const tot={t:0,s:0,m:0,f:0,w:0,o:0,oa:0,fa:0,fs:0,hs:0,rc:[],br:[],tMin:[],tMax:[],tAvg:[],sv:[]};
+  games.forEach(g=>{tot.t+=g.t;tot.s+=g.s;tot.m+=g.m;tot.f+=g.f;tot.w+=g.w;tot.o+=g.o;tot.oa+=(g.oa||0);tot.fa+=g.fa;tot.fs+=g.fs;tot.hs+=g.hs;if(g.rc)tot.rc.push(...g.rc);if(g.br!=null)tot.br.push(g.br);if(g.tMin!=null)tot.tMin.push(g.tMin);if(g.tMax!=null)tot.tMax.push(g.tMax);if(g.tAvg!=null)tot.tAvg.push(g.tAvg);if(g.sv)tot.sv.push(...g.sv);});
   const missRate=tot.t>0?tot.m/tot.t:0;
   const finishRate=tot.fa>0?tot.fs/tot.fa:0;
   const avgPts=tot.t>0?tot.s/tot.t:0;
@@ -191,8 +199,45 @@ function calcMetrics(games){
   return{
     missRate,finishRate,avgPts,recAvg,highRate,breakAvg,ojamaRate,throwMin,throwMax,throwAvg,
     missCount:tot.m,turnCount:tot.t,ojamaCount:tot.o,ojamaAttempts:tot.oa,winCount:tot.w,gameCount:games.length,
+    scoreValues:tot.sv,
     r:[(1-missRate)*100,finishRate*100,(avgPts/12)*100,(recAvg/12)*100,ojamaRate*100,(breakAvg/12)*100]
   };
+}
+
+/* ═══ Game-level helpers ═══ */
+function getAvailableGames(stats,names){
+  const gameMap=new Map();
+  names.forEach(nm=>{(stats[nm]||[]).forEach(g=>{
+    const key=g.d;
+    if(!gameMap.has(key)){gameMap.set(key,{d:g.d,de:g.de,players:[],records:[],ft:g.ft||"unknown"});}
+    const gm=gameMap.get(key);
+    if(!gm.players.includes(nm))gm.players.push(nm);
+    gm.records.push({nm,data:g});
+    if(g.w===1&&!gm.winnerName)gm.winnerName=nm;
+    if(g.ft&&g.ft!=="unknown")gm.ft=g.ft;
+  });});
+  return[...gameMap.values()].sort((a,b)=>new Date(b.d)-new Date(a.d));
+}
+function getGameDates(stats,names){
+  const dates=new Set();
+  names.forEach(nm=>{(stats[nm]||[]).forEach(g=>{dates.add(g.d.slice(0,10));});});
+  return dates;
+}
+function filterGamesByDates(games,startDate,endDate){
+  const s=new Date(startDate);s.setHours(0,0,0,0);
+  const e=new Date(endDate);e.setHours(23,59,59,999);
+  return games.filter(g=>{const d=new Date(g.d);return d>=s&&d<=e;});
+}
+function filterGamesByKeys(games,selectedKeys){
+  return games.filter(g=>selectedKeys.has(g.d));
+}
+function getGamesForNames(stats,names,selectedKeys){
+  const result={};
+  names.forEach(nm=>{
+    const all=stats[nm]||[];
+    result[nm]=selectedKeys?all.filter(g=>selectedKeys.has(g.d)):all;
+  });
+  return result;
 }
 
 /* ═══ Helpers ═══ */
@@ -270,20 +315,21 @@ function Confirm({msg,sub,okLabel,cancelLabel,thirdLabel,onOk,onCancel,onThird})
 
 function FavDropdown({favs,addF,rmF,onPick,usedNames,openUp}){
   const[open,setOpen]=useState(false);const[newN,setNewN]=useState("");const[delTarget,setDelTarget]=useState(null);
+  const[dropStyle,setDropStyle]=useState({});
   const longRef=useRef(null);const wrapRef=useRef(null);
   const available=favs.filter(f=>!(usedNames||[]).includes(f));
   useEffect(()=>{if(!open)return;const h=e=>{if(wrapRef.current&&!wrapRef.current.contains(e.target))setOpen(false);};document.addEventListener("pointerdown",h);return()=>document.removeEventListener("pointerdown",h);},[open]);
+  useEffect(()=>{if(!open||!wrapRef.current)return;const rect=wrapRef.current.getBoundingClientRect();const spBelow=window.innerHeight-rect.bottom-20;const spAbove=rect.top-20;if(spBelow>=220){setDropStyle({top:"100%",marginTop:4,maxHeight:Math.min(spBelow,400)});}else if(spAbove>spBelow){setDropStyle({bottom:"100%",marginBottom:4,maxHeight:Math.min(spAbove,400)});}else{setDropStyle({top:"100%",marginTop:4,maxHeight:Math.max(spBelow,150)});}},[open]);
   const startLP=name=>{longRef.current=setTimeout(()=>setDelTarget(name),600);};const cancelLP=()=>{if(longRef.current)clearTimeout(longRef.current);};
-  const pos=openUp?{bottom:"100%",marginBottom:4}:{top:"100%",marginTop:4};
   return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
     <button onClick={()=>{setOpen(!open);setDelTarget(null);}} style={{width:40,height:40,border:"1px solid #d0dff0",borderRadius:8,background:open?"#2b7de9":"#f0f6ff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:open?"#fff":"#d9a83a"}}>⭐</button>
-    {open&&(<div style={{position:"absolute",right:0,...pos,background:"#fff",border:"1px solid #ccc",borderRadius:12,boxShadow:"0 6px 20px rgba(0,0,0,0.18)",zIndex:50,minWidth:220,maxWidth:300,padding:10}}>
+    {open&&(<div style={{position:"absolute",right:0,...dropStyle,background:"#fff",border:"1px solid #ccc",borderRadius:12,boxShadow:"0 6px 20px rgba(0,0,0,0.18)",zIndex:50,minWidth:220,maxWidth:300,padding:10,display:"flex",flexDirection:"column"}}>
       {available.length===0&&<div style={{padding:12,textAlign:"center",color:"#aaa",fontSize:16}}>{favs.length===0?"登録なし":"全員配置済み"}</div>}
-      <div style={{maxHeight:220,overflow:"auto"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid #f0f0f0",background:delTarget===f?"#fde8e8":"transparent",fontSize:18,fontWeight:600,color:"#14365a",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<span onClick={e=>{e.stopPropagation();rmF(f);setDelTarget(null);}} style={{padding:"5px 12px",background:"#e74c3c",color:"#fff",borderRadius:6,fontSize:13,fontWeight:700}}>削除</span>}</button></div>))}</div>
-      <div style={{borderTop:"1px solid #eee",paddingTop:10,marginTop:4}}><div style={{display:"flex",gap:6}}>
+      <div style={{flex:1,minHeight:0,overflow:"auto",WebkitOverflowScrolling:"touch"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid #f0f0f0",background:delTarget===f?"#fde8e8":"transparent",fontSize:18,fontWeight:600,color:"#14365a",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<span onClick={e=>{e.stopPropagation();rmF(f);setDelTarget(null);}} style={{padding:"5px 12px",background:"#e74c3c",color:"#fff",borderRadius:6,fontSize:13,fontWeight:700}}>削除</span>}</button></div>))}</div>
+      <div style={{borderTop:"1px solid #eee",paddingTop:10,marginTop:4,flexShrink:0}}><div style={{display:"flex",gap:6}}>
         <input value={newN} onChange={e=>setNewN(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder={"新規("+MAX_NAME+"文字)"} style={{flex:1,padding:"10px 12px",border:"1px solid #ddd",borderRadius:8,fontSize:16,outline:"none"}}/>
-        <button onClick={()=>{if(newN.trim()){addF(newN.trim());setNewN("");}}} style={{padding:"10px 16px",border:"none",borderRadius:8,background:"#2b7de9",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",opacity:newN.trim()?1:0.3}}>登録</button>
-      </div></div>
+        <button onClick={()=>{if(newN.trim()&&favs.length<MAX_FAV){addF(newN.trim());setNewN("");}}} style={{padding:"10px 16px",border:"none",borderRadius:8,background:"#2b7de9",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",opacity:newN.trim()?1:0.3}}>登録</button>
+      </div>{favs.length>=MAX_FAV&&<div style={{fontSize:12,color:"#c0392b",marginTop:4,textAlign:"center"}}>登録上限({MAX_FAV}人)に達しています</div>}</div>
     </div>)}
   </div>);
 }
@@ -343,7 +389,7 @@ function SetupScreen({onStart,savedTeams}){
   const[om,setOm]=useState("normal");const[numGames,setNumGames]=useState(1);const[bestOf,setBestOf]=useState(0);const[dqEnd,setDqEnd]=useState(true);
   const[saveToStats,setSaveToStats]=useState(true);
   const[teams,setTeams]=useState(()=>{if(savedTeams){const base=savedTeams.map(t=>({name:t.name,players:t.players.length>0?t.players:[""]}));while(base.length<MAX_TEAMS)base.push({name:"チーム"+(base.length+1),players:[""]});return base.slice(0,MAX_TEAMS);}return Array.from({length:MAX_TEAMS},(_,i)=>({name:"チーム"+(i+1),players:[""]}));});
-  const[mems,setMems]=useState(Array(4).fill(""));const[sp,setSp]=useState(null);
+  const[mems,setMems]=useState(Array(4).fill(""));const[sp,setSp]=useState(null);const[showSetupStats,setShowSetupStats]=useState(false);
   const uN=(i,v)=>setTeams(p=>p.map((t,j)=>j===i?{...t,name:v}:t));
   const uP=(ti,pi,v)=>setTeams(p=>p.map((t,i)=>i===ti?{...t,players:t.players.map((pl,j)=>j===pi?v.slice(0,MAX_NAME):pl)}:t));
   const aP=ti=>setTeams(p=>p.map((t,i)=>i===ti&&t.players.length<MAX_PL?{...t,players:[...t.players,""]}:t));
@@ -370,8 +416,16 @@ function SetupScreen({onStart,savedTeams}){
         <div style={{marginBottom:14}}><label style={SL}>入力モード</label><div style={{display:"flex",gap:8}}>{[["manual","✏️ 手動"],["shuffle","🎲 ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>{setMode(k);setSp(null);}} style={{...CH,...(mode===k?CHA:{})}}>{l}</button>))}</div></div>
         <div style={{display:"flex",gap:14,marginBottom:14}}><div style={{flex:1}}><label style={SL}>チーム数</label><div style={{display:"flex",gap:8}}>{[2,3,4].map(n=>(<button key={n} onClick={()=>{setTc(n);setSp(null);}} style={{...CH,...(tc===n?CHA:{}),padding:"16px 0"}}>{n}</button>))}</div></div><div style={{flex:1}}><label style={SL}>投げ順</label><div style={{display:"flex",gap:8}}>{[["normal","通常"],["random","ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>setOm(k)} style={{...CH,...(om===k?CHA:{})}}>{l}</button>))}</div></div></div>
         <div style={{display:"flex",gap:8,marginBottom:14}}><div style={{flex:"1 1 0"}}><label style={SL}>ゲーム数</label><select value={numGames} onChange={e=>setNumGames(+e.target.value)} style={SEL}>{Array.from({length:10},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}ゲーム</option>)}</select></div><div style={{flex:"1 1 0"}}><label style={SL}>先取機能</label><select value={bestOf} onChange={e=>setBestOf(+e.target.value)} style={SEL}><option value={0}>なし</option>{Array.from({length:11},(_,i)=>i+2).map(n=><option key={n} value={n}>{n}先取</option>)}</select></div><div style={{flex:"1 1 0"}}><label style={SL}>失格時</label><select value={dqEnd?"end":"cont"} onChange={e=>setDqEnd(e.target.value==="end")} style={SEL}><option value="end">即終了</option><option value="cont">継続</option></select></div></div>
-        {/* Stats toggle */}
-        <div style={{marginBottom:14}}><button onClick={()=>setSaveToStats(p=>!p)} style={{width:"100%",padding:"14px 16px",border:"2px solid "+(saveToStats?"#22b566":"rgba(255,255,255,0.25)"),borderRadius:12,background:saveToStats?"rgba(34,181,102,0.15)":"transparent",color:saveToStats?"#22b566":"rgba(255,255,255,0.5)",fontSize:18,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>{saveToStats?"✅ 累計スタッツに反映する":"⬜ 累計スタッツに反映しない"}</button></div>
+        {/* Stats toggle (UISwitch) + Stats button */}
+        <div style={{display:"flex",gap:8,marginBottom:14}}>
+          <div onClick={()=>setSaveToStats(p=>!p)} style={{flex:1,padding:"14px 16px",border:"2px solid "+(saveToStats?"#22b566":"rgba(255,255,255,0.25)"),borderRadius:12,background:saveToStats?"rgba(34,181,102,0.15)":"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8}}>
+            <span style={{color:saveToStats?"#22b566":"rgba(255,255,255,0.5)",fontSize:15,fontWeight:700}}>累計スタッツに反映</span>
+            <div style={{width:48,height:28,borderRadius:14,padding:2,background:saveToStats?"#22b566":"rgba(255,255,255,0.25)",transition:"background 0.2s",display:"flex",alignItems:saveToStats?"center":"center",justifyContent:saveToStats?"flex-end":"flex-start"}}>
+              <div style={{width:24,height:24,borderRadius:12,background:"#fff",boxShadow:"0 1px 3px rgba(0,0,0,0.2)",transition:"all 0.2s"}}/>
+            </div>
+          </div>
+          <button onClick={()=>setShowSetupStats(true)} style={{flex:1,padding:"14px 16px",border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"#fff",fontSize:18,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>📊 スタッツ</button>
+        </div>
         <div style={{padding:"12px 16px",background:"rgba(43,125,233,0.12)",borderRadius:12,border:"1px solid rgba(43,125,233,0.2)",marginBottom:14}}><div style={{fontWeight:800,fontSize:16,color:"#fff",marginBottom:3}}>📋 公式ルール</div><div style={{fontSize:13,color:"rgba(255,255,255,0.6)",lineHeight:1.8}}>50点で勝利 / 超過→25点 / 37点以上でフォルト→25点 / ミス＝倒れず / フォルト＝反則 / 3連続→失格</div></div>
         {mode==="manual"&&(<>{teams.slice(0,tc).map((team,ti)=>(<div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac}}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><div style={{width:34,height:34,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900,fontSize:18,flexShrink:0,background:C[ti].ac}}>{ti+1}</div><input value={team.name} onChange={e=>uN(ti,e.target.value)} style={TIN} placeholder={"チーム"+(ti+1)}/></div>
           <div style={{paddingLeft:44}}>{team.players.map((p,pi)=>(<div key={pi} style={{display:"flex",alignItems:"center",gap:6,marginBottom:7}}><span style={{width:20,fontSize:16,color:"#aaa",fontWeight:700,textAlign:"center"}}>{pi+1}</span><input value={p} onChange={e=>uP(ti,pi,e.target.value)} maxLength={MAX_NAME} style={PIN} placeholder={"名前("+MAX_NAME+"文字)"}/><FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uP(ti,pi,name)} usedNames={used}/></div>))}
@@ -389,6 +443,7 @@ function SetupScreen({onStart,savedTeams}){
             <button style={{width:"100%",padding:14,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"#fff",fontSize:18,fontWeight:800,cursor:"pointer",marginTop:6}} onClick={doShuf}>🔄 再シャッフル</button></div>)}
         </>)}
       </div>
+      {showSetupStats&&<StatsModal onClose={()=>setShowSetupStats(false)} source="setup"/>}
     </div>);
 }
 
@@ -546,14 +601,123 @@ function RadarChart({playersData,size}){
 
 function fmtSec(s){if(s==null)return"-";return s<60?s.toFixed(1)+"秒":Math.floor(s/60)+"分"+Math.round(s%60)+"秒";}
 
-/* ═══ Stats Modal — enhanced periods + delete + per-game ═══ */
-function StatsModal({onClose,currentGameRecords,initialDelete}){
+/* ═══ Calendar Component ═══ */
+function CalendarPicker({gameDates,onSelect,mode,selectedStart,selectedEnd}){
+  const[viewDate,setViewDate]=useState(()=>new Date());
+  const year=viewDate.getFullYear();const month=viewDate.getMonth();
+  const firstDay=new Date(year,month,1).getDay();
+  const daysInMonth=new Date(year,month+1,0).getDate();
+  const prevMonth=()=>setViewDate(new Date(year,month-1,1));
+  const nextMonth=()=>setViewDate(new Date(year,month+1,1));
+  const dayNames=["日","月","火","水","木","金","土"];
+  const cells=[];
+  for(let i=0;i<firstDay;i++)cells.push(null);
+  for(let d=1;d<=daysInMonth;d++)cells.push(d);
+  const isGameDay=d=>{if(!d)return false;const ds=year+"-"+String(month+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");return gameDates.has(ds);};
+  const isInRange=(d)=>{if(!d||!selectedStart)return false;const dt=new Date(year,month,d);dt.setHours(0,0,0,0);const s=new Date(selectedStart);s.setHours(0,0,0,0);if(!selectedEnd)return dt.getTime()===s.getTime();const e=new Date(selectedEnd);e.setHours(0,0,0,0);return dt>=s&&dt<=e;};
+  const isStart=(d)=>{if(!d||!selectedStart)return false;const dt=new Date(year,month,d);dt.setHours(0,0,0,0);const s=new Date(selectedStart);s.setHours(0,0,0,0);return dt.getTime()===s.getTime();};
+  const isEnd=(d)=>{if(!d||!selectedEnd)return false;const dt=new Date(year,month,d);dt.setHours(0,0,0,0);const e=new Date(selectedEnd);e.setHours(0,0,0,0);return dt.getTime()===e.getTime();};
+  const handleClick=(d)=>{if(!d)return;const dt=new Date(year,month,d);dt.setHours(0,0,0,0);onSelect(dt);};
+  const today=new Date();today.setHours(0,0,0,0);
+  const isToday=(d)=>{if(!d)return false;return year===today.getFullYear()&&month===today.getMonth()&&d===today.getDate();};
+  return(<div style={{background:"#fff",borderRadius:14,padding:16,border:"1px solid #ddd",marginBottom:10}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+      <button onClick={prevMonth} style={{width:36,height:36,border:"1px solid #ddd",borderRadius:8,background:"#fff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
+      <span style={{fontSize:20,fontWeight:800,color:"#14365a"}}>{year}年{String(month+1).padStart(2,"0")}月</span>
+      <button onClick={nextMonth} style={{width:36,height:36,border:"1px solid #ddd",borderRadius:8,background:"#fff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
+      {dayNames.map((dn,i)=>(<div key={dn} style={{textAlign:"center",fontSize:13,fontWeight:700,color:i===0?"#d93a5e":i===6?"#2b7de9":"#888",padding:"4px 0"}}>{dn}</div>))}
+      {cells.map((d,i)=>{
+        const inR=isInRange(d);const isSt=isStart(d);const isEn=isEnd(d);const gd=isGameDay(d);const td=isToday(d);
+        return(<div key={i} onClick={()=>handleClick(d)} style={{textAlign:"center",padding:"8px 2px",cursor:d?"pointer":"default",position:"relative",borderRadius:isSt&&isEn?10:isSt?"10px 0 0 10px":isEn?"0 10px 10px 0":0,background:inR?"#2b7de9":"transparent",color:inR?"#fff":!d?"transparent":td?"#2b7de9":"#333",fontWeight:td||inR?800:500,fontSize:15,transition:"background 0.15s"}}>
+          {d||""}{gd&&!inR&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:"#2b7de9"}}/>}{gd&&inR&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:"rgba(255,255,255,0.7)"}}/>}
+        </div>);
+      })}
+    </div>
+    {selectedStart&&(<div style={{marginTop:8,fontSize:13,fontWeight:600,color:"#14365a",textAlign:"center"}}>
+      期間: {fmtMD(new Date(selectedStart))}
+      {selectedEnd&&selectedStart.getTime()!==selectedEnd.getTime()?" 〜 "+fmtMD(new Date(selectedEnd)):""}
+    </div>)}
+  </div>);
+}
+
+/* ═══ Score Distribution Component ═══ */
+function ScoreDistribution({playersData}){
+  const hasSV=playersData.some(pd=>pd.metrics.scoreValues&&pd.metrics.scoreValues.length>0);
+  if(!hasSV)return(<div style={{background:"#fff",borderRadius:14,padding:14,marginBottom:14,border:"1px solid #ddd"}}>
+    <div style={{fontSize:16,fontWeight:800,color:"#14365a",marginBottom:8}}>🎯 スコア分布分析</div>
+    <div style={{textAlign:"center",padding:20,color:"#aaa",fontSize:14}}>スコア分布データがありません</div>
+  </div>);
+  const SCORE_COLORS=["#e8e8e8","#dbeafe","#bfdbfe","#93c5fd","#60a5fa","#3b82f6","#2563eb","#1d4ed8","#1e40af","#1e3a8a","#f59e0b","#ef4444"];
+  return(<div style={{background:"#fff",borderRadius:14,padding:14,marginBottom:14,border:"1px solid #ddd"}}>
+    <div style={{fontSize:16,fontWeight:800,color:"#14365a",marginBottom:12}}>🎯 スコア分布分析</div>
+    {playersData.map(pd=>{
+      const sv=pd.metrics.scoreValues||[];if(!sv.length)return null;
+      const dist=Array(12).fill(0);sv.forEach(s=>{if(s>=1&&s<=12)dist[s-1]++;});
+      const maxC=Math.max(...dist,1);
+      const sorted=[...dist.map((c,i)=>({score:i+1,count:c}))].sort((a,b)=>b.count-a.count);
+      const top3=sorted.filter(s=>s.count>0).slice(0,3);
+      const highCount=sv.filter(s=>s>=10).length;const lowCount=sv.filter(s=>s<=3).length;
+      let pattern="バランス型のスタイルです";
+      if(highCount/sv.length>0.3)pattern="高得点を狙う積極的なスタイルです";
+      else if(lowCount/sv.length>0.4)pattern="確実に倒す堅実なスタイルです";
+      else if(sv.length>0){const avg=sv.reduce((a,b)=>a+b,0)/sv.length;if(avg>=7)pattern="中〜高得点を安定して狙うスタイルです";else if(avg<=4)pattern="手堅く点を重ねるスタイルです";}
+      return(<div key={pd.name} style={{marginBottom:16}}>
+        <div style={{fontSize:15,fontWeight:800,color:pd.color,marginBottom:8}}>{pd.name}</div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(6,1fr)",gap:4,marginBottom:10}}>
+          {dist.map((c,i)=>{const ratio=maxC>0?c/maxC:0;return(<div key={i} onClick={()=>{}} style={{textAlign:"center",padding:"10px 4px",borderRadius:8,background:c>0?SCORE_COLORS[i]:"#f5f5f5",color:c>0?(i>=6?"#fff":"#333"):"#ccc",fontWeight:700,fontSize:16,position:"relative",cursor:"default",border:c>0?"none":"1px solid #e8e8e8",opacity:c>0?0.5+ratio*0.5:0.4}}>
+            {i+1}<div style={{fontSize:10,fontWeight:500,marginTop:2}}>{c>0?c+"回":"-"}</div>
+          </div>);})}
+        </div>
+        <div style={{background:"#f8f9fa",borderRadius:8,padding:10}}>
+          <div style={{fontSize:13,fontWeight:700,color:"#14365a",marginBottom:4}}>分析結果</div>
+          <div style={{fontSize:13,color:"#555"}}>よく獲得するスコア: {top3.length>0?top3.map(s=>s.score+"点").join(", "):"−"}</div>
+          <div style={{fontSize:13,color:"#555",marginTop:2}}>得点パターン: {pattern}</div>
+        </div>
+      </div>);
+    })}
+  </div>);
+}
+
+/* ═══ Game List Item ═══ */
+function GameListItem({game,checked,onToggle,isTab}){
+  const dt=new Date(game.d);
+  const timeStr=fmtHM(dt);
+  const dateStr=(dt.getMonth()+1)+"/"+dt.getDate();
+  const ftLabel=game.ft==="50finish"?"50点決着":game.ft==="dq"?"失格決着":"不明";
+  const ftColor=game.ft==="50finish"?"#22b566":"#c0392b";
+  return(<div onClick={onToggle} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 14px",background:checked?"#e6f0fb":"#fff",borderRadius:10,border:checked?"2px solid #2b7de9":"1px solid #e0e0e0",marginBottom:6,cursor:"pointer",transition:"all 0.15s"}}>
+    <div style={{width:22,height:22,borderRadius:6,border:checked?"none":"2px solid #ccc",background:checked?"#2b7de9":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}>
+      {checked&&<span style={{color:"#fff",fontSize:14,fontWeight:900}}>✓</span>}
+    </div>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+        <span style={{fontSize:isTab?18:15,fontWeight:800,color:"#14365a"}}>{dateStr} {timeStr}</span>
+        <span style={{fontSize:isTab?14:12,fontWeight:700,color:ftColor,background:ftColor+"18",padding:"2px 8px",borderRadius:4}}>{ftLabel}</span>
+      </div>
+      <div style={{fontSize:isTab?15:13,color:"#555",marginTop:3}}>
+        {game.players.length}人戦　参加者: {game.players.join(", ")}
+      </div>
+      {game.winnerName&&<div style={{fontSize:isTab?14:12,color:"#22b566",fontWeight:700,marginTop:2}}>上がり: {game.winnerName}</div>}
+    </div>
+  </div>);
+}
+
+/* ═══ Stats Modal — with Calendar/Recent tabs + Score Distribution ═══ */
+function StatsModal({onClose,currentGameRecords,initialDelete,source}){
   const isTab=typeof window!=="undefined"&&window.innerWidth>=768;
   const[stats,setStats]=useState(()=>loadStats());
   const favs=loadFavs();
-  const[period,setPeriod]=useState("all");const[subSel,setSubSel]=useState(null);const[showSub,setShowSub]=useState(false);
-  const[viewMode,setViewMode]=useState("cumulative");
+  const[viewMode,setViewMode]=useState(source==="setup"?"cumulative":"cumulative");
+  const[tab,setTab]=useState("all");
   const[delStep,setDelStep]=useState(initialDelete?1:0);
+  /* Calendar state */
+  const[calMode,setCalMode]=useState("single");
+  const[calStart,setCalStart]=useState(null);const[calEnd,setCalEnd]=useState(null);
+  /* Game selection state */
+  const[selectedGameKeys,setSelectedGameKeys]=useState(new Set());
+
   const currentNames=(currentGameRecords||[]).map(r=>r.nm);
   const allNames=favs.filter(n=>(stats[n]&&stats[n].length>0)||currentNames.includes(n));
   const names=viewMode==="current"?allNames.filter(n=>currentNames.includes(n)):allNames;
@@ -561,52 +725,96 @@ function StatsModal({onClose,currentGameRecords,initialDelete}){
   const effectiveSelected=viewMode==="current"?selected.filter(n=>currentNames.includes(n)):selected;
   const toggleSel=n=>{setSelected(p=>p.includes(n)?p.filter(x=>x!==n):[...p,n].slice(0,6));};
 
-  const now=new Date();
-  const todayStr=(now.getMonth()+1)+"/"+now.getDate();
-  const mon=getMondayOfWeek(now);const sun=new Date(mon);sun.setDate(sun.getDate()+6);
-  const weekStr=fmtMD(mon)+"〜"+fmtMD(sun);
+  const allGames=getAvailableGames(stats,names);
+  const gameDateSet=getGameDates(stats,names);
 
-  const sessions=getAvailableSessions(stats,names);
-  const weeks=getAvailableWeeks(stats,names);
-  const months=getAvailableMonths(stats,names);
-
-  const getGames=(nm)=>{
-    if(viewMode==="current"){const r=(currentGameRecords||[]).find(r2=>r2.nm===nm);return r?[r.data]:[];}
-    return filterGames(stats[nm]||[],period,subSel);
+  /* Calendar date selection */
+  const handleCalSelect=(dt)=>{
+    if(calMode==="single"){setCalStart(dt);setCalEnd(dt);
+      const ds=dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+      const dayGames=allGames.filter(g=>g.d.startsWith(ds));
+      setSelectedGameKeys(new Set(dayGames.map(g=>g.d)));
+    }else{
+      if(!calStart||calEnd){setCalStart(dt);setCalEnd(null);setSelectedGameKeys(new Set());}
+      else{
+        const s=dt<calStart?dt:calStart;const e=dt<calStart?calStart:dt;
+        setCalStart(s);setCalEnd(e);
+        const rangeGames=filterGamesByDates(allGames,s,e);
+        setSelectedGameKeys(new Set(rangeGames.map(g=>g.d)));
+      }
+    }
   };
-  const playersData=effectiveSelected.map((nm,i)=>{const g=getGames(nm);const m=calcMetrics(g);return{name:nm,color:PC[i%PC.length],metrics:m,r:m?m.r:[0,0,0,0,0,0]};}).filter(p=>p.metrics);
+
+  /* Recent tab: show last 20 games */
+  const recentGames=allGames.slice(0,20);
+
+  const toggleGameKey=(key)=>{setSelectedGameKeys(p=>{const n=new Set(p);if(n.has(key))n.delete(key);else n.add(key);return n;});};
+  const selectAllRecent=()=>{setSelectedGameKeys(new Set(recentGames.map(g=>g.d)));};
+  const deselectAllRecent=()=>{setSelectedGameKeys(new Set());};
+
+  /* Compute player data based on tab + selection */
+  const getPlayerGames=(nm)=>{
+    if(viewMode==="current"){const r=(currentGameRecords||[]).find(r2=>r2.nm===nm);return r?[r.data]:[];}
+    if(tab==="all")return stats[nm]||[];
+    const playerGames=stats[nm]||[];
+    return playerGames.filter(g=>selectedGameKeys.has(g.d));
+  };
+  const playersData=effectiveSelected.map((nm,i)=>{const g=getPlayerGames(nm);const m=calcMetrics(g);return{name:nm,color:PC[i%PC.length],metrics:m,r:m?m.r:[0,0,0,0,0,0]};}).filter(p=>p.metrics);
 
   const doDelete=(p)=>{deleteStatsByPeriod(p);setStats(loadStats());setDelStep(0);};
 
-  const PB=({k,label,sub2})=>(<button onClick={()=>{setPeriod(k);setSubSel(null);setShowSub(period===k?!showSub:true);}} style={{padding:isTab?"12px 20px":"6px 10px",border:"1px solid #ddd",borderRadius:isTab?14:8,background:period===k?"#14365a":"#fff",color:period===k?"#fff":"#14365a",fontSize:isTab?26:13,fontWeight:700,cursor:"pointer",textAlign:"center",lineHeight:1.2,minWidth:0}}>
-    <div>{label}</div>{sub2&&<div style={{fontSize:isTab?20:10,fontWeight:500,opacity:0.7,marginTop:1}}>{sub2}</div>}
-  </button>);
+  const tabBtnStyle=(k)=>({padding:isTab?"10px 24px":"8px 16px",border:"none",borderBottom:tab===k?"3px solid #2b7de9":"3px solid transparent",background:"transparent",color:tab===k?"#14365a":"#888",fontSize:isTab?20:15,fontWeight:tab===k?800:600,cursor:"pointer"});
+
+  /* Games filtered for display in calendar tab */
+  const calFilteredGames=(calStart&&calEnd)?filterGamesByDates(allGames,calStart,calEnd):calStart?filterGamesByDates(allGames,calStart,calStart):[];
 
   return(<div style={{position:"fixed",inset:0,background:"#f0f3f8",zIndex:150,display:"flex",flexDirection:"column",overflow:"hidden"}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px",background:"#14365a",flexShrink:0}}>
-      <h2 style={{fontSize:32,fontWeight:900,color:"#fff",margin:0}}>📊 プレイヤースタッツ</h2>
+      <h2 style={{fontSize:isTab?32:24,fontWeight:900,color:"#fff",margin:0}}>📊 {source==="setup"?"累計スタッツ":"プレイヤースタッツ"}</h2>
       <button onClick={onClose} style={{padding:"8px 18px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"transparent",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>✕ 閉じる</button>
     </div>
     <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:"12px 20px"}}>
       {names.length===0?<div style={{textAlign:"center",padding:40,color:"#888",fontSize:18}}>⭐ お気に入り登録プレイヤーのデータなし</div>:(<>
-        {/* View mode toggle: cumulative vs current game */}
-        {currentGameRecords&&currentGameRecords.length>0&&(
+        {/* View mode toggle: cumulative vs current game (only from game result) */}
+        {source!=="setup"&&currentGameRecords&&currentGameRecords.length>0&&(
           <div style={{display:"flex",gap:6,marginBottom:10}}>{[["cumulative","累計データ"],["current","この試合"]].map(([k,l])=>(<button key={k} onClick={()=>{setViewMode(k);}} style={{flex:1,padding:"10px 0",border:"2px solid "+(viewMode===k?"#14365a":"#ddd"),borderRadius:10,background:viewMode===k?"#14365a":"#fff",color:viewMode===k?"#fff":"#14365a",fontSize:16,fontWeight:700,cursor:"pointer"}}>{l}</button>))}</div>
         )}
-        {/* Period buttons (only for cumulative) */}
-        {viewMode==="cumulative"&&(<>
-          <div style={{display:"flex",gap:5,marginBottom:4}}>
-            <PB k="day" label={"今日("+todayStr+")"}/>
-            <PB k="week" label="今週" sub2={weekStr}/>
-            <PB k="month" label="今月"/>
-            <PB k="year" label="今年"/>
-            <PB k="all" label="累計"/>
+        {/* Tabs (only for cumulative mode) */}
+        {viewMode==="cumulative"&&(
+          <div style={{display:"flex",borderBottom:"1px solid #ddd",marginBottom:10}}>
+            <button onClick={()=>{setTab("calendar");setSelectedGameKeys(new Set());}} style={tabBtnStyle("calendar")}>カレンダー</button>
+            <button onClick={()=>{setTab("recent");setSelectedGameKeys(new Set());}} style={tabBtnStyle("recent")}>直近の試合</button>
+            <button onClick={()=>{setTab("all");}} style={tabBtnStyle("all")}>累計</button>
           </div>
-          {/* Sub-selector dropdowns */}
-          {showSub&&period==="day"&&sessions.length>0&&(<div style={{background:"#fff",border:"1px solid #ddd",borderRadius:8,padding:6,marginBottom:6,maxHeight:150,overflow:"auto"}}>{sessions.map((s,i)=>{const d=new Date(s.date);const lab=(d.getMonth()+1)+"/"+d.getDate()+" "+s.label;return(<button key={i} onClick={()=>{setSubSel(s);setShowSub(false);}} style={{display:"block",width:"100%",padding:"8px 10px",border:"none",background:subSel===s?"#e6f0fb":"transparent",fontSize:14,fontWeight:600,color:"#14365a",cursor:"pointer",textAlign:"left",borderBottom:"1px solid #f0f0f0"}}>{lab}</button>);})}</div>)}
-          {showSub&&period==="week"&&weeks.length>0&&(<div style={{background:"#fff",border:"1px solid #ddd",borderRadius:8,padding:6,marginBottom:6,maxHeight:150,overflow:"auto"}}>{weeks.map((w,i)=>{const wEnd=new Date(w);wEnd.setDate(wEnd.getDate()+6);const lab=fmtMD(w)+"〜"+fmtMD(wEnd);return(<button key={i} onClick={()=>{setSubSel(w);setShowSub(false);}} style={{display:"block",width:"100%",padding:"8px 10px",border:"none",background:"transparent",fontSize:14,fontWeight:600,color:"#14365a",cursor:"pointer",textAlign:"left",borderBottom:"1px solid #f0f0f0"}}>{lab}</button>);})}</div>)}
-          {showSub&&period==="month"&&months.length>0&&(<div style={{background:"#fff",border:"1px solid #ddd",borderRadius:8,padding:6,marginBottom:6,maxHeight:150,overflow:"auto"}}>{months.map((m,i)=>(<button key={i} onClick={()=>{setSubSel(m.replace("-","/"));setShowSub(false);}} style={{display:"block",width:"100%",padding:"8px 10px",border:"none",background:"transparent",fontSize:14,fontWeight:600,color:"#14365a",cursor:"pointer",textAlign:"left",borderBottom:"1px solid #f0f0f0"}}>{m.replace("-","/")}</button>))}</div>)}
+        )}
+        {/* Calendar Tab */}
+        {viewMode==="cumulative"&&tab==="calendar"&&(<>
+          <div style={{display:"flex",gap:6,marginBottom:8}}>
+            {[["single","単一日付"],["range","期間選択"]].map(([k,l])=>(<button key={k} onClick={()=>{setCalMode(k);setCalStart(null);setCalEnd(null);setSelectedGameKeys(new Set());}} style={{flex:1,padding:"8px 0",border:"2px solid "+(calMode===k?"#2b7de9":"#ddd"),borderRadius:8,background:calMode===k?"#2b7de9":"#fff",color:calMode===k?"#fff":"#14365a",fontSize:14,fontWeight:700,cursor:"pointer"}}>{l}</button>))}
+          </div>
+          <CalendarPicker gameDates={gameDateSet} onSelect={handleCalSelect} mode={calMode} selectedStart={calStart} selectedEnd={calEnd}/>
+          {calFilteredGames.length>0&&(<div style={{marginBottom:10}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+              <span style={{fontSize:14,fontWeight:700,color:"#14365a"}}>{selectedGameKeys.size}/{calFilteredGames.length} セット選択中</span>
+              <div style={{display:"flex",gap:6}}>
+                <button onClick={()=>setSelectedGameKeys(new Set(calFilteredGames.map(g=>g.d)))} style={{padding:"4px 12px",border:"1px solid #2b7de9",borderRadius:6,background:"#fff",color:"#2b7de9",fontSize:12,fontWeight:700,cursor:"pointer"}}>全選択</button>
+                <button onClick={()=>setSelectedGameKeys(new Set())} style={{padding:"4px 12px",border:"1px solid #ccc",borderRadius:6,background:"#fff",color:"#888",fontSize:12,fontWeight:700,cursor:"pointer"}}>全解除</button>
+              </div>
+            </div>
+            {calFilteredGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab}/>))}
+          </div>)}
         </>)}
+        {/* Recent Tab */}
+        {viewMode==="cumulative"&&tab==="recent"&&(<div style={{marginBottom:10}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+            <span style={{fontSize:14,fontWeight:700,color:"#14365a"}}>{selectedGameKeys.size}/{recentGames.length} セット選択中</span>
+            <div style={{display:"flex",gap:6}}>
+              <button onClick={selectAllRecent} style={{padding:"4px 12px",border:"1px solid #2b7de9",borderRadius:6,background:"#fff",color:"#2b7de9",fontSize:12,fontWeight:700,cursor:"pointer"}}>全選択</button>
+              <button onClick={deselectAllRecent} style={{padding:"4px 12px",border:"1px solid #ccc",borderRadius:6,background:"#fff",color:"#888",fontSize:12,fontWeight:700,cursor:"pointer"}}>全解除</button>
+            </div>
+          </div>
+          {recentGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab}/>))}
+        </div>)}
         {/* Player select chips */}
         <div style={{display:"flex",gap:isTab?12:6,marginBottom:10,flexWrap:"wrap",marginTop:6}}>{names.map((nm,i)=>(<button key={nm} onClick={()=>toggleSel(nm)} style={{padding:isTab?"12px 28px":"6px 14px",border:"2px solid "+(effectiveSelected.includes(nm)?PC[effectiveSelected.indexOf(nm)%PC.length]:"#ddd"),borderRadius:isTab?36:20,background:effectiveSelected.includes(nm)?PC[effectiveSelected.indexOf(nm)%PC.length]+"22":"#fff",color:effectiveSelected.includes(nm)?PC[effectiveSelected.indexOf(nm)%PC.length]:"#888",fontSize:isTab?28:14,fontWeight:700,cursor:"pointer"}}>{nm}</button>))}</div>
         {playersData.length>0&&(<>
@@ -617,11 +825,30 @@ function StatsModal({onClose,currentGameRecords,initialDelete}){
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}><thead><tr style={{background:"#14365a",color:"#fff"}}><th style={{padding:"8px",textAlign:"left"}}>プレイヤー</th><th style={{padding:"8px"}}>試合</th><th style={{padding:"8px"}}>勝利</th><th style={{padding:"8px"}}>ターン</th><th style={{padding:"8px"}}>ミス</th><th style={{padding:"8px"}}>ミス率</th><th style={{padding:"8px"}}>上がり率</th><th style={{padding:"8px"}}>お邪魔</th></tr></thead>
             <tbody>{playersData.map(pd=>{const m=pd.metrics;return(<tr key={pd.name} style={{borderBottom:"1px solid #eee"}}><td style={{padding:"8px",fontWeight:700,color:pd.color}}>{pd.name}</td><td style={{padding:"8px",textAlign:"center"}}>{m.gameCount}</td><td style={{padding:"8px",textAlign:"center"}}>{m.winCount}</td><td style={{padding:"8px",textAlign:"center"}}>{m.turnCount}</td><td style={{padding:"8px",textAlign:"center",color:"#bf6900"}}>{m.missCount}</td><td style={{padding:"8px",textAlign:"center"}}>{(m.missRate*100).toFixed(1)}%</td><td style={{padding:"8px",textAlign:"center"}}>{(m.finishRate*100).toFixed(1)}%</td><td style={{padding:"8px",textAlign:"center",color:"#22b566",fontWeight:800}}>{m.ojamaCount}</td></tr>);})}</tbody></table>
           </div>
+          {/* Score Distribution */}
+          <ScoreDistribution playersData={playersData}/>
           {/* Detailed metrics */}
           <div style={{background:"#fff",borderRadius:14,padding:14,border:"1px solid #ddd",marginBottom:14}}>
             <div style={{fontSize:16,fontWeight:800,color:"#14365a",marginBottom:8}}>📈 詳細指標</div>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:"#f0f3f8"}}><th style={{padding:"6px",textAlign:"left"}}>指標</th>{playersData.map(pd=><th key={pd.name} style={{padding:"6px",textAlign:"center",color:pd.color,fontWeight:800}}>{pd.name}</th>)}</tr></thead>
             <tbody>{[["投擲平均点",pd=>pd.metrics.avgPts.toFixed(2)],["ブレイク平均",pd=>pd.metrics.breakAvg.toFixed(2)],["お邪魔成功率",pd=>(pd.metrics.ojamaRate*100).toFixed(1)+"%"],["2ミス後平均",pd=>pd.metrics.recAvg.toFixed(2)],["上がり決定率",pd=>(pd.metrics.finishRate*100).toFixed(1)+"%"],["ミス率",pd=>(pd.metrics.missRate*100).toFixed(1)+"%"],["最短投擲",pd=>fmtSec(pd.metrics.throwMin)],["最長投擲",pd=>fmtSec(pd.metrics.throwMax)],["平均投擲",pd=>fmtSec(pd.metrics.throwAvg)]].map(([label,fn])=>(<tr key={label} style={{borderBottom:"1px solid #eee"}}><td style={{padding:"6px",fontWeight:700}}>{label}</td>{playersData.map(pd=><td key={pd.name} style={{padding:"6px",textAlign:"center"}}>{fn(pd)}</td>)}</tr>))}</tbody></table>
+          </div>
+          {/* Turn-by-turn performance (bar chart placeholder) */}
+          <div style={{background:"#fff",borderRadius:14,padding:14,border:"1px solid #ddd",marginBottom:14}}>
+            <div style={{fontSize:16,fontWeight:800,color:"#14365a",marginBottom:8}}>📊 ターン別パフォーマンス分析</div>
+            {playersData.map(pd=>{
+              const sv=pd.metrics.scoreValues||[];if(!sv.length)return null;
+              const maxBars=Math.min(sv.length,20);const recent=sv.slice(-maxBars);
+              const maxV=Math.max(...recent,1);
+              return(<div key={pd.name} style={{marginBottom:12}}>
+                <div style={{fontSize:14,fontWeight:700,color:pd.color,marginBottom:6}}>{pd.name}（直近{recent.length}投）</div>
+                <div style={{display:"flex",alignItems:"flex-end",gap:2,height:60}}>
+                  {recent.map((v,i)=>(<div key={i} style={{flex:1,background:v===0?"#e0e0e0":pd.color,borderRadius:"3px 3px 0 0",height:Math.max((v/maxV)*56,4),opacity:0.7+0.3*(v/maxV),position:"relative"}} title={v+"点"}>
+                    {recent.length<=12&&<div style={{position:"absolute",top:-16,left:"50%",transform:"translateX(-50%)",fontSize:9,fontWeight:700,color:"#666"}}>{v}</div>}
+                  </div>))}
+                </div>
+              </div>);
+            })}
           </div>
         </>)}
       </>)}
@@ -679,15 +906,21 @@ function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gam
         {isAllDone&&(<div style={{background:"#fff",borderRadius:14,padding:16,marginBottom:12,border:"1px solid #d0dff0"}}><div style={{fontSize:18,fontWeight:800,color:"#14365a",marginBottom:5}}>🔄 ゲーム継続・延長</div><OrderPicker teams={teams} teamOrder={teamOrder} value={ordMode} onChangeOrd={handleOrd} prevOrder={teamOrder}/><div style={{display:"flex",gap:8,marginTop:6}}><button onClick={()=>onExtend("game",ordVal)} style={{flex:1,padding:"14px 0",border:"none",borderRadius:10,background:"#2b7de9",color:"#fff",fontSize:17,fontWeight:700,cursor:"pointer"}}>＋1ゲーム追加</button>{isMatchOver&&<button onClick={()=>onExtend("set",ordVal)} style={{flex:1,padding:"14px 0",border:"none",borderRadius:10,background:"#22b566",color:"#fff",fontSize:17,fontWeight:700,cursor:"pointer"}}>＋1セット延長</button>}</div></div>)}
         <button onClick={onBack} style={{width:"100%",padding:"16px 0",border:"2px solid #14365a",borderRadius:12,background:"transparent",color:"#14365a",fontSize:19,fontWeight:700,cursor:"pointer",marginBottom:24}}>設定に戻る</button>
       </div>
-      {showStats===true&&<StatsModal onClose={()=>setShowStats(false)} currentGameRecords={currentGameRecords}/>}
-      {showStats==="delete"&&<StatsModal onClose={()=>setShowStats(false)} currentGameRecords={currentGameRecords} initialDelete={true}/>}
+      {showStats===true&&<StatsModal onClose={()=>setShowStats(false)} currentGameRecords={currentGameRecords} source="game"/>}
+      {showStats==="delete"&&<StatsModal onClose={()=>setShowStats(false)} currentGameRecords={currentGameRecords} initialDelete={true} source="game"/>}
     </div>
   );
 }
 
 /* ═══ Game Screen — with timing ═══ */
-function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goBack,saveToStatsProp}){
-  const init={teams:initialTeams.map(t=>({...t,players:t.players.map(n=>({name:n,active:true}))})),history:[],currentOrderIdx:0,currentTurn:1,teamOrder:initialOrder,eliminated:initialTeams.map(()=>false),winner:null,gameNumber:1,dqEndGame:dqEnd,autoEnd:false,turnStartTime:Date.now(),plOffsets:initialTeams.map(()=>0)};
+function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goBack,saveToStatsProp,recoverData}){
+  const init=recoverData?{
+    teams:recoverData.teams.map(t=>({...t,players:t.players.map(p=>typeof p==="string"?{name:p,active:true}:p)})),
+    history:recoverData.history,currentOrderIdx:recoverData.currentOrderIdx,currentTurn:recoverData.currentTurn,
+    teamOrder:recoverData.teamOrder,eliminated:recoverData.eliminated,
+    winner:null,gameNumber:recoverData.gameNumber||1,dqEndGame:recoverData.dqEndGame!==undefined?recoverData.dqEndGame:dqEnd,
+    autoEnd:false,turnStartTime:Date.now(),plOffsets:recoverData.plOffsets||recoverData.teams.map(()=>0)
+  }:{teams:initialTeams.map(t=>({...t,players:t.players.map(n=>({name:n,active:true}))})),history:[],currentOrderIdx:0,currentTurn:1,teamOrder:initialOrder,eliminated:initialTeams.map(()=>false),winner:null,gameNumber:1,dqEndGame:dqEnd,autoEnd:false,turnStartTime:Date.now(),plOffsets:initialTeams.map(()=>0)};
   const[st,dispatch]=useReducer(reducer,init);const{teams,history,currentOrderIdx,currentTurn,teamOrder,eliminated,winner,gameNumber,plOffsets}=st;
   const[showPl,setShowPl]=useState(false);const[showRes,setShowRes]=useState(false);
   const[view,setView]=useState("both");const[conf,setConf]=useState(null);
@@ -717,6 +950,16 @@ function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goB
     }
     prevHistLen.current=history.length;
   },[history.length]);
+
+  /* Auto-save progress for crash recovery */
+  useEffect(()=>{
+    if(winner!==null){try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}return;}
+    if(history.length===0)return;
+    try{
+      const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name:p.name,active:p.active}))})),history,teamOrder,currentOrderIdx,currentTurn,eliminated,gameNumber,plOffsets,dqEndGame:dqEnd,savedAt:Date.now()};
+      localStorage.setItem(PROGRESS_KEY,JSON.stringify(snapshot));
+    }catch(e){console.warn("Progress save failed:",e);}
+  },[history,eliminated,currentTurn,winner]);
 
   useEffect(()=>{if(winner!==null&&!showRes){
     setGW(p=>{const n=[...p];n[winner]++;return n;});setShowRes(true);
@@ -765,8 +1008,20 @@ function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goB
 }
 
 export default function App(){
-  const[scr,setScr]=useState("setup");const[cfg,setCfg]=useState(null);const[saved,setSaved]=useState(null);
-  return(<div style={{width:"100%",height:"100dvh"}}>{scr==="setup"?<SetupScreen savedTeams={saved} onStart={(t,o,ng,bo,dq,sts)=>{setCfg({t,o,ng,bo,dq,sts});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts} goBack={saveData=>{if(saveData)setSaved(saveData);setScr("setup");setCfg(null);}}/>}</div>);
+  const[scr,setScr]=useState(()=>{try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0)return"recover";}catch(e){}return"setup";});
+  const[cfg,setCfg]=useState(null);const[saved,setSaved]=useState(null);const[recovery,setRecovery]=useState(null);
+  useEffect(()=>{if(scr==="recover"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));setRecovery(p);}catch(e){setScr("setup");}};},[]);
+  const doRecover=()=>{if(!recovery)return;const r=recovery;setCfg({t:r.teams,o:r.teamOrder,ng:1,bo:0,dq:r.dqEndGame!==undefined?r.dqEndGame:true,sts:true,recover:r});setScr("game");};
+  const dismissRecover=()=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}setRecovery(null);setScr("setup");};
+  if(scr==="recover"&&recovery){return(<div style={{width:"100%",height:"100dvh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(170deg,#0f1f30,#14365a)",padding:20}}>
+    <div style={{background:"#fff",borderRadius:20,padding:"32px 28px",maxWidth:480,width:"100%",textAlign:"center",boxShadow:"0 10px 36px rgba(0,0,0,0.25)"}}>
+      <div style={{fontSize:44,marginBottom:8}}>🔄</div>
+      <div style={{fontSize:22,fontWeight:800,color:"#14365a",marginBottom:6}}>未完了の試合があります</div>
+      <div style={{fontSize:16,color:"#888",marginBottom:14}}>Game {recovery.gameNumber}、{recovery.currentTurn}ターン目まで記録があります。<br/>続きから再開しますか？</div>
+      <div style={{display:"flex",gap:10}}><button onClick={doRecover} style={{flex:1,padding:"16px 0",border:"none",borderRadius:12,background:"#14365a",color:"#fff",fontSize:18,fontWeight:700,cursor:"pointer"}}>再開する</button><button onClick={dismissRecover} style={{flex:1,padding:"16px 0",border:"2px solid #14365a",borderRadius:12,background:"transparent",color:"#14365a",fontSize:18,fontWeight:700,cursor:"pointer"}}>破棄する</button></div>
+    </div>
+  </div>);}
+  return(<div style={{width:"100%",height:"100dvh"}}>{scr==="setup"?<SetupScreen savedTeams={saved} onStart={(t,o,ng,bo,dq,sts)=>{setCfg({t,o,ng,bo,dq,sts});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts} recoverData={cfg.recover||null} goBack={saveData=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);setScr("setup");setCfg(null);}}/>}</div>);
 }
 
 const SS={
