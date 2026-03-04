@@ -26,9 +26,10 @@ function loadFavs(){
     /* Backup 1: secondary key */
     f=JSON.parse(localStorage.getItem(LS_FAV_BK));
     if(f&&f.length>0){localStorage.setItem(LS_KEY,JSON.stringify(f));return f;}
-    /* Backup 2: reconstruct from stats keys */
-    const stats=JSON.parse(localStorage.getItem("mk-player-stats"));
-    if(stats){const names=Object.keys(stats);if(names.length>0){localStorage.setItem(LS_KEY,JSON.stringify(names));localStorage.setItem(LS_FAV_BK,JSON.stringify(names));return names;}}
+    /* Backup 2: reconstruct from stats cache */
+    if(_cache.ready){const names=Object.keys(_cache.stats);if(names.length>0){localStorage.setItem(LS_KEY,JSON.stringify(names));localStorage.setItem(LS_FAV_BK,JSON.stringify(names));return names;}}
+    /* Backup 3: try localStorage stats (pre-migration) */
+    try{const stats=JSON.parse(localStorage.getItem("mk-player-stats"));if(stats){const names=Object.keys(stats);if(names.length>0){localStorage.setItem(LS_KEY,JSON.stringify(names));localStorage.setItem(LS_FAV_BK,JSON.stringify(names));return names;}}}catch(e2){}
     return[];
   }catch(e){return[];}
 }
@@ -36,20 +37,137 @@ function saveFavs(l){try{localStorage.setItem(LS_KEY,JSON.stringify(l));localSto
 const MAX_FAV=99;
 function useFavs(){const[f,sF]=useState(()=>loadFavs());return{favs:f,addF:n=>{const x=n.trim().slice(0,MAX_NAME);if(x&&!f.includes(x)&&f.length<MAX_FAV){const u=[...f,x];sF(u);saveFavs(u);}},rmF:n=>{const u=f.filter(v=>v!==n);sF(u);saveFavs(u);}};}
 
-/* ═══ Stats Storage ═══ */
+/* ═══ Stats Storage — IndexedDB with in-memory cache (100K games) ═══ */
 const STATS_KEY="mk-player-stats";
 const PROGRESS_KEY="mk-game-progress";
-function loadStats(){try{return JSON.parse(localStorage.getItem(STATS_KEY))||{};}catch(e){return{};}}
-function saveStats(d){try{localStorage.setItem(STATS_KEY,JSON.stringify(d));}catch(e){}}
+const REPLAY_KEY="mk-game-replays";
+const IDB_NAME="mk-molkky-db";
+const IDB_VER=1;
+const MAX_GAMES=100000;
+const MAX_REPLAYS=100000;
+
+/* In-memory cache — loaded from IndexedDB at startup */
+const _cache={stats:{},replays:{},ready:false};
+
+function openIDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(IDB_NAME,IDB_VER);
+    req.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains("kv"))db.createObjectStore("kv");
+    };
+    req.onsuccess=()=>res(req.result);
+    req.onerror=()=>rej(req.error);
+  });
+}
+function idbGet(db,key){
+  return new Promise((res,rej)=>{
+    const tx=db.transaction("kv","readonly");
+    const req=tx.objectStore("kv").get(key);
+    req.onsuccess=()=>res(req.result);
+    req.onerror=()=>rej(req.error);
+  });
+}
+function idbSet(db,key,val){
+  return new Promise((res,rej)=>{
+    const tx=db.transaction("kv","readwrite");
+    const req=tx.objectStore("kv").put(val,key);
+    req.onsuccess=()=>res();
+    req.onerror=()=>rej(req.error);
+  });
+}
+function idbDel(db,key){
+  return new Promise((res,rej)=>{
+    const tx=db.transaction("kv","readwrite");
+    const req=tx.objectStore("kv").delete(key);
+    req.onsuccess=()=>res();
+    req.onerror=()=>rej(req.error);
+  });
+}
+
+let _db=null;
+async function initDB(){
+  try{
+    _db=await openIDB();
+    /* Load from IndexedDB */
+    let stats=await idbGet(_db,"stats");
+    let replays=await idbGet(_db,"replays");
+    /* Migrate from localStorage if IDB is empty */
+    if(!stats){
+      try{const ls=JSON.parse(localStorage.getItem(STATS_KEY));if(ls&&Object.keys(ls).length>0){stats=ls;await idbSet(_db,"stats",stats);localStorage.removeItem(STATS_KEY);}}catch(e){}
+    }
+    if(!replays){
+      try{const lr=JSON.parse(localStorage.getItem(REPLAY_KEY));if(lr&&Object.keys(lr).length>0){replays=lr;await idbSet(_db,"replays",replays);localStorage.removeItem(REPLAY_KEY);}}catch(e){}
+    }
+    /* Also try to migrate favs backup from stats if needed */
+    if(stats){
+      try{const existingFavs=JSON.parse(localStorage.getItem("mk-fav"));if(!existingFavs||existingFavs.length===0){const names=Object.keys(stats);if(names.length>0){localStorage.setItem("mk-fav",JSON.stringify(names));localStorage.setItem("mk-fav-bk",JSON.stringify(names));}}}catch(e){}
+    }
+    _cache.stats=stats||{};
+    _cache.replays=replays||{};
+  }catch(e){
+    console.error("IDB init failed, falling back to localStorage",e);
+    try{_cache.stats=JSON.parse(localStorage.getItem(STATS_KEY))||{};}catch(e2){_cache.stats={};}
+    try{_cache.replays=JSON.parse(localStorage.getItem(REPLAY_KEY))||{};}catch(e2){_cache.replays={};}
+  }
+  _cache.ready=true;
+}
+
+/* Sync reads from cache */
+function loadStats(){return _cache.stats;}
+function loadReplays(){return _cache.replays;}
+
+/* Async-persist writes (fire-and-forget) */
+function _persistStats(){if(_db)idbSet(_db,"stats",_cache.stats).catch(e=>console.error("stats persist error",e));}
+function _persistReplays(){if(_db)idbSet(_db,"replays",_cache.replays).catch(e=>console.error("replays persist error",e));}
+
+function saveStats(d){
+  _cache.stats=d;
+  _persistStats();
+}
+
+function _countTotalGames(stats){
+  let c=0;for(const nm in stats)c+=stats[nm].length;return c;
+}
+function _trimOldestStats(stats,maxGames){
+  /* Collect all dates, find oldest to remove */
+  const allDates=[];
+  for(const nm in stats)stats[nm].forEach((g,i)=>allDates.push({nm,i,d:g.d}));
+  allDates.sort((a,b)=>a.d.localeCompare(b.d));
+  const excess=allDates.length-maxGames;
+  if(excess<=0)return;
+  /* Remove oldest entries */
+  const toRemove=allDates.slice(0,excess);
+  const removeMap={};
+  toRemove.forEach(r=>{if(!removeMap[r.nm])removeMap[r.nm]=new Set();removeMap[r.nm].add(r.i);});
+  for(const nm in removeMap){
+    stats[nm]=stats[nm].filter((_,i)=>!removeMap[nm].has(i));
+    if(!stats[nm].length)delete stats[nm];
+  }
+}
+
+function saveGameStatsToDB(records){
+  const stats=_cache.stats;
+  records.forEach(({nm,data})=>{if(!stats[nm])stats[nm]=[];stats[nm].push(data);});
+  /* Trim if over limit */
+  if(_countTotalGames(stats)>MAX_GAMES)_trimOldestStats(stats,MAX_GAMES);
+  _persistStats();
+}
 function deleteStatsByPeriod(period){
-  if(period==="all"){localStorage.removeItem(STATS_KEY);return;}
-  const stats=loadStats();const now=new Date();let start;
+  if(period==="all"){_cache.stats={};_persistStats();
+    /* Also clear replays when deleting all */
+    _cache.replays={};_persistReplays();return;}
+  const stats=_cache.stats;const now=new Date();let start;
   if(period==="day"){start=new Date(now);start.setHours(0,0,0,0);}
   else if(period==="week"){start=new Date(now);const dow=start.getDay();start.setDate(start.getDate()-(dow===0?6:dow-1));start.setHours(0,0,0,0);}
   else if(period==="month"){start=new Date(now.getFullYear(),now.getMonth(),1);}
   else if(period==="year"){start=new Date(now.getFullYear(),0,1);}
   for(const nm in stats){stats[nm]=stats[nm].filter(g=>new Date(g.d)<start);if(!stats[nm].length)delete stats[nm];}
-  saveStats(stats);
+  _persistStats();
+  /* Also clean replays in the same period */
+  const replays=_cache.replays;
+  for(const key in replays){if(new Date(key)>=start)delete replays[key];}
+  _persistReplays();
 }
 
 function calcOjama(history,playerName,playerTeamIdx){
@@ -79,8 +197,8 @@ function calcOjama(history,playerName,playerTeamIdx){
 /* Build per-game stats record from history.
    timestamps = array of {teamIndex,playerIndex,ts} for throw timing
    teamOrder[0] = first thrower team for break definition */
-function buildGameRecord(teams,history,teamOrder,winner,timestamps,favs){
-  const records=[];const d=new Date().toISOString();
+function buildGameRecord(teams,history,teamOrder,winner,timestamps,favs,overrideD){
+  const records=[];const d=overrideD||new Date().toISOString();
   const gameStart=timestamps.length>0?timestamps[0].ts:null;
   const gameEnd=timestamps.length>0?timestamps[timestamps.length-1].ts:null;
   /* Determine finish type */
@@ -110,7 +228,10 @@ function buildGameRecord(teams,history,teamOrder,winner,timestamps,favs){
     if(ti===firstTeam){const t1=turns.find(h=>h.turn===1);if(t1&&t1.type==="score")breakScore=t1.score;}
     const ojama=calcOjama(history,nm,ti);
     const won=winner===ti;
+    const isFirstOrder=teamOrder[0]===ti;
     const times=[];
+    /* Build turn values: positive=score, 0=miss, -1=fault */
+    const turnValues=turns.map(h=>h.type==="score"?h.score:h.type==="fault"?-1:0);
     turns.forEach(h=>{
       const hIdx=history.indexOf(h);
       const tsEntry=timestamps.find(ts=>ts.histIdx===hIdx);
@@ -121,15 +242,24 @@ function buildGameRecord(teams,history,teamOrder,winner,timestamps,favs){
     const tAvg=times.length>0?times.reduce((a,b)=>a+b,0)/times.length:null;
     /* winner name for display */
     const winnerName=winner!==null?teams[winner].players.map(p2=>typeof p2==="object"?p2.name:p2).find((_,pi)=>{const wturns=history.filter(h=>h.teamIndex===winner);const last=wturns[wturns.length-1];return last&&last.playerIndex===pi;})||"":null;
-    records.push({nm,data:{d,de:gameEnd,t:turns.length,s:totalPts,m:misses,f:faults,w:won?1:0,o:ojama.success,oa:ojama.attempts,fa:finA,fs:finS,hs:highScores,rc:rec,br:breakScore,tMin,tMax,tAvg,ft:finishType,sv:scoreValues}});
+    records.push({nm,data:{d,de:gameEnd,t:turns.length,s:totalPts,m:misses,f:faults,w:won?1:0,o:ojama.success,oa:ojama.attempts,fa:finA,fs:finS,hs:highScores,rc:rec,br:breakScore,tMin,tMax,tAvg,ft:finishType,sv:scoreValues,fo:isFirstOrder?1:0,tv:turnValues}});
   });});
   return records;
 }
 
-function saveGameStatsToDB(records){
-  const stats=loadStats();
-  records.forEach(({nm,data})=>{if(!stats[nm])stats[nm]=[];stats[nm].push(data);});
-  saveStats(stats);
+/* ═══ Game Replay Storage ═══ */
+function saveReplay(d,teams,history,teamOrder,winner){
+  try{
+    const replays=_cache.replays;
+    /* Slim down: only keep what ScoreTable needs */
+    const slimTeams=teams.map(t=>({name:t.name,players:t.players.map(p=>({name:typeof p==="object"?p.name:p,active:typeof p==="object"?p.active:true}))}));
+    const slimHistory=history.map(h=>({turn:h.turn,teamIndex:h.teamIndex,playerIndex:h.playerIndex,playerName:h.playerName,type:h.type,score:h.score,runningTotal:h.runningTotal,prevScore:h.prevScore,reset25:h.reset25,faultReset:h.faultReset,consecutiveFails:h.consecutiveFails}));
+    replays[d]={teams:slimTeams,history:slimHistory,teamOrder,winner};
+    /* Keep max MAX_REPLAYS, remove oldest */
+    const keys=Object.keys(replays).sort();
+    while(keys.length>MAX_REPLAYS){delete replays[keys.shift()];}
+    _persistReplays();
+  }catch(e){console.error("replay save error",e);}
 }
 
 /* ═══ Period helpers ═══ */
@@ -186,8 +316,10 @@ function filterGames(games,period,subSel){
 
 function calcMetrics(games){
   if(!games.length)return null;
-  const tot={t:0,s:0,m:0,f:0,w:0,o:0,oa:0,fa:0,fs:0,hs:0,rc:[],br:[],tMin:[],tMax:[],tAvg:[],sv:[]};
-  games.forEach(g=>{tot.t+=g.t;tot.s+=g.s;tot.m+=g.m;tot.f+=g.f;tot.w+=g.w;tot.o+=g.o;tot.oa+=(g.oa||0);tot.fa+=g.fa;tot.fs+=g.fs;tot.hs+=g.hs;if(g.rc)tot.rc.push(...g.rc);if(g.br!=null)tot.br.push(g.br);if(g.tMin!=null)tot.tMin.push(g.tMin);if(g.tMax!=null)tot.tMax.push(g.tMax);if(g.tAvg!=null)tot.tAvg.push(g.tAvg);if(g.sv)tot.sv.push(...g.sv);});
+  const tot={t:0,s:0,m:0,f:0,w:0,o:0,oa:0,fa:0,fs:0,hs:0,rc:[],br:[],tMin:[],tMax:[],tAvg:[],sv:[],foW:0,foG:0,loW:0,loG:0};
+  games.forEach(g=>{tot.t+=g.t;tot.s+=g.s;tot.m+=g.m;tot.f+=g.f;tot.w+=g.w;tot.o+=g.o;tot.oa+=(g.oa||0);tot.fa+=g.fa;tot.fs+=g.fs;tot.hs+=g.hs;if(g.rc)tot.rc.push(...g.rc);if(g.br!=null)tot.br.push(g.br);if(g.tMin!=null)tot.tMin.push(g.tMin);if(g.tMax!=null)tot.tMax.push(g.tMax);if(g.tAvg!=null)tot.tAvg.push(g.tAvg);if(g.sv)tot.sv.push(...g.sv);
+    if(g.fo===1){tot.foG++;if(g.w)tot.foW++;}else if(g.fo===0){tot.loG++;if(g.w)tot.loW++;}
+  });
   const missRate=tot.t>0?tot.m/tot.t:0;
   const finishRate=tot.fa>0?tot.fs/tot.fa:0;
   const avgPts=tot.t>0?tot.s/tot.t:0;
@@ -198,20 +330,24 @@ function calcMetrics(games){
   const throwMin=tot.tMin.length>0?Math.min(...tot.tMin):null;
   const throwMax=tot.tMax.length>0?Math.max(...tot.tMax):null;
   const throwAvg=tot.tAvg.length>0?tot.tAvg.reduce((a,b)=>a+b,0)/tot.tAvg.length:null;
+  const winRate=games.length>0?tot.w/games.length:0;
+  const firstWinRate=tot.foG>0?tot.foW/tot.foG:null;
+  const lastWinRate=tot.loG>0?tot.loW/tot.loG:null;
   return{
     missRate,finishRate,avgPts,recAvg,highRate,breakAvg,ojamaRate,throwMin,throwMax,throwAvg,
     missCount:tot.m,turnCount:tot.t,ojamaCount:tot.o,ojamaAttempts:tot.oa,winCount:tot.w,gameCount:games.length,
-    scoreValues:tot.sv,
-    r:[(1-missRate)*100,finishRate*100,(avgPts/12)*100,(recAvg/12)*100,ojamaRate*100,(breakAvg/12)*100]
+    scoreValues:tot.sv,winRate,firstWinRate,lastWinRate,firstGames:tot.foG,lastGames:tot.loG,
+    r:[(1-missRate)*100,finishRate*100,(avgPts/12)*100,(recAvg/12)*100,ojamaRate*100,(breakAvg/12)*100,winRate*100]
   };
 }
 
 /* ═══ Game-level helpers ═══ */
 function getAvailableGames(stats,names){
   const gameMap=new Map();
+  const replays=loadReplays();
   names.forEach(nm=>{(stats[nm]||[]).forEach(g=>{
     const key=g.d;
-    if(!gameMap.has(key)){gameMap.set(key,{d:g.d,de:g.de,players:[],records:[],ft:g.ft||"unknown",winnerMembers:[]});}
+    if(!gameMap.has(key)){gameMap.set(key,{d:g.d,de:g.de,players:[],records:[],ft:g.ft||"unknown",winnerMembers:[],hasReplay:!!replays[g.d]});}
     const gm=gameMap.get(key);
     if(!gm.players.includes(nm))gm.players.push(nm);
     gm.records.push({nm,data:g});
@@ -569,11 +705,11 @@ function drawScoreImage(teams,history,teamOrder,comments,gameNumber){
 async function saveImage(canvas){return new Promise((res,rej)=>{canvas.toBlob(async blob=>{if(!blob)return rej("fail");const file=new File([blob],"molkky-score.png",{type:"image/png"});if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:"モルック スコア"});res("shared");}catch(e){if(e.name!=="AbortError")rej(e);else res("cancelled");}}else{const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="molkky-score.png";a.click();URL.revokeObjectURL(url);res("dl");}},"image/png");});}
 
 /* ═══ Radar Chart SVG ═══ */
-const RADAR_LABELS=["ミス率\n(低い程◎)","上がり\n決定率","投擲\n平均点","2ミス後\n平均点","お邪魔\n成功率","ブレイク\n平均点"];
-const RADAR_MAX=["0%","100%","12pt","12pt","100%","12pt"];
-/* Per-vertex nudge: separate max-value from label to prevent overlap */
-const LB_ADJ=[{dx:0,dy:-20},{dx:28,dy:-2},{dx:28,dy:10},{dx:0,dy:20},{dx:-28,dy:10},{dx:-28,dy:-2}];
-const MX_ADJ=[{dx:0,dy:6},{dx:16,dy:2},{dx:16,dy:-2},{dx:0,dy:-6},{dx:-16,dy:-2},{dx:-16,dy:2}];
+const RADAR_LABELS=["ミス率\n(低い程◎)","上がり\n決定率","投擲\n平均点","2ミス後\n平均点","お邪魔\n成功率","ブレイク\n平均点","勝率"];
+const RADAR_MAX=["0%","100%","12pt","12pt","100%","12pt","100%"];
+/* Per-vertex nudge for 7-gon */
+const LB_ADJ=[{dx:0,dy:-20},{dx:30,dy:-8},{dx:30,dy:8},{dx:14,dy:20},{dx:-14,dy:20},{dx:-30,dy:8},{dx:-30,dy:-8}];
+const MX_ADJ=[{dx:0,dy:6},{dx:18,dy:0},{dx:18,dy:0},{dx:8,dy:-4},{dx:-8,dy:-4},{dx:-18,dy:0},{dx:-18,dy:0}];
 function RadarChart({playersData,size}){
   const isTablet=typeof window!=="undefined"&&window.innerWidth>=768;
   const S=isTablet?952:size||560;
@@ -584,7 +720,7 @@ function RadarChart({playersData,size}){
   const mxFS=isTablet?29:17;
   const lbDy=isTablet?34:21;
   const adjScale=isTablet?1.7:1;
-  const cx2=S/2,cy2=S/2,R=S*rRatio;const n=6;
+  const cx2=S/2,cy2=S/2,R=S*rRatio;const n=7;
   const ang=i=>-Math.PI/2+i*(2*Math.PI/n);
   const pt=(i,r)=>({x:cx2+r*Math.cos(ang(i)),y:cy2+r*Math.sin(ang(i))});
   const grid=[0.25,0.5,0.75,1].map(f=>Array.from({length:n},(_,i)=>pt(i,R*f)).map(p=>p.x+","+p.y).join(" "));
@@ -697,8 +833,27 @@ function ScoreDistribution({playersData}){
   </div>);
 }
 
+/* ═══ Game Score Table Modal (uses real ScoreTable from replay data) ═══ */
+function GameScoreModal({gameKey,onClose}){
+  const[replay,setReplay]=useState(null);
+  useEffect(()=>{if(!gameKey)return;const replays=loadReplays();setReplay(replays[gameKey]||null);},[gameKey]);
+  if(!gameKey||!replay)return null;
+  const dt=new Date(gameKey);
+  const dateStr=(dt.getMonth()+1)+"/"+dt.getDate()+" "+fmtHM(dt);
+  return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={onClose}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(10px + env(safe-area-inset-top, 0px)) 16px 8px",background:"#14365a",flexShrink:0}} onClick={e=>e.stopPropagation()}>
+      <div style={{fontSize:20,fontWeight:800,color:"#fff"}}>📋 スコア表</div>
+      <div style={{fontSize:14,color:"rgba(255,255,255,0.7)"}}>{dateStr}</div>
+      <button onClick={onClose} style={{padding:"6px 14px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"transparent",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>✕ 閉じる</button>
+    </div>
+    <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",background:"#fff"}} onClick={e=>e.stopPropagation()}>
+      <ScoreTable teams={replay.teams} history={replay.history} teamOrder={replay.teamOrder} highlightLast={false} forCapture={true}/>
+    </div>
+  </div>);
+}
+
 /* ═══ Game List Item ═══ */
-function GameListItem({game,checked,onToggle,isTab}){
+function GameListItem({game,checked,onToggle,isTab,onShowScore}){
   const dt=new Date(game.d);
   const timeStr=fmtHM(dt);
   const dateStr=(dt.getMonth()+1)+"/"+dt.getDate();
@@ -707,11 +862,12 @@ function GameListItem({game,checked,onToggle,isTab}){
   /* E: Labels depend on finish type */
   const winLabel=game.ft==="50finish"?"上がり者":"勝者";
   const hasTeam=(game.winnerMembers||[]).length>=2;
-  return(<div onClick={onToggle} style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 14px",background:checked?"#e6f0fb":"#fff",borderRadius:10,border:checked?"2px solid #2b7de9":"1px solid #e0e0e0",marginBottom:6,cursor:"pointer",transition:"all 0.15s"}}>
-    <div style={{width:22,height:22,borderRadius:6,border:checked?"none":"2px solid #ccc",background:checked?"#2b7de9":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2}}>
+  const hasReplay=game.hasReplay;
+  return(<div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 14px",background:checked?"#e6f0fb":"#fff",borderRadius:10,border:checked?"2px solid #2b7de9":"1px solid #e0e0e0",marginBottom:6,transition:"all 0.15s"}}>
+    <div onClick={onToggle} style={{width:22,height:22,borderRadius:6,border:checked?"none":"2px solid #ccc",background:checked?"#2b7de9":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2,cursor:"pointer"}}>
       {checked&&<span style={{color:"#fff",fontSize:14,fontWeight:900}}>✓</span>}
     </div>
-    <div style={{flex:1,minWidth:0}}>
+    <div onClick={onToggle} style={{flex:1,minWidth:0,cursor:"pointer"}}>
       <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
         <span style={{fontSize:isTab?18:15,fontWeight:800,color:"#14365a"}}>{dateStr} {timeStr}</span>
         <span style={{fontSize:isTab?14:12,fontWeight:700,color:ftColor,background:ftColor+"18",padding:"2px 8px",borderRadius:4}}>{ftLabel}</span>
@@ -722,6 +878,7 @@ function GameListItem({game,checked,onToggle,isTab}){
       {game.winnerName&&<div style={{fontSize:isTab?14:12,color:"#22b566",fontWeight:700,marginTop:2}}>{winLabel}: {game.winnerName}</div>}
       {hasTeam&&<div style={{fontSize:isTab?13:11,color:"#2b7de9",fontWeight:600,marginTop:1}}>勝利チームのメンバー: {game.winnerMembers.join(", ")}</div>}
     </div>
+    {hasReplay&&<button onClick={e=>{e.stopPropagation();onShowScore&&onShowScore(game.d);}} style={{padding:"6px 10px",border:"1px solid #2b7de9",borderRadius:8,background:"#f0f6ff",color:"#2b7de9",fontSize:isTab?14:12,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>📋</button>}
   </div>);
 }
 
@@ -741,6 +898,8 @@ function StatsModal({onClose,currentGameRecords,initialDelete,source}){
   /* F: Pagination for recent tab */
   const[recentPage,setRecentPage]=useState(0);
   const RECENT_TOTAL=30;const PAGE_SIZE=10;
+  /* Score table modal (stores game date key) */
+  const[scoreGame,setScoreGame]=useState(null);
 
   const currentNames=(currentGameRecords||[]).map(r=>r.nm);
   const allNames=favs.filter(n=>(stats[n]&&stats[n].length>0)||currentNames.includes(n));
@@ -857,7 +1016,7 @@ function StatsModal({onClose,currentGameRecords,initialDelete,source}){
                 <button onClick={()=>setSelectedGameKeys(new Set())} style={{padding:"4px 12px",border:"1px solid #ccc",borderRadius:6,background:"#fff",color:"#888",fontSize:12,fontWeight:700,cursor:"pointer"}}>全解除</button>
               </div>
             </div>
-            {calFilteredGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab}/>))}
+            {calFilteredGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab} onShowScore={setScoreGame}/>))}
           </div>)}
         </>)}
         {/* Recent Tab */}
@@ -882,7 +1041,7 @@ function StatsModal({onClose,currentGameRecords,initialDelete,source}){
               return(<button key={k} onClick={applyPreset} style={{padding:"6px 12px",border:"1px solid #2b7de9",borderRadius:8,background:"#f0f6ff",color:"#2b7de9",fontSize:13,fontWeight:700,cursor:"pointer"}}>{label}</button>);
             })}
           </div>
-          {recentGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab}/>))}
+          {recentGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab} onShowScore={setScoreGame}/>))}
           {/* F: Pagination */}
           {totalPages>1&&(<div style={{display:"flex",justifyContent:"center",gap:8,marginTop:10}}>
             {Array.from({length:totalPages},(_,i)=>(<button key={i} onClick={()=>setRecentPage(i)} style={{width:36,height:36,border:recentPage===i?"2px solid #2b7de9":"1px solid #ddd",borderRadius:8,background:recentPage===i?"#2b7de9":"#fff",color:recentPage===i?"#fff":"#14365a",fontSize:14,fontWeight:700,cursor:"pointer"}}>{i+1}</button>))}
@@ -904,7 +1063,7 @@ function StatsModal({onClose,currentGameRecords,initialDelete,source}){
           <div style={{background:"#fff",borderRadius:14,padding:14,border:"1px solid #ddd",marginBottom:14}}>
             <div style={{fontSize:16,fontWeight:800,color:"#14365a",marginBottom:8}}>📈 詳細指標</div>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}><thead><tr style={{background:"#f0f3f8"}}><th style={{padding:"6px",textAlign:"left"}}>指標</th>{playersData.map(pd=><th key={pd.name} style={{padding:"6px",textAlign:"center",color:pd.color,fontWeight:800}}>{pd.name}</th>)}</tr></thead>
-            <tbody>{[["投擲平均点",pd=>pd.metrics.avgPts.toFixed(2)],["ブレイク平均",pd=>pd.metrics.breakAvg.toFixed(2)],["お邪魔成功率",pd=>(pd.metrics.ojamaRate*100).toFixed(1)+"%"],["2ミス後平均",pd=>pd.metrics.recAvg.toFixed(2)],["上がり決定率",pd=>(pd.metrics.finishRate*100).toFixed(1)+"%"],["ミス率",pd=>(pd.metrics.missRate*100).toFixed(1)+"%"],["最短投擲",pd=>fmtSec(pd.metrics.throwMin)],["最長投擲",pd=>fmtSec(pd.metrics.throwMax)],["平均投擲",pd=>fmtSec(pd.metrics.throwAvg)]].map(([label,fn])=>(<tr key={label} style={{borderBottom:"1px solid #eee"}}><td style={{padding:"6px",fontWeight:700}}>{label}</td>{playersData.map(pd=><td key={pd.name} style={{padding:"6px",textAlign:"center"}}>{fn(pd)}</td>)}</tr>))}</tbody></table>
+            <tbody>{[["先攻勝率",pd=>pd.metrics.firstWinRate!=null?(pd.metrics.firstWinRate*100).toFixed(1)+"% ("+pd.metrics.firstGames+"試合)":"-"],["後攻勝率",pd=>pd.metrics.lastWinRate!=null?(pd.metrics.lastWinRate*100).toFixed(1)+"% ("+pd.metrics.lastGames+"試合)":"-"],["投擲平均点",pd=>pd.metrics.avgPts.toFixed(2)],["ブレイク平均",pd=>pd.metrics.breakAvg.toFixed(2)],["お邪魔成功率",pd=>(pd.metrics.ojamaRate*100).toFixed(1)+"%"],["2ミス後平均",pd=>pd.metrics.recAvg.toFixed(2)],["上がり決定率",pd=>(pd.metrics.finishRate*100).toFixed(1)+"%"],["ミス率",pd=>(pd.metrics.missRate*100).toFixed(1)+"%"],["最短投擲",pd=>fmtSec(pd.metrics.throwMin)],["最長投擲",pd=>fmtSec(pd.metrics.throwMax)],["平均投擲",pd=>fmtSec(pd.metrics.throwAvg)]].map(([label,fn])=>(<tr key={label} style={{borderBottom:"1px solid #eee"}}><td style={{padding:"6px",fontWeight:700}}>{label}</td>{playersData.map(pd=><td key={pd.name} style={{padding:"6px",textAlign:"center"}}>{fn(pd)}</td>)}</tr>))}</tbody></table>
           </div>
           {/* Turn-by-turn performance (bar chart placeholder) */}
           <div style={{background:"#fff",borderRadius:14,padding:14,border:"1px solid #ddd",marginBottom:14}}>
@@ -926,6 +1085,8 @@ function StatsModal({onClose,currentGameRecords,initialDelete,source}){
         </>)}
       </>)}
     </div>
+    {/* Score table modal */}
+    {scoreGame&&<GameScoreModal gameKey={scoreGame} onClose={()=>setScoreGame(null)}/>}
     {/* Delete dialogs */}
     {delStep===1&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"#fff",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}}>
       <div style={{fontSize:18,fontWeight:800,color:"#c0392b",marginBottom:12}}>⚠️ スタッツを削除しますか？</div>
@@ -1033,8 +1194,15 @@ function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goB
 
   useEffect(()=>{if(winner!==null&&!showRes){
     setGW(p=>{const n=[...p];n[winner]++;return n;});setShowRes(true);
-    if(saveToStatsProp){const key=gameNumber+"-"+history.length;
-    if(!statsSavedRef.current[key]){statsSavedRef.current[key]=true;const favs=loadFavs();const records=buildGameRecord(teams,history,teamOrder,winner,timestamps,favs);saveGameStatsToDB(records);}}
+    const key=gameNumber+"-"+history.length;
+    if(!statsSavedRef.current[key]){
+      statsSavedRef.current[key]=true;
+      const d=new Date().toISOString();
+      /* Save replay for score table viewing */
+      saveReplay(d,teams,history,teamOrder,winner);
+      /* Save stats */
+      if(saveToStatsProp){const favs=loadFavs();const records=buildGameRecord(teams,history,teamOrder,winner,timestamps,favs,d);saveGameStatsToDB(records);}
+    }
   }},[winner]);
 
   const execConf=()=>{if(!conf)return;if(conf.t==="score")dispatch({type:"SCORE",score:conf.s});else if(conf.t==="miss")dispatch({type:"MISS"});else dispatch({type:"FAULT"});setConf(null);};
@@ -1070,11 +1238,17 @@ function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goB
 }
 
 export default function App(){
-  const[scr,setScr]=useState(()=>{try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0)return"recover";}catch(e){}return"setup";});
+  const[dbReady,setDbReady]=useState(_cache.ready);
+  useEffect(()=>{if(!_cache.ready)initDB().then(()=>setDbReady(true)).catch(()=>setDbReady(true));},[]);
+  const[scr,setScr]=useState(()=>{if(!dbReady)return"loading";try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0)return"recover";}catch(e){}return"setup";});
   const[cfg,setCfg]=useState(null);const[saved,setSaved]=useState(null);const[recovery,setRecovery]=useState(null);
-  useEffect(()=>{if(scr==="recover"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));setRecovery(p);}catch(e){setScr("setup");}};},[]);
+  useEffect(()=>{if(dbReady&&scr==="loading"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0){setScr("recover");}else{setScr("setup");}}catch(e){setScr("setup");}}},[dbReady]);
+  useEffect(()=>{if(scr==="recover"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));setRecovery(p);}catch(e){setScr("setup");}};},[scr]);
   const doRecover=()=>{if(!recovery)return;const r=recovery;setCfg({t:r.teams,o:r.teamOrder,ng:1,bo:0,dq:r.dqEndGame!==undefined?r.dqEndGame:true,sts:true,recover:r});setScr("game");};
   const dismissRecover=()=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}setRecovery(null);setScr("setup");};
+  if(!dbReady||scr==="loading"){return(<div style={{width:"100%",height:"100dvh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(170deg,#0f1f30,#14365a)"}}>
+    <div style={{textAlign:"center"}}><div style={{fontSize:48,marginBottom:12}}>🎯</div><div style={{fontSize:20,fontWeight:700,color:"#fff"}}>データ読み込み中...</div></div>
+  </div>);}
   if(scr==="recover"&&recovery){return(<div style={{width:"100%",height:"100dvh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(170deg,#0f1f30,#14365a)",padding:20}}>
     <div style={{background:"#fff",borderRadius:20,padding:"32px 28px",maxWidth:480,width:"100%",textAlign:"center",boxShadow:"0 10px 36px rgba(0,0,0,0.25)"}}>
       <div style={{fontSize:44,marginBottom:8}}>🔄</div>
