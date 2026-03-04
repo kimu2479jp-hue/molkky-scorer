@@ -18,20 +18,25 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid request body" });
     }
 
+    // Safe number: convert undefined/null/NaN to 0
+    const n = (v) => (typeof v === "number" && !isNaN(v)) ? v : 0;
+    const pct = (v) => (n(v) * 100).toFixed(1);
+    const pt = (v) => n(v).toFixed(1);
+
     const prompt = `あなたはモルック（フィンランドの投擲スポーツ）のベテラン解説者であり、コピーライターです。
 以下のスタッツからプレイヤーの個性を読み取り、その人のプレイスタイルを表現する「キャッチコピー」を書いてください。
 
 【スタッツ】
 試合数: ${p.gameCount}
-勝率: ${(p.winRate*100).toFixed(1)}%
-ミス率: ${(p.missRate*100).toFixed(1)}%
-上がり決定率: ${(p.finishRate*100).toFixed(1)}%（38点以上から50点丁度を1投で決めた割合）
-投擲平均点: ${p.avgPts.toFixed(1)}pt
-ブレイク平均: ${p.breakAvg.toFixed(1)}pt（先攻の初投平均）
-お邪魔成功率: ${(p.ojamaRate*100).toFixed(1)}%（相手が上がれる場面で妨害に成功した割合）
-2ミス後リカバリ平均: ${p.recAvg.toFixed(1)}pt（連続ミス後に取り返す平均点）
-先攻勝率: ${p.firstWinRate!=null?(p.firstWinRate*100).toFixed(1)+"%":"データなし"}
-後攻勝率: ${p.lastWinRate!=null?(p.lastWinRate*100).toFixed(1)+"%":"データなし"}
+勝率: ${pct(p.winRate)}%
+ミス率: ${pct(p.missRate)}%
+上がり決定率: ${pct(p.finishRate)}%（38点以上から50点丁度を1投で決めた割合）
+投擲平均点: ${pt(p.avgPts)}pt
+ブレイク平均: ${pt(p.breakAvg)}pt（先攻の初投平均）
+お邪魔成功率: ${pct(p.ojamaRate)}%（相手が上がれる場面で妨害に成功した割合）
+2ミス後リカバリ平均: ${pt(p.recAvg)}pt（連続ミス後に取り返す平均点）
+先攻勝率: ${p.firstWinRate != null ? pct(p.firstWinRate) + "%" : "データなし"}
+後攻勝率: ${p.lastWinRate != null ? pct(p.lastWinRate) + "%" : "データなし"}
 
 【出力ルール — 厳守】
 1. 3〜4行の流れる文章で書く。一つの文が行を跨いでも構わない
