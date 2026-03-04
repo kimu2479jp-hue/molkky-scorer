@@ -804,7 +804,8 @@ function usePlayerAnalysis(name,m){
   const keyRef=useRef("");
   useEffect(()=>{
     if(!m||gc<3){setText(null);setError(null);return;}
-    const key=name+"|"+gc+"|"+m.missRate.toFixed(3)+"|"+m.finishRate.toFixed(3)+"|"+m.ojamaRate.toFixed(3)+"|"+m.winRate.toFixed(3)+"|"+m.avgPts.toFixed(2);
+    const sf=(v,d)=>(typeof v==="number"&&!isNaN(v))?v.toFixed(d):"0";
+    const key=name+"|"+gc+"|"+sf(m.missRate,3)+"|"+sf(m.finishRate,3)+"|"+sf(m.ojamaRate,3)+"|"+sf(m.winRate,3)+"|"+sf(m.avgPts,2);
     keyRef.current=key;
     /* Already cached */
     if(_analysisCache[key]){setText(_analysisCache[key]);setLoading(false);setError(null);return;}
@@ -817,7 +818,7 @@ function usePlayerAnalysis(name,m){
     let active=true;
     (async()=>{try{
       const res=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({gameCount:gc,winRate:m.winRate||0,missRate:m.missRate||0,finishRate:m.finishRate||0,avgPts:m.avgPts||0,breakAvg:m.breakAvg||0,ojamaRate:m.ojamaRate||0,ojamaAttempts:m.ojamaAttempts||0,recAvg:m.recAvg||0,firstWinRate:m.firstWinRate!=null?m.firstWinRate:null,lastWinRate:m.lastWinRate!=null?m.lastWinRate:null})});
-      if(!res.ok){const err=await res.text();_analysisPending.delete(key);if(active){setError("API "+res.status);setLoading(false);}return;}
+      if(!res.ok){let errMsg="API "+res.status;try{const raw=await res.text();try{const ej=JSON.parse(raw);if(ej.error)errMsg=typeof ej.error==="string"?ej.error:ej.error.message||errMsg;}catch(_){if(raw)errMsg+=": "+raw.slice(0,120);}}catch(_2){} _analysisPending.delete(key);if(active){setError(errMsg);setLoading(false);}return;}
       const data=await res.json();
       if(data.text){_analysisCache[key]=data.text;if(active){setText(data.text);setError(null);}}
       else if(active){setError(data.error||"空のレスポンス");}
