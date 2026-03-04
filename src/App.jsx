@@ -825,7 +825,7 @@ function StatsModal({onClose,currentGameRecords,initialDelete,source}){
   const calFilteredGames=(calStart&&calEnd)?filterGamesByDates(allGames,calStart,calEnd):calStart?filterGamesByDates(allGames,calStart,calStart):[];
 
   return(<div style={{position:"fixed",inset:0,background:"#f0f3f8",zIndex:150,display:"flex",flexDirection:"column",overflow:"hidden",overscrollBehavior:"none"}}>
-    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px",background:"#14365a",flexShrink:0}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(10px + env(safe-area-inset-top, 0px)) 20px 10px",background:"#14365a",flexShrink:0}}>
       <h2 style={{fontSize:isTab?32:24,fontWeight:900,color:"#fff",margin:0}}>📊 {source==="setup"?"累計スタッツ":"プレイヤースタッツ"}</h2>
       <button onClick={onClose} style={{padding:"8px 18px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"transparent",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>✕ 閉じる</button>
     </div>
@@ -958,7 +958,7 @@ function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gam
   const cancelLP=()=>{if(statsLPRef.current)clearTimeout(statsLPRef.current);};
   return(
     <div style={{position:"fixed",inset:0,background:"#f0f3f8",zIndex:100,display:"flex",flexDirection:"column",overflow:"hidden",overscrollBehavior:"none"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px",background:"#14365a",flexShrink:0}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(10px + env(safe-area-inset-top, 0px)) 20px 10px",background:"#14365a",flexShrink:0}}>
         <h2 style={{fontSize:24,fontWeight:900,color:"#fff",margin:0}}>🏆 Game {gameNumber} 結果</h2>
         <button onPointerDown={startLP} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(showStats!=="delete")setShowStats(true);}} style={{padding:"8px 18px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"rgba(255,255,255,0.1)",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>📊 スタッツ</button>
       </div>
