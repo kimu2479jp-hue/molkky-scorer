@@ -354,13 +354,11 @@ if(r.status===404){_syncBusy=false;await pushToServer();return{merged:true,reaso
 if(!r.ok){const e=await r.json().catch(()=>({}));_syncBusy=false;return{merged:false,reason:"error",error:e.error||"HTTP "+r.status};}
 const data=await r.json();
 
-/* Merge favorites (union) */
-const localFavs=loadFavs();
+/* Favorites: server wins (replace local with server) — enables deletion sync */
 const serverFavs=data.favorites||[];
-const mergedFavs=[...new Set([...localFavs,...serverFavs])].slice(0,MAX_FAV);
-_saveFavsRaw(mergedFavs);
+_saveFavsRaw(serverFavs);
 
-/* Merge stats (union by player × date) */
+/* Merge stats (union by player x date) */
 const localStats=_cache.stats;
 const serverStats=data.stats||{};
 let added=0;
@@ -386,7 +384,7 @@ _persistReplays();
 _syncBusy=false;
 /* Push merged data back so both sides are identical */
 await pushToServer();
-return{merged:true,added,favs:mergedFavs};
+return{merged:true,added,favs:serverFavs};
 
 }catch(e){_syncBusy=false;return{merged:false,reason:"network",error:e.message};}
 }
