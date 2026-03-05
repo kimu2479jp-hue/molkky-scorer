@@ -42,14 +42,20 @@ function useFavs(){const[f,sF]=useState(()=>loadFavs());return{favs:f,addF:n=>{c
 const STATS_KEY="mk-player-stats";
 const PROGRESS_KEY="mk-game-progress";
 const SYNC_CODE_KEY="mk-sync-code";
+const ADMIN_PIN_KEY="mk-admin-pin";
+const AI_ENABLED_KEY="mk-ai-enabled";
+const ANALYSIS_TOTAL_KEY="mk-analysis-total";
+const ANALYSIS_LIMIT_KEY="mk-analysis-daily";
+const ANALYSIS_DAILY_MAX=20;
+const ANALYSIS_CACHE_DAYS=32;
 const REPLAY_KEY="mk-game-replays";
 const IDB_NAME="mk-molkky-db";
-const IDB_VER=1;
+const IDB_VER=2;
 const MAX_GAMES=100000;
 const MAX_REPLAYS=100000;
 
 /* In-memory cache — loaded from IndexedDB at startup */
-const _cache={stats:{},replays:{},ready:false};
+const _cache={stats:{},replays:{},analysis:{},ready:false};
 
 function openIDB(){
 return new Promise((res,rej)=>{
@@ -57,6 +63,7 @@ const req=indexedDB.open(IDB_NAME,IDB_VER);
 req.onupgradeneeded=e=>{
 const db=e.target.result;
 if(!db.objectStoreNames.contains("kv"))db.createObjectStore("kv");
+if(!db.objectStoreNames.contains("analysis"))db.createObjectStore("analysis");
 };
 req.onsuccess=()=>res(req.result);
 req.onerror=()=>rej(req.error);
@@ -107,6 +114,17 @@ try{const existingFavs=JSON.parse(localStorage.getItem("mk-fav"));if(!existingFa
 }
 _cache.stats=stats||{};
 _cache.replays=replays||{};
+/* Load analysis cache + prune expired */
+try{
+const ac=await idbGet(_db,"analysisCache");
+if(ac&&typeof ac==="object"){
+const now=Date.now();const maxAge=ANALYSIS_CACHE_DAYS*86400000;
+const pruned={};let changed=false;
+for(const k in ac){if(ac[k].t&&(now-ac[k].t)<maxAge)pruned[k]=ac[k];else changed=true;}
+_cache.analysis=pruned;
+if(changed)idbSet(_db,"analysisCache",pruned).catch(()=>{});
+}
+}catch(e){_cache.analysis={};}
 }catch(e){
 console.error("IDB init failed, falling back to localStorage",e);
 try{_cache.stats=JSON.parse(localStorage.getItem(STATS_KEY))||{};}catch(e2){_cache.stats={};}
@@ -270,6 +288,41 @@ _debouncedSync();
 /* ═══ Cloud Sync — Supabase via /api/sync ═══ */
 function getSyncCode(){try{return localStorage.getItem(SYNC_CODE_KEY)||"";}catch(e){return "";}}
 function setSyncCodeLS(c){try{localStorage.setItem(SYNC_CODE_KEY,c);}catch(e){}}
+
+/* ═══ Admin PIN ═══ */
+function getAdminPin(){try{return localStorage.getItem(ADMIN_PIN_KEY)||"";}catch(e){return "";}}
+function setAdminPin(p){try{localStorage.setItem(ADMIN_PIN_KEY,p);}catch(e){}}
+function maskSyncCode(code){if(!code||code.length<=2)return code?"***":"";return code.slice(0,2)+"\u2022".repeat(Math.min(code.length-2,8));}
+
+/* ═══ AI Enabled Setting ═══ */
+function getAIEnabled(){try{const v=localStorage.getItem(AI_ENABLED_KEY);return v===null?true:v==="true";}catch(e){return true;}}
+function setAIEnabledLS(v){try{localStorage.setItem(AI_ENABLED_KEY,v?"true":"false");}catch(e){}}
+
+/* ═══ Analysis Rate Limit (per-player per-day) ═══ */
+function getPlayerAnalysisCount(name){
+try{const d=JSON.parse(localStorage.getItem(ANALYSIS_LIMIT_KEY)||"{}");
+const today=new Date().toISOString().slice(0,10);
+if(d.date!==today)return 0;return(d.players&&d.players[name])||0;}catch(e){return 0;}
+}
+function incPlayerAnalysisCount(name){
+try{const today=new Date().toISOString().slice(0,10);
+const d=JSON.parse(localStorage.getItem(ANALYSIS_LIMIT_KEY)||"{}");
+if(d.date!==today){d.date=today;d.players={};}
+if(!d.players)d.players={};
+d.players[name]=(d.players[name]||0)+1;
+localStorage.setItem(ANALYSIS_LIMIT_KEY,JSON.stringify(d));
+return d.players[name];}catch(e){return 999;}
+}
+
+/* ═══ Analysis Total Counter ═══ */
+function getAnalysisTotal(){try{return parseInt(localStorage.getItem(ANALYSIS_TOTAL_KEY)||"0",10);}catch(e){return 0;}}
+function incAnalysisTotal(){try{const c=getAnalysisTotal()+1;localStorage.setItem(ANALYSIS_TOTAL_KEY,String(c));return c;}catch(e){return 0;}}
+
+/* ═══ Analysis Persistent Cache (IndexedDB) ═══ */
+function _persistAnalysis(){if(_db)idbSet(_db,"analysisCache",_cache.analysis).catch(e=>console.error("analysis persist error",e));}
+function getAnalysisCached(key){const e=_cache.analysis[key];if(!e)return null;if(Date.now()-e.t>ANALYSIS_CACHE_DAYS*86400000){delete _cache.analysis[key];_persistAnalysis();return null;}return e.text;}
+function setAnalysisCached(key,text){_cache.analysis[key]={text,t:Date.now()};_persistAnalysis();}
+function makeAnalysisKey(name,gc,m){const sf=(v,d)=>(typeof v==="number"&&!isNaN(v))?v.toFixed(d):"0";return name+"|"+gc+"|"+sf(m.missRate,3)+"|"+sf(m.finishRate,3)+"|"+sf(m.ojamaRate,3)+"|"+sf(m.winRate,3)+"|"+sf(m.avgPts,2);}
 
 let _syncTimer=null;
 function _debouncedSync(){
@@ -603,14 +656,113 @@ return(<div ref={ref} style={{height:"100%",overflow:"auto",WebkitOverflowScroll
 }
 
 /* ═══ Setup — 1.5x bigger + stats toggle ═══ */
-function SetupScreen({onStart,savedTeams}){
+/* ═══ Admin PIN Modal ═══ */
+function AdminPinModal({mode,onSuccess,onCancel}){
+const[pin,setPin]=useState("");const[pin2,setPin2]=useState("");const[err,setErr]=useState("");const[step,setStep]=useState(mode==="create"?1:0);
+const submit=()=>{
+if(mode==="create"){
+  if(step===1){if(pin.length<4||pin.length>6){setErr("4〜6桁で入力");return;}setStep(2);setErr("");return;}
+  if(step===2){if(pin!==pin2){setErr("PINが一致しません");setPin2("");return;}setAdminPin(pin);onSuccess();}
+}else{
+  if(pin===getAdminPin()){onSuccess();}else{setErr("PINが違います");setPin("");}
+}};
+return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+<div style={{background:"#fff",borderRadius:18,padding:28,maxWidth:340,width:"100%",textAlign:"center"}}>
+<div style={{fontSize:22,fontWeight:800,color:"#14365a",marginBottom:6}}>{mode==="create"?"🔐 管理者PINを作成":"🔐 管理者PIN入力"}</div>
+<div style={{fontSize:14,color:"#888",marginBottom:16}}>{mode==="create"?(step===1?"4〜6桁の数字を設定":"もう一度入力してください"):"PINを入力してください"}</div>
+<input type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={step===2?pin2:pin} onChange={e=>{const v=e.target.value.replace(/\D/g,"").slice(0,6);step===2?setPin2(v):setPin(v);setErr("");}} placeholder="●●●●" style={{width:"100%",padding:"16px",border:"2px solid "+(err?"#c0392b":"#ddd"),borderRadius:12,fontSize:28,fontWeight:700,textAlign:"center",letterSpacing:12,outline:"none",marginBottom:8}}/>
+{err&&<div style={{color:"#c0392b",fontSize:14,fontWeight:600,marginBottom:8}}>{err}</div>}
+<div style={{display:"flex",gap:8,marginTop:8}}>
+<button onClick={submit} style={{flex:1,padding:"14px 0",border:"none",borderRadius:12,background:"#14365a",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>{mode==="create"?(step===1?"次へ":"設定する"):"解除"}</button>
+<button onClick={onCancel} style={{flex:1,padding:"14px 0",border:"2px solid #ccc",borderRadius:12,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
+</div></div></div>);
+}
+
+/* ═══ Settings Page ═══ */
+function SettingsPage({onClose,isAdmin,onAdminToggle,aiEnabled,onAIToggle}){
+const[showAdminPin,setShowAdminPin]=useState(false);
+const[syncCode,setSyncCode]=useState(()=>getSyncCode());const[syncStatus,setSyncStatus]=useState("");
+const total=getAnalysisTotal();const totalDisplay=total>=10000?"\u221E":total;
+const costYen=(total*0.1).toFixed(1);
+const SW=({on,onToggle,label,color})=>(<div onClick={onToggle} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 18px",background:on?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.03)",border:"2px solid "+(on?(color||"#2b7de9")+"44":"rgba(255,255,255,0.1)"),borderRadius:14,cursor:"pointer",marginBottom:10}}>
+<span style={{color:on?(color||"#2b7de9"):"rgba(255,255,255,0.5)",fontSize:16,fontWeight:700}}>{label}</span>
+<div style={{width:52,height:30,borderRadius:15,padding:2,background:on?(color||"#2b7de9"):"rgba(255,255,255,0.25)",transition:"background 0.2s",display:"flex",alignItems:"center",justifyContent:on?"flex-end":"flex-start"}}>
+<div style={{width:26,height:26,borderRadius:13,background:"#fff",boxShadow:"0 1px 3px rgba(0,0,0,0.2)",transition:"all 0.2s"}}/></div></div>);
+return(<div style={{position:"fixed",inset:0,background:"linear-gradient(170deg,#0f1f30,#14365a)",zIndex:200,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(14px + env(safe-area-inset-top, 0px)) 20px 14px",borderBottom:"1px solid rgba(255,255,255,0.1)",flexShrink:0}}>
+<h2 style={{fontSize:24,fontWeight:900,color:"#fff",margin:0}}>⚙️ 詳細設定</h2>
+<button onClick={onClose} style={{padding:"8px 18px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"transparent",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>✕ 閉じる</button>
+</div>
+<div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:"16px 20px",overscrollBehavior:"contain"}}>
+{/* Status overview */}
+<div style={{display:"flex",gap:8,marginBottom:16}}>
+<div style={{flex:1,padding:"10px 14px",border:"2px solid "+(isAdmin?"#e6a81744":"rgba(255,255,255,0.1)"),borderRadius:12,background:isAdmin?"rgba(230,168,23,0.08)":"rgba(255,255,255,0.03)",display:"flex",alignItems:"center",gap:6}}>
+<span style={{fontSize:14,color:isAdmin?"#e6a817":"rgba(255,255,255,0.4)",fontWeight:700}}>🔐 {isAdmin?"管理者":"メンバー"}</span>
+</div>
+<div style={{flex:1,padding:"10px 14px",border:"2px solid "+(getSyncCode()?"#22b56644":"rgba(255,255,255,0.1)"),borderRadius:12,background:getSyncCode()?"rgba(34,181,102,0.08)":"rgba(255,255,255,0.03)",display:"flex",alignItems:"center",gap:6}}>
+<span style={{fontSize:14,color:getSyncCode()?"#22b566":"rgba(255,255,255,0.4)",fontWeight:700}}>☁️ {getSyncCode()?"同期済":"未設定"}</span>
+</div>
+</div>
+{/* Admin mode */}
+<div style={{marginBottom:20}}>
+<div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>権限管理</div>
+<SW on={isAdmin} onToggle={()=>{if(isAdmin){onAdminToggle(false);}else{setShowAdminPin(true);}}} label={"🔐 管理者モード "+(isAdmin?"(ON)":"(OFF)")} color="#e6a817"/>
+<div style={{fontSize:12,color:"rgba(255,255,255,0.35)",marginTop:-4,marginBottom:12,paddingLeft:4}}>スタッツ削除・同期コード編集・AI無制限</div>
+</div>
+{/* Cloud sync */}
+<div style={{marginBottom:20}}>
+<div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>クラウド同期</div>
+<div style={{background:"rgba(255,255,255,0.96)",borderRadius:14,padding:16}}>
+{isAdmin?(<>
+<div style={{fontSize:13,color:"#888",marginBottom:10}}>同期コードを設定すると複数端末でデータを共有できます。</div>
+<div style={{display:"flex",gap:8,marginBottom:8}}>
+<input value={syncCode} onChange={e=>setSyncCode(e.target.value.trim().slice(0,30))} placeholder="同期コード（3文字以上）" style={{flex:1,border:"1px solid #ddd",borderRadius:8,padding:"10px 12px",fontSize:16,outline:"none"}}/>
+<button onClick={()=>{
+if(syncCode.length<3){setSyncStatus("❌ 3文字以上");return;}
+setSyncCodeLS(syncCode);setSyncStatus("⏳ 同期中...");
+pullFromServer().then(r=>{if(r.merged)setSyncStatus("✅ 同期完了"+(r.added>0?" (+"+r.added+"件)":""));else setSyncStatus("❌ "+(r.error||"同期失敗"));});
+}} style={{padding:"10px 18px",border:"none",borderRadius:8,background:"#2b7de9",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>同期</button>
+</div>
+{syncCode&&syncCode.length>=3&&<button onClick={()=>{setSyncStatus("⏳ アップロード中...");setSyncCodeLS(syncCode);pushToServer().then(r=>{setSyncStatus(r.ok?"✅ アップロード完了":"❌ "+(r.error||"失敗"));});}} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8,background:"#f8f9fa",color:"#555",fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:8}}>📤 手動アップロード</button>}
+</>):(<>
+{syncCode?(<div style={{display:"flex",alignItems:"center",gap:8}}>
+<div style={{flex:1,padding:"10px 12px",border:"1px solid #ddd",borderRadius:8,fontSize:16,color:"#888",background:"#f8f9fa",letterSpacing:2}}>{maskSyncCode(syncCode)}</div>
+<span style={{fontSize:13,color:"#22b566",fontWeight:700}}>設定済み</span>
+</div>):(<div style={{fontSize:14,color:"#aaa"}}>管理者モードで同期コードを設定できます</div>)}
+</>)}
+{syncStatus&&<div style={{fontSize:14,color:syncStatus.startsWith("✅")?"#22b566":syncStatus.startsWith("❌")?"#c0392b":"#2b7de9",fontWeight:600,marginTop:6}}>{syncStatus}</div>}
+<div style={{fontSize:12,color:"#bbb",marginTop:8}}>{isAdmin?"同じコードを全端末で設定してください。":"編集は管理者モードON時のみ"}</div>
+</div>
+</div>
+{/* AI analysis */}
+<div style={{marginBottom:20}}>
+<div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>AI分析</div>
+<SW on={aiEnabled} onToggle={()=>onAIToggle(!aiEnabled)} label={"🤖 プレイスタイルAI分析 "+(aiEnabled?"(ON)":"(OFF)")} color="#2b7de9"/>
+<div style={{background:"rgba(255,255,255,0.06)",borderRadius:14,padding:16,border:"1px solid rgba(255,255,255,0.08)"}}>
+<div style={{fontSize:14,fontWeight:700,color:"#fff",marginBottom:10}}>📊 累計使用量</div>
+<div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:6}}>
+<span style={{fontSize:36,fontWeight:900,color:"#2b7de9"}}>{totalDisplay}</span>
+<span style={{fontSize:14,color:"rgba(255,255,255,0.5)"}}>回使用</span>
+</div>
+<div style={{fontSize:13,color:"rgba(255,255,255,0.4)"}}>推定コスト: 約{costYen}円</div>
+<div style={{fontSize:12,color:"rgba(255,255,255,0.3)",marginTop:2}}>1回 ≈ 250トークン（Claude Sonnet）</div>
+<div style={{fontSize:12,color:"rgba(255,255,255,0.3)",marginTop:2}}>メンバー: 1人あたり{ANALYSIS_DAILY_MAX}回/日、管理者: 無制限</div>
+{isAdmin&&<a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",marginTop:10,padding:"8px 16px",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,background:"rgba(255,255,255,0.06)",color:"#2b7de9",fontSize:13,fontWeight:700,textDecoration:"none"}}>🔗 Anthropicコンソールで残高確認</a>}
+</div>
+</div>
+</div>
+{showAdminPin&&<AdminPinModal mode={getAdminPin()?"verify":"create"} onSuccess={()=>{setShowAdminPin(false);onAdminToggle(true);}} onCancel={()=>setShowAdminPin(false)}/>}
+</div>);
+}
+
+function SetupScreen({onStart,savedTeams,isAdmin,onAdminToggle,aiEnabled,onAIToggle}){
 const{favs,addF,rmF}=useFavs();
 const[mode,setMode]=useState("manual");const[tc,setTc]=useState(savedTeams?savedTeams.length:2);
 const[om,setOm]=useState("normal");const[numGames,setNumGames]=useState(1);const[bestOf,setBestOf]=useState(0);const[dqEnd,setDqEnd]=useState(true);
 const[saveToStats,setSaveToStats]=useState(true);
 const[teams,setTeams]=useState(()=>{if(savedTeams){const base=savedTeams.map(t=>({name:t.name,players:t.players.length>0?t.players:[""]}));while(base.length<MAX_TEAMS)base.push({name:"チーム"+(base.length+1),players:[""]});return base.slice(0,MAX_TEAMS);}return Array.from({length:MAX_TEAMS},(_,i)=>({name:"チーム"+(i+1),players:[""]}));});
 const[mems,setMems]=useState(Array(4).fill(""));const[sp,setSp]=useState(null);const[showSetupStats,setShowSetupStats]=useState(false);
-const[syncCode,setSyncCode]=useState(()=>getSyncCode());const[syncStatus,setSyncStatus]=useState("");const[showSync,setShowSync]=useState(false);
+const[showSettings,setShowSettings]=useState(false);
 const uN=(i,v)=>setTeams(p=>p.map((t,j)=>j===i?{...t,name:v}:t));
 const uP=(ti,pi,v)=>setTeams(p=>p.map((t,i)=>i===ti?{...t,players:t.players.map((pl,j)=>j===pi?v.slice(0,MAX_NAME):pl)}:t));
 const aP=ti=>setTeams(p=>p.map((t,i)=>i===ti&&t.players.length<MAX_PL?{...t,players:[...t.players,""]}:t));
@@ -632,7 +784,7 @@ const PIN={flex:1,border:"1px solid #e0e0e0",borderRadius:10,padding:"12px 14px"
 const TIN={flex:1,border:"none",borderBottom:"2px solid #ddd",padding:"6px 4px",fontSize:22,fontWeight:700,outline:"none",background:"transparent"};
 return(
 <div style={{height:"100dvh",display:"flex",flexDirection:"column",overflow:"auto",background:"linear-gradient(170deg,#0f1f30,#14365a)",WebkitOverflowScrolling:"touch",overscrollBehavior:"none"}}>
-<div style={{padding:"36px 20px 8px",textAlign:"center"}}><img src={MASCOT_S} alt="モルック" style={{width:200,height:200,objectFit:"contain",display:"block",margin:"0 auto -6px"}}/><h1 style={{fontSize:38,fontWeight:900,color:"#fff",letterSpacing:4}}>モルック スコアラー</h1><div style={{fontSize:13,color:"rgba(255,255,255,0.3)",fontWeight:600,letterSpacing:5}}>MÖLKKY SCORER</div></div>
+<div style={{padding:"36px 20px 8px",textAlign:"center",position:"relative"}}><button onClick={()=>setShowSettings(true)} style={{position:"absolute",top:40,right:20,padding:"8px 14px",border:"1px solid rgba(255,255,255,0.25)",borderRadius:10,background:"rgba(255,255,255,0.08)",color:"#fff",fontSize:18,cursor:"pointer",zIndex:10}}>⚙️</button><img src={MASCOT_S} alt="モルック" style={{width:200,height:200,objectFit:"contain",display:"block",margin:"0 auto -6px"}}/><h1 style={{fontSize:38,fontWeight:900,color:"#fff",letterSpacing:4}}>モルック スコアラー</h1><div style={{fontSize:13,color:"rgba(255,255,255,0.3)",fontWeight:600,letterSpacing:5}}>MÖLKKY SCORER</div></div>
 <div style={{flex:1,padding:"0 20px 36px",maxWidth:720,margin:"0 auto",width:"100%"}}>
 <div style={{marginBottom:14}}><label style={SL}>入力モード</label><div style={{display:"flex",gap:8}}>{[["manual","✏️ 手動"],["shuffle","🎲 ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>{setMode(k);setSp(null);}} style={{...CH,...(mode===k?CHA:{})}}>{l}</button>))}</div></div>
 <div style={{display:"flex",gap:14,marginBottom:14}}><div style={{flex:1}}><label style={SL}>チーム数</label><div style={{display:"flex",gap:8}}>{[2,3,4].map(n=>(<button key={n} onClick={()=>{setTc(n);setSp(null);}} style={{...CH,...(tc===n?CHA:{}),padding:"16px 0"}}>{n}</button>))}</div></div><div style={{flex:1}}><label style={SL}>投げ順</label><div style={{display:"flex",gap:8}}>{[["normal","通常"],["random","ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>setOm(k)} style={{...CH,...(om===k?CHA:{})}}>{l}</button>))}</div></div></div>
@@ -646,34 +798,6 @@ return(
 </div>
 </div>
 <button onClick={()=>setShowSetupStats(true)} style={{flex:1,padding:"14px 16px",border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"#fff",fontSize:18,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>📊 スタッツ</button>
-</div>
-{/* ── Cloud Sync Section ── */}
-<div style={{marginBottom:14}}>
-<div onClick={()=>setShowSync(p=>!p)} style={{padding:"14px 16px",border:"2px solid rgba(255,255,255,0.15)",borderRadius:12,background:"rgba(255,255,255,0.04)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-<span style={{color:"rgba(255,255,255,0.7)",fontSize:15,fontWeight:700}}>☁️ クラウド同期 {syncCode?"(設定済)":"(未設定)"}</span>
-<span style={{color:"rgba(255,255,255,0.4)",fontSize:14}}>{showSync?"▲":"▼"}</span>
-</div>
-{showSync&&(<div style={{marginTop:8,padding:"14px 16px",background:"rgba(255,255,255,0.96)",borderRadius:12}}>
-<div style={{fontSize:13,color:"#888",marginBottom:8}}>同期コードを設定すると、iPad・iPhoneなど複数端末でスタッツとお気に入りを共有できます。</div>
-<div style={{display:"flex",gap:8,marginBottom:8}}>
-<input value={syncCode} onChange={e=>setSyncCode(e.target.value.trim().slice(0,30))} placeholder="同期コード（3文字以上）" style={{flex:1,border:"1px solid #ddd",borderRadius:8,padding:"10px 12px",fontSize:16,outline:"none"}}/>
-<button onClick={()=>{
-if(syncCode.length<3){setSyncStatus("❌ 3文字以上入力してください");return;}
-setSyncCodeLS(syncCode);setSyncStatus("⏳ 同期中...");
-pullFromServer().then(r=>{
-if(r.merged)setSyncStatus("✅ 同期完了"+(r.added>0?" (+"+r.added+"件)":""));
-else if(r.reason==="error")setSyncStatus("❌ "+r.error);
-else setSyncStatus("❌ 同期失敗");
-});
-}} style={{padding:"10px 18px",border:"none",borderRadius:8,background:"#2b7de9",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>同期</button>
-</div>
-{syncCode&&syncCode.length>=3&&(<button onClick={()=>{
-setSyncStatus("⏳ アップロード中...");setSyncCodeLS(syncCode);
-pushToServer().then(r=>{setSyncStatus(r.ok?"✅ アップロード完了":"❌ "+r.error);});
-}} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8,background:"#f8f9fa",color:"#555",fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:8}}>📤 手動アップロード</button>)}
-{syncStatus&&<div style={{fontSize:14,color:syncStatus.startsWith("✅")?"#22b566":syncStatus.startsWith("❌")?"#c0392b":"#2b7de9",fontWeight:600}}>{syncStatus}</div>}
-<div style={{fontSize:12,color:"#bbb",marginTop:6}}>同じコードを全端末で設定してください。試合終了時に自動同期されます。</div>
-</div>)}
 </div>
 <div style={{padding:"12px 16px",background:"rgba(43,125,233,0.12)",borderRadius:12,border:"1px solid rgba(43,125,233,0.2)",marginBottom:14}}><div style={{fontWeight:800,fontSize:16,color:"#fff",marginBottom:3}}>📋 公式ルール</div><div style={{fontSize:13,color:"rgba(255,255,255,0.6)",lineHeight:1.8}}>50点で勝利 / 超過→25点 / 37点以上でフォルト→25点 / ミス＝倒れず / フォルト＝反則 / 3連続→失格</div></div>
 {mode==="manual"&&(<>{teams.slice(0,tc).map((team,ti)=>(<div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac}}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><div style={{width:34,height:34,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900,fontSize:18,flexShrink:0,background:C[ti].ac}}>{ti+1}</div><input value={team.name} onChange={e=>uN(ti,e.target.value)} style={TIN} placeholder={"チーム"+(ti+1)}/></div>
@@ -692,7 +816,8 @@ pushToServer().then(r=>{setSyncStatus(r.ok?"✅ アップロード完了":"❌ "
 <button style={{width:"100%",padding:14,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"#fff",fontSize:18,fontWeight:800,cursor:"pointer",marginTop:6}} onClick={doShuf}>🔄 再シャッフル</button></div>)}
 </>)}
 </div>
-{showSetupStats&&<StatsModal onClose={()=>setShowSetupStats(false)} source="setup"/>}
+{showSetupStats&&<StatsModal onClose={()=>setShowSetupStats(false)} source="setup" isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
+{showSettings&&<SettingsPage onClose={()=>setShowSettings(false)} isAdmin={isAdmin} onAdminToggle={onAdminToggle} aiEnabled={aiEnabled} onAIToggle={onAIToggle}/>}
 </div>);
 }
 
@@ -905,59 +1030,69 @@ return(<div key={i} onClick={()=>handleClick(d)} style={{textAlign:"center",padd
   </div>);
 }
 
-/* ═══ AI Player Analysis via /api/analyze ═══ */
-const _analysisCache={};
+/* ═══ AI Player Analysis — manual trigger only ═══ */
 const _analysisPending=new Set();
-function usePlayerAnalysis(name,m){
-const[text,setText]=useState(null);const[loading,setLoading]=useState(false);const[error,setError]=useState(null);
+async function fetchPlayerAnalysis(name,m,isAdminMode){
 const gc=m?m.gameCount:0;
-const keyRef=useRef("");
-useEffect(()=>{
-if(!m||gc<3){setText(null);setError(null);return;}
-const sf=(v,d)=>(typeof v==="number"&&!isNaN(v))?v.toFixed(d):"0";
-const key=name+"|"+gc+"|"+sf(m.missRate,3)+"|"+sf(m.finishRate,3)+"|"+sf(m.ojamaRate,3)+"|"+sf(m.winRate,3)+"|"+sf(m.avgPts,2);
-keyRef.current=key;
-/* Already cached */
-if(_analysisCache[key]){setText(_analysisCache[key]);setLoading(false);setError(null);return;}
-/* Already fetching (another instance or re-render) */
-if(_analysisPending.has(key)){setLoading(true);
-const poll=setInterval(()=>{if(_analysisCache[key]){setText(_analysisCache[key]);setLoading(false);setError(null);clearInterval(poll);}},500);
-return()=>clearInterval(poll);
-}
-_analysisPending.add(key);setLoading(true);setError(null);
-let active=true;
-(async()=>{try{
+if(!m||gc<3)return{text:null,error:"3試合以上必要"};
+/* Rate limit (per-player per-day, admin exempt) */
+if(!isAdminMode){const used=getPlayerAnalysisCount(name);if(used>=ANALYSIS_DAILY_MAX)return{text:null,error:"本日の分析上限("+ANALYSIS_DAILY_MAX+"回/人)に達しました"};}
+const key=makeAnalysisKey(name,gc,m);
+if(_analysisPending.has(key))return{text:null,error:"分析中..."};
+_analysisPending.add(key);
+try{
 const res=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({gameCount:gc,winRate:m.winRate||0,missRate:m.missRate||0,finishRate:m.finishRate||0,avgPts:m.avgPts||0,breakAvg:m.breakAvg||0,ojamaRate:m.ojamaRate||0,ojamaAttempts:m.ojamaAttempts||0,recAvg:m.recAvg||0,firstWinRate:m.firstWinRate!=null?m.firstWinRate:null,lastWinRate:m.lastWinRate!=null?m.lastWinRate:null})});
-if(!res.ok){let errMsg="API "+res.status;try{const raw=await res.text();try{const ej=JSON.parse(raw);if(ej.error)errMsg=typeof ej.error==="string"?ej.error:ej.error.message||errMsg;}catch(_){if(raw)errMsg+=": "+raw.slice(0,120);}}catch(_2){} _analysisPending.delete(key);if(active){setError(errMsg);setLoading(false);}return;}
+if(!res.ok){let errMsg="API "+res.status;try{const raw=await res.text();try{const ej=JSON.parse(raw);if(ej.error)errMsg=typeof ej.error==="string"?ej.error:ej.error.message||errMsg;}catch(_){if(raw)errMsg+=": "+raw.slice(0,120);}}catch(_2){}return{text:null,error:errMsg};}
 const data=await res.json();
-if(data.text){_analysisCache[key]=data.text;if(active){setText(data.text);setError(null);}}
-else if(active){setError(data.error||"空のレスポンス");}
-}catch(e){if(active)setError(e.message||"通信エラー");}finally{_analysisPending.delete(key);if(active)setLoading(false);}})();
-return()=>{active=false;};
-},[name,gc,m?.missRate,m?.finishRate,m?.ojamaRate,m?.winRate]);
-return{text,loading,error};
+if(data.text){setAnalysisCached(key,data.text);incPlayerAnalysisCount(name);incAnalysisTotal();return{text:data.text,error:null};}
+return{text:null,error:data.error||"空のレスポンス"};
+}catch(e){return{text:null,error:e.message||"通信エラー"};}
+finally{_analysisPending.delete(key);}
 }
 
 /* ═══ Score Distribution Component ═══ */
-function ScoreDistribution({playersData,favs}){
+function ScoreDistribution({playersData,favs,isAdmin,aiEnabled}){
 const hasSV=playersData.some(pd=>pd.metrics.scoreValues&&pd.metrics.scoreValues.length>0);
+const[analyzeAll,setAnalyzeAll]=useState(false);
+const[analyzeKey,setAnalyzeKey]=useState(0);
 if(!hasSV)return(<div style={{background:"#fff",borderRadius:14,padding:14,marginBottom:14,border:"1px solid #ddd"}}>
 <div style={{fontSize:16,fontWeight:800,color:"#14365a",marginBottom:8}}>🎯 スコア分布分析</div>
 <div style={{textAlign:"center",padding:20,color:"#aaa",fontSize:14}}>スコア分布データがありません</div>
 
   </div>);
   const SCORE_COLORS=["#e8e8e8","#dbeafe","#bfdbfe","#93c5fd","#60a5fa","#3b82f6","#2563eb","#1d4ed8","#1e40af","#1e3a8a","#f59e0b","#ef4444"];
+  const analyzablePlayers=playersData.filter(pd=>(favs||[]).includes(pd.name)&&(pd.metrics.gameCount||0)>=3);
   return(<div style={{background:"#fff",borderRadius:14,padding:14,marginBottom:14,border:"1px solid #ddd"}}>
-    <div style={{fontSize:16,fontWeight:800,color:"#14365a",marginBottom:12}}>🎯 スコア分布分析</div>
-    {playersData.map(pd=>(<ScoreDistPlayer key={pd.name} pd={pd} SCORE_COLORS={SCORE_COLORS} isFav={(favs||[]).includes(pd.name)}/>))}
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+    <div style={{fontSize:16,fontWeight:800,color:"#14365a"}}>🎯 スコア分布分析</div>
+    {aiEnabled&&analyzablePlayers.length>1&&<button onClick={()=>{setAnalyzeAll(true);setAnalyzeKey(k=>k+1);}} style={{padding:"6px 14px",border:"none",borderRadius:8,background:"#2b7de9",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>🤖 全員分析</button>}
+    </div>
+    {playersData.map(pd=>(<ScoreDistPlayer key={pd.name} pd={pd} SCORE_COLORS={SCORE_COLORS} isFav={(favs||[]).includes(pd.name)} isAdmin={isAdmin} aiEnabled={aiEnabled} triggerAll={analyzeAll} analyzeKey={analyzeKey}/>))}
   </div>);
 }
 
-function ScoreDistPlayer({pd,SCORE_COLORS,isFav}){
+function ScoreDistPlayer({pd,SCORE_COLORS,isFav,isAdmin,aiEnabled,triggerAll,analyzeKey}){
 const sv=pd.metrics.scoreValues||[];
 const gc=pd.metrics.gameCount||0;
-const shouldAnalyze=isFav&&gc>=3;
-const{text:aiText,loading:aiLoading,error:aiError}=usePlayerAnalysis(pd.name,shouldAnalyze?pd.metrics:null);
+const canAnalyze=isFav&&gc>=3;
+const[aiText,setAiText]=useState(()=>{if(!canAnalyze)return null;const key=makeAnalysisKey(pd.name,gc,pd.metrics);return getAnalysisCached(key);});
+const[aiLoading,setAiLoading]=useState(false);
+const[aiError,setAiError]=useState(null);
+const remaining=ANALYSIS_DAILY_MAX-getPlayerAnalysisCount(pd.name);
+
+const doAnalyze=useCallback(async(force)=>{
+if(!canAnalyze)return;
+const key=makeAnalysisKey(pd.name,gc,pd.metrics);
+if(!force){const cached=getAnalysisCached(key);if(cached){setAiText(cached);setAiError(null);return;}}
+setAiLoading(true);setAiError(null);
+const r=await fetchPlayerAnalysis(pd.name,pd.metrics,isAdmin);
+setAiLoading(false);
+if(r.text){setAiText(r.text);setAiError(null);}else{setAiError(r.error);}
+},[pd.name,gc,isAdmin,canAnalyze]);
+
+/* Trigger from "全員分析" button */
+useEffect(()=>{if(triggerAll&&analyzeKey>0&&canAnalyze&&aiEnabled){doAnalyze(false);}},[analyzeKey]);
+
 if(!sv.length)return null;
 const dist=Array(12).fill(0);sv.forEach(s=>{if(s>=1&&s<=12)dist[s-1]++;});
 const maxC=Math.max(...dist,1);
@@ -973,15 +1108,22 @@ return(<div style={{marginBottom:16}}>
 <div style={{background:"#f8f9fa",borderRadius:8,padding:10}}>
 <div style={{fontSize:13,fontWeight:700,color:"#14365a",marginBottom:4}}>分析結果</div>
 <div style={{fontSize:13,color:"#555"}}>よく獲得するスコア: {top3.length>0?top3.map(s=>s.score+"点").join(", "):"−"}</div>
-<div style={{fontSize:13,color:"#555",marginTop:4}}>
-<span style={{fontWeight:700}}>得点スタイル: </span>
-{!isFav?<span style={{color:"#aaa"}}>お気に入り登録で分析可能</span>
+<div style={{fontSize:13,color:"#555",marginTop:6}}>
+<span style={{fontWeight:700}}>プレイスタイルAI分析: </span>
+{!aiEnabled?<span style={{color:"#aaa"}}>AI分析OFF</span>
+:!isFav?<span style={{color:"#aaa"}}>お気に入り登録で分析可能</span>
 :gc<3?<span style={{color:"#aaa"}}>3試合以上で分析可能（現在{gc}試合）</span>
 :aiLoading?<span style={{color:"#2b7de9"}}>AI分析中...</span>
-:aiError?<span style={{color:"#c0392b"}}>エラー: {aiError}</span>
+:aiError?<span style={{color:"#c0392b"}}>{aiError}</span>
 :aiText?<span style={{whiteSpace:"pre-line",lineHeight:1.6}}>{aiText}</span>
-:<span style={{color:"#aaa"}}>分析データなし</span>}
+:<span style={{color:"#aaa"}}>ボタンを押して分析</span>}
 </div>
+{aiEnabled&&canAnalyze&&!aiLoading&&(
+<div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
+{aiText?<button onClick={()=>doAnalyze(true)} style={{padding:"5px 12px",border:"1px solid #ddd",borderRadius:6,background:"#fff",color:"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}>🔄 再分析</button>
+:<button onClick={()=>doAnalyze(false)} style={{padding:"6px 14px",border:"none",borderRadius:8,background:"#2b7de9",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>🤖 分析</button>}
+{!isAdmin&&<span style={{fontSize:11,color:"#bbb"}}>残{remaining}/{ANALYSIS_DAILY_MAX}回</span>}
+</div>)}
 </div>
 
   </div>);
@@ -1039,7 +1181,7 @@ return(<div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 
 }
 
 /* ═══ Stats Modal — with Calendar/Recent tabs + Score Distribution ═══ */
-function StatsModal({onClose,currentGameRecords,initialDelete,source}){
+function StatsModal({onClose,currentGameRecords,initialDelete,source,isAdmin,aiEnabled}){
 const isTab=typeof window!=="undefined"&&window.innerWidth>=768;
 const[stats,setStats]=useState(()=>loadStats());
 const favs=loadFavs();
@@ -1214,7 +1356,7 @@ return(<button key={k} onClick={applyPreset} style={{padding:"6px 12px",border:"
 <tbody>{playersData.map(pd=>{const m=pd.metrics;return(<tr key={pd.name} style={{borderBottom:"1px solid #eee"}}><td style={{padding:"8px",fontWeight:700,color:pd.color}}>{pd.name}</td><td style={{padding:"8px",textAlign:"center"}}>{m.gameCount}</td><td style={{padding:"8px",textAlign:"center"}}>{m.winCount}</td><td style={{padding:"8px",textAlign:"center"}}>{m.turnCount}</td><td style={{padding:"8px",textAlign:"center",color:"#bf6900"}}>{m.missCount}</td><td style={{padding:"8px",textAlign:"center"}}>{(m.missRate*100).toFixed(1)}%</td><td style={{padding:"8px",textAlign:"center"}}>{(m.finishRate*100).toFixed(1)}%</td><td style={{padding:"8px",textAlign:"center",color:"#22b566",fontWeight:800}}>{m.ojamaCount}</td></tr>);})}</tbody></table>
 </div>
 {/* Score Distribution */}
-<ScoreDistribution playersData={playersData} favs={favs}/>
+<ScoreDistribution playersData={playersData} favs={favs} isAdmin={isAdmin} aiEnabled={aiEnabled!==false}/>
 {/* Detailed metrics */}
 <div style={{background:"#fff",borderRadius:14,padding:14,border:"1px solid #ddd",marginBottom:14}}>
 <div style={{fontSize:16,fontWeight:800,color:"#14365a",marginBottom:8}}>📈 詳細指標</div>
@@ -1245,8 +1387,15 @@ return(<div key={pd.name} style={{marginBottom:12}}>
 {scoreGame&&<GameScoreModal gameKey={scoreGame} onClose={()=>setScoreGame(null)}/>}
 {/* Delete dialogs */}
 {delStep===1&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"#fff",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}}>
+{isAdmin?(<>
 <div style={{fontSize:18,fontWeight:800,color:"#c0392b",marginBottom:12}}>⚠️ スタッツを削除しますか？</div>
 <div style={{display:"flex",gap:8}}><button onClick={()=>setDelStep(2)} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"#c0392b",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>する</button><button onClick={()=>setDelStep(0)} style={{flex:1,padding:"12px 0",border:"2px solid #ccc",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
+</>):(<>
+<div style={{fontSize:44,marginBottom:8}}>🔐</div>
+<div style={{fontSize:18,fontWeight:800,color:"#14365a",marginBottom:8}}>管理者モードが必要です</div>
+<div style={{fontSize:14,color:"#888",marginBottom:14}}>スタッツの削除は管理者のみ実行できます。<br/>⚙️ 詳細設定で管理者モードをONにしてください。</div>
+<button onClick={()=>setDelStep(0)} style={{width:"100%",padding:"12px 0",border:"2px solid #ccc",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>閉じる</button>
+</>)}
 </div></div>}
 {delStep===2&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"#fff",borderRadius:16,padding:24,maxWidth:400,width:"90%",textAlign:"center"}}>
 <div style={{fontSize:18,fontWeight:800,color:"#c0392b",marginBottom:12}}>削除する期間を選択</div>
@@ -1257,7 +1406,7 @@ return(<div key={pd.name} style={{marginBottom:12}}>
 }
 
 /* ═══ Game Result — with stats toggle + long-press delete ═══ */
-function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gameNumber,onNext,onBack,onExtend,timestamps}){
+function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gameNumber,onNext,onBack,onExtend,timestamps,isAdmin,aiEnabled}){
 const[comment,setComment]=useState("");const[comments,setComments]=useState([]);
 const[ordMode,setOrdMode]=useState("reverse");const[ordVal,setOrdVal]=useState([...teamOrder].reverse());
 const[saving,setSaving]=useState(false);const[showStats,setShowStats]=useState(false);
@@ -1295,14 +1444,14 @@ return(
 {isAllDone&&(<div style={{background:"#fff",borderRadius:14,padding:16,marginBottom:12,border:"1px solid #d0dff0"}}><div style={{fontSize:18,fontWeight:800,color:"#14365a",marginBottom:5}}>🔄 ゲーム継続・延長</div><OrderPicker teams={teams} teamOrder={teamOrder} value={ordMode} onChangeOrd={handleOrd} prevOrder={teamOrder}/><div style={{display:"flex",gap:8,marginTop:6}}><button onClick={()=>onExtend("game",ordVal)} style={{flex:1,padding:"14px 0",border:"none",borderRadius:10,background:"#2b7de9",color:"#fff",fontSize:17,fontWeight:700,cursor:"pointer"}}>＋1ゲーム追加</button>{isMatchOver&&<button onClick={()=>onExtend("set",ordVal)} style={{flex:1,padding:"14px 0",border:"none",borderRadius:10,background:"#22b566",color:"#fff",fontSize:17,fontWeight:700,cursor:"pointer"}}>＋1セット延長</button>}</div></div>)}
 <button onClick={onBack} style={{width:"100%",padding:"16px 0",border:"2px solid #14365a",borderRadius:12,background:"transparent",color:"#14365a",fontSize:19,fontWeight:700,cursor:"pointer",marginBottom:24}}>設定に戻る</button>
 </div>
-{showStats===true&&<StatsModal onClose={()=>setShowStats(false)} currentGameRecords={currentGameRecords} source="game"/>}
-{showStats==="delete"&&<StatsModal onClose={()=>setShowStats(false)} currentGameRecords={currentGameRecords} initialDelete={true} source="game"/>}
+{showStats===true&&<StatsModal onClose={()=>setShowStats(false)} currentGameRecords={currentGameRecords} source="game" isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
+{showStats==="delete"&&<StatsModal onClose={()=>setShowStats(false)} currentGameRecords={currentGameRecords} initialDelete={true} source="game" isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
 </div>
 );
 }
 
 /* ═══ Game Screen — with timing ═══ */
-function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goBack,saveToStatsProp,recoverData}){
+function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goBack,saveToStatsProp,recoverData,isAdmin,aiEnabled}){
 const init=recoverData?{
 teams:recoverData.teams.map(t=>({...t,players:t.players.map(p=>typeof p==="string"?{name:p,active:true}:p)})),
 history:recoverData.history,currentOrderIdx:recoverData.currentOrderIdx,currentTurn:recoverData.currentTurn,
@@ -1389,7 +1538,7 @@ return(
 </div>
 {showPl&&<PlModal teams={teams} dispatch={dispatch} onClose={()=>setShowPl(false)}/>}
 {conf&&<Confirm msg={conf.msg} onOk={execConf} onCancel={()=>setConf(null)}/>}
-{showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} timestamps={timestamps}/>}
+{showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} timestamps={timestamps} isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
 {saveDialog&&<Confirm msg={"チーム・プレイヤー情報を\n設定画面に保存しますか？"} sub={"保存すると次のゲームで\n同じメンバーをすぐ使えます"} okLabel="保存する" cancelLabel="保存しない" thirdLabel="キャンセル（試合に戻る）" onOk={()=>doBack(true)} onCancel={()=>doBack(false)} onThird={()=>setSaveDialog(false)}/>}
 </div>);
 }
@@ -1399,6 +1548,9 @@ const[dbReady,setDbReady]=useState(_cache.ready);
 useEffect(()=>{if(!_cache.ready)initDB().then(()=>{setDbReady(true);/* Auto-sync on load */if(getSyncCode())pullFromServer().catch(e=>console.error("auto-pull error",e));}).catch(()=>setDbReady(true));},[]);
 const[scr,setScr]=useState(()=>{if(!dbReady)return"loading";try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0)return"recover";}catch(e){}return"setup";});
 const[cfg,setCfg]=useState(null);const[saved,setSaved]=useState(null);const[recovery,setRecovery]=useState(null);
+const[isAdmin,setIsAdmin]=useState(false);
+const[aiEnabled,setAiEnabled]=useState(()=>getAIEnabled());
+const handleAIToggle=(v)=>{setAiEnabled(v);setAIEnabledLS(v);};
 useEffect(()=>{if(dbReady&&scr==="loading"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0){setScr("recover");}else{setScr("setup");}}catch(e){setScr("setup");}}},[dbReady]);
 useEffect(()=>{if(scr==="recover"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));setRecovery(p);}catch(e){setScr("setup");}};},[scr]);
 const doRecover=()=>{if(!recovery)return;const r=recovery;setCfg({t:r.teams,o:r.teamOrder,ng:1,bo:0,dq:r.dqEndGame!==undefined?r.dqEndGame:true,sts:true,recover:r});setScr("game");};
@@ -1415,7 +1567,7 @@ if(!dbReady||scr==="loading"){return(<div style={{width:"100%",height:"100dvh",d
       <div style={{display:"flex",gap:10}}><button onClick={doRecover} style={{flex:1,padding:"16px 0",border:"none",borderRadius:12,background:"#14365a",color:"#fff",fontSize:18,fontWeight:700,cursor:"pointer"}}>再開する</button><button onClick={dismissRecover} style={{flex:1,padding:"16px 0",border:"2px solid #14365a",borderRadius:12,background:"transparent",color:"#14365a",fontSize:18,fontWeight:700,cursor:"pointer"}}>破棄する</button></div>
     </div>
   </div>);}
-  return(<div style={{width:"100%",height:"100dvh"}}>{scr==="setup"?<SetupScreen savedTeams={saved} onStart={(t,o,ng,bo,dq,sts)=>{setCfg({t,o,ng,bo,dq,sts});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts!==false} recoverData={cfg.recover||null} goBack={saveData=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);setScr("setup");setCfg(null);}}/>}</div>);
+  return(<div style={{width:"100%",height:"100dvh"}}>{scr==="setup"?<SetupScreen savedTeams={saved} isAdmin={isAdmin} onAdminToggle={setIsAdmin} aiEnabled={aiEnabled} onAIToggle={handleAIToggle} onStart={(t,o,ng,bo,dq,sts)=>{setCfg({t,o,ng,bo,dq,sts});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts!==false} recoverData={cfg.recover||null} isAdmin={isAdmin} aiEnabled={aiEnabled} goBack={saveData=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);setScr("setup");setCfg(null);}}/>}</div>);
 }
 
 const SS={
