@@ -56,6 +56,7 @@ const IDB_NAME="mk-molkky-db";
 const IDB_VER=2;
 const MAX_GAMES=100000;
 const MAX_REPLAYS=100000;
+const MAX_SYNC_CODES=1;
 
 /* In-memory cache — loaded from IndexedDB at startup */
 const _cache={stats:{},replays:{},analysis:{},ready:false};
@@ -390,7 +391,7 @@ if(!code||_syncBusy)return{merged:false,reason:"no_code"};
 _syncBusy=true;
 try{
 const r=await fetch("/api/sync?code="+encodeURIComponent(code));
-if(r.status===404){_syncBusy=false;await pushToServer();return{merged:true,reason:"new_pushed",added:0};}
+if(r.status===404){_syncBusy=false;try{const cr=await fetch("/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code,action:"count_codes"})});const cd=await cr.json();if(cd.ok&&cd.count>=MAX_SYNC_CODES){return{merged:false,reason:"limit",error:"既存の同期コードを使用してください"};}}catch(e){}await pushToServer();return{merged:true,reason:"new_pushed",added:0};}
 if(!r.ok){const e=await r.json().catch(()=>({}));_syncBusy=false;return{merged:false,reason:"error",error:e.error||"HTTP "+r.status};}
 const data=await r.json();
 
@@ -622,14 +623,14 @@ return(<div style={SS.ov}><div className="mk-fade-scale-in" style={{background:"
   </div></div>);
 }
 
-function FavDropdown({favs,addF,rmF,onPick,usedNames}){
+function FavDropdown({favs,addF,rmF,onPick,usedNames,isAdmin:isAdminProp}){
 const[open,setOpen]=useState(false);const[newN,setNewN]=useState("");const[delTarget,setDelTarget]=useState(null);
 const[dropPos,setDropPos]=useState({top:0,right:0,maxHeight:300});
 const longRef=useRef(null);const wrapRef=useRef(null);const dropRef=useRef(null);
 const available=favs.filter(f=>!(usedNames||[]).includes(f));
 useEffect(()=>{if(!open)return;const h=e=>{if(wrapRef.current&&wrapRef.current.contains(e.target))return;if(dropRef.current&&dropRef.current.contains(e.target))return;setOpen(false);};document.addEventListener("pointerdown",h);return()=>document.removeEventListener("pointerdown",h);},[open]);
 useEffect(()=>{if(!open||!wrapRef.current)return;const rect=wrapRef.current.getBoundingClientRect();const spBelow=window.innerHeight-rect.bottom-12;const spAbove=rect.top-12;const useBelow=spBelow>=200||spBelow>=spAbove;const mH=Math.min(useBelow?spBelow:spAbove,420);const r=window.innerWidth-rect.right;if(useBelow){setDropPos({top:rect.bottom+4,right:Math.max(r,8),maxHeight:mH});}else{setDropPos({bottom:window.innerHeight-rect.top+4,right:Math.max(r,8),maxHeight:mH});}},[open]);
-const startLP=name=>{longRef.current=setTimeout(()=>setDelTarget(name),600);};const cancelLP=()=>{if(longRef.current)clearTimeout(longRef.current);};
+const startLP=name=>{if(!isAdminProp)return;longRef.current=setTimeout(()=>setDelTarget(name),600);};const cancelLP=()=>{if(longRef.current)clearTimeout(longRef.current);};
 return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 <button onClick={()=>{setOpen(!open);setDelTarget(null);}} style={{width:40,height:40,border:"1px solid #d0dff0",borderRadius:8,background:open?"var(--accent-blue)":"#f0f6ff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:open?"#fff":"#d9a83a"}}><Star size={18}/></button>
 {open&&(<div ref={dropRef} style={{position:"fixed",...dropPos,background:"var(--bg-surface)",border:"1px solid var(--border-input)",borderRadius:12,boxShadow:"var(--shadow-md)",zIndex:9999,minWidth:220,maxWidth:300,padding:10,display:"flex",flexDirection:"column"}}>
@@ -878,13 +879,13 @@ return(
 </div>
 <div style={{padding:"12px 16px",background:"rgba(43,125,233,0.12)",borderRadius:12,border:"1px solid rgba(43,125,233,0.2)",marginBottom:14}}><div style={{fontWeight:800,fontSize:16,color:"var(--text-inverse)",marginBottom:3}}><ClipboardList size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 公式ルール</div><div style={{fontSize:13,color:"rgba(255,255,255,0.6)",lineHeight:1.8}}>50点で勝利 / 超過→25点 / 37点以上でフォルト→25点 / ミス＝倒れず / フォルト＝反則 / 3連続→失格</div></div>
 {mode==="manual"&&(<>{teams.slice(0,tc).map((team,ti)=>(<div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac}}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><div style={{width:34,height:34,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-inverse)",fontWeight:900,fontSize:18,flexShrink:0,background:C[ti].ac}}>{ti+1}</div><input value={team.name} onChange={e=>uN(ti,e.target.value)} style={TIN} placeholder={"チーム"+(ti+1)}/></div>
-<div style={{paddingLeft:44}}>{team.players.map((p,pi)=>(<div key={pi} style={{display:"flex",alignItems:"center",gap:6,marginBottom:7}}><span style={{width:20,fontSize:16,color:"var(--text-muted)",fontWeight:700,textAlign:"center"}}>{pi+1}</span><input value={p} onChange={e=>uP(ti,pi,e.target.value)} maxLength={MAX_NAME} style={PIN} placeholder={"名前("+MAX_NAME+"文字)"}/><FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uP(ti,pi,name)} usedNames={used}/></div>))}
+<div style={{paddingLeft:44}}>{team.players.map((p,pi)=>(<div key={pi} style={{display:"flex",alignItems:"center",gap:6,marginBottom:7}}><span style={{width:20,fontSize:16,color:"var(--text-muted)",fontWeight:700,textAlign:"center"}}>{pi+1}</span><input value={p} onChange={e=>uP(ti,pi,e.target.value)} maxLength={MAX_NAME} style={PIN} placeholder={"名前("+MAX_NAME+"文字)"}/><FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uP(ti,pi,name)} usedNames={used} isAdmin={isAdmin}/></div>))}
 {team.players.length<MAX_PL&&<button style={{width:"100%",padding:10,border:"2px dashed var(--border-input)",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer"}} onClick={()=>aP(ti)}>＋ 追加</button>}
 {team.players.length>1&&<button style={{width:"100%",padding:10,border:"2px dashed #f0b0b0",borderRadius:8,background:"transparent",color:"var(--text-danger)",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:4}} onClick={()=>rP(ti,team.players.length-1)}>− 最後を削除</button>}
 </div></div>))}
 <button style={{width:"100%",padding:20,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"var(--text-inverse)",fontSize:32,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:6,boxShadow:"0 3px 16px rgba(43,125,233,0.3)",opacity:okM?1:0.3}} onClick={okM?go:undefined}><Target size={28} style={{display:"inline",verticalAlign:"middle",marginRight:6}}/> ゲーム開始</button>
 </>)}
-{mode==="shuffle"&&(<><div style={CARD}><div style={{fontWeight:700,fontSize:18,marginBottom:6,color:"var(--text-primary)"}}>参加メンバー（最大{MAX_SHUF}人）</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>{mems.map((m,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:20,fontSize:14,color:"var(--text-muted)",fontWeight:700,textAlign:"right"}}>{i+1}</span><input value={m} onChange={e=>uM(i,e.target.value)} maxLength={MAX_NAME} style={{...PIN,padding:"10px 12px",fontSize:18}} placeholder="メンバー"/><FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uM(i,name)} usedNames={used}/></div>))}</div>
+{mode==="shuffle"&&(<><div style={CARD}><div style={{fontWeight:700,fontSize:18,marginBottom:6,color:"var(--text-primary)"}}>参加メンバー（最大{MAX_SHUF}人）</div><div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>{mems.map((m,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:20,fontSize:14,color:"var(--text-muted)",fontWeight:700,textAlign:"right"}}>{i+1}</span><input value={m} onChange={e=>uM(i,e.target.value)} maxLength={MAX_NAME} style={{...PIN,padding:"10px 12px",fontSize:18}} placeholder="メンバー"/><FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uM(i,name)} usedNames={used} isAdmin={isAdmin}/></div>))}</div>
 {mems.length<MAX_SHUF&&<button style={{width:"100%",padding:10,border:"2px dashed var(--border-input)",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:6}} onClick={aM}>＋</button>}
 {mems.length>2&&<button style={{width:"100%",padding:10,border:"2px dashed #f0b0b0",borderRadius:8,background:"transparent",color:"var(--text-danger)",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:4}} onClick={()=>rM(mems.length-1)}>− 最後を削除</button>}</div>
 <button style={{width:"100%",padding:16,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"var(--text-inverse)",fontSize:20,fontWeight:800,cursor:"pointer",opacity:okS?1:0.3}} onClick={okS?doShuf:undefined}>🎲 シャッフル</button>
@@ -937,7 +938,7 @@ return(
 }
 
 /* ═══ Player Modal ═══ */
-function PlModal({teams,dispatch,onClose}){
+function PlModal({teams,dispatch,onClose,isAdmin}){
 const{favs,addF,rmF}=useFavs();const[name,setName]=useState("");
 const sizes=teams.map(t=>t.players.filter(p=>p.active).length);const mi=sizes.indexOf(Math.min(...sizes));const[sel,setSel]=useState(mi);
 const[addConf,setAddConf]=useState(null);const[delConf,setDelConf]=useState(null);
@@ -964,7 +965,7 @@ return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" st
 <select value={sel} onChange={e=>setSel(+e.target.value)} style={{padding:8,borderRadius:8,border:"1px solid var(--border-input)",fontSize:16}}>{teams.map((t,i)=><option key={i} value={i}>{t.name}</option>)}</select>
 <input value={name} onChange={e=>setName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder="名前" style={{flex:1,minWidth:80,padding:8,borderRadius:8,border:"1px solid var(--border-input)",fontSize:16}}/>
 <button onClick={()=>doAdd()} style={{padding:"8px 14px",borderRadius:8,border:"none",background:"var(--accent-blue)",color:"var(--text-inverse)",fontWeight:700,fontSize:16,cursor:"pointer",opacity:name.trim()?1:0.3}}>追加</button>
-<FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={n=>doAdd(n)} usedNames={allUsed}/>
+<FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={n=>doAdd(n)} usedNames={allUsed} isAdmin={isAdmin}/>
 </div>
 </div>
 {addConf&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}}>
@@ -1679,7 +1680,7 @@ return(
 {(view==="both"||view==="sheet")&&(<div style={{flex:1,minHeight:0,overflow:"hidden"}}><GameSheet teams={teams} history={history} currentTurn={currentTurn} teamOrder={teamOrder} activeCell={activeCell}/></div>)}
 {(view==="both"||view==="input")&&(<ScoreInput dispatch={dispatch} canUndo={history.length>0} teamName={teams[ti].name} teamScore={score} teamColor={C[ti].ac} playerName={cp?.name} fails={fails} onConfirm={(t,s,m)=>setConf({t,s,msg:m})} minimized={inputMin} onToggleMin={()=>setInputMin(p=>!p)}/>)}
 </div>
-{showPl&&<PlModal teams={teams} dispatch={dispatch} onClose={()=>setShowPl(false)}/>}
+{showPl&&<PlModal teams={teams} dispatch={dispatch} onClose={()=>setShowPl(false)} isAdmin={isAdmin}/>}
 {conf&&<Confirm msg={conf.msg} onOk={execConf} onCancel={()=>setConf(null)}/>}
 {showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} timestamps={timestamps} isAdmin={isAdmin} aiEnabled={aiEnabled} autoEnd={!!autoEnd} dqEndGame={!!dqEndGame}/>}
 {animState.confetti&&<CSSConfetti/>}

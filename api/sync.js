@@ -49,6 +49,15 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid code (min 3 chars)" });
     }
 
+    // --- Action: count_codes (check how many sync codes exist) ---
+    if (body.action === "count_codes") {
+      const { count, error: cErr } = await supabase
+        .from("sync_data")
+        .select("sync_code", { count: "exact", head: true });
+      if (cErr) return res.status(500).json({ error: cErr.message });
+      return res.status(200).json({ ok: true, count: count || 0 });
+    }
+
     // --- Action: verify_pin ---
     if (body.action === "verify_pin") {
       const { pin } = body;
