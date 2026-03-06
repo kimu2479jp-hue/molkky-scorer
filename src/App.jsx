@@ -624,7 +624,7 @@ return(<div style={SS.ov}><div className="mk-fade-scale-in" style={{background:"
 }
 
 function FavDropdown({favs,addF,rmF,onPick,usedNames,isAdmin:isAdminProp}){
-const[open,setOpen]=useState(false);const[newN,setNewN]=useState("");const[delTarget,setDelTarget]=useState(null);
+const[open,setOpen]=useState(false);const[newN,setNewN]=useState("");const[delTarget,setDelTarget]=useState(null);const[delConf,setDelConf]=useState(null);
 const[dropPos,setDropPos]=useState({top:0,right:0,maxHeight:300});
 const longRef=useRef(null);const wrapRef=useRef(null);const dropRef=useRef(null);
 const available=favs.filter(f=>!(usedNames||[]).includes(f));
@@ -635,12 +635,17 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 <button onClick={()=>{setOpen(!open);setDelTarget(null);}} style={{width:40,height:40,border:"1px solid #d0dff0",borderRadius:8,background:open?"var(--accent-blue)":"#f0f6ff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:open?"#fff":"#d9a83a"}}><Star size={18}/></button>
 {open&&(<div ref={dropRef} style={{position:"fixed",...dropPos,background:"var(--bg-surface)",border:"1px solid var(--border-input)",borderRadius:12,boxShadow:"var(--shadow-md)",zIndex:9999,minWidth:220,maxWidth:300,padding:10,display:"flex",flexDirection:"column"}}>
 {available.length===0&&<div style={{padding:12,textAlign:"center",color:"var(--text-muted)",fontSize:16}}>{favs.length===0?"登録なし":"全員配置済み"}</div>}
-<div style={{flex:1,minHeight:0,overflow:"auto",WebkitOverflowScrolling:"touch"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid var(--border-lighter)",background:delTarget===f?"#fde8e8":"transparent",fontSize:18,fontWeight:600,color:"var(--text-primary)",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<span onClick={e=>{e.stopPropagation();rmF(f);setDelTarget(null);}} style={{padding:"5px 12px",background:"#e74c3c",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700}}>削除</span>}</button></div>))}</div>
+<div style={{flex:1,minHeight:0,overflow:"auto",WebkitOverflowScrolling:"touch"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid var(--border-lighter)",background:delTarget===f?"#fde8e8":"transparent",fontSize:18,fontWeight:600,color:"var(--text-primary)",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<span onClick={e=>{e.stopPropagation();setDelConf(f);}} style={{padding:"5px 12px",background:"#e74c3c",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700}}>削除</span>}</button></div>))}</div>
 <div style={{borderTop:"1px solid var(--border-lighter)",paddingTop:10,marginTop:4,flexShrink:0}}><div style={{display:"flex",gap:6}}>
 <input value={newN} onChange={e=>setNewN(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder={"新規("+MAX_NAME+"文字)"} style={{flex:1,padding:"10px 12px",border:"1px solid var(--border-input)",borderRadius:8,fontSize:16,outline:"none"}}/>
 <button onClick={()=>{if(newN.trim()&&favs.length<MAX_FAV){addF(newN.trim());setNewN("");}}} style={{padding:"10px 16px",border:"none",borderRadius:8,background:"var(--accent-blue)",color:"var(--text-inverse)",fontWeight:700,fontSize:15,cursor:"pointer",opacity:newN.trim()?1:0.3}}>登録</button>
 </div>{favs.length>=MAX_FAV&&<div style={{fontSize:12,color:"var(--text-danger)",marginTop:4,textAlign:"center"}}>登録上限({MAX_FAV}人)に達しています</div>}</div>
 </div>)}
+{delConf&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setDelConf(null)}><div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}} onClick={e=>e.stopPropagation()}>
+<div style={{fontSize:18,fontWeight:800,color:"var(--text-danger)",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}><AlertTriangle size={18}/> お気に入り削除</div>
+<div style={{fontSize:16,marginBottom:16}}>「{delConf}」をお気に入りから削除しますか？</div>
+<div style={{display:"flex",gap:8}}><button onClick={()=>{rmF(delConf);setDelConf(null);setDelTarget(null);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>削除する</button><button onClick={()=>setDelConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
+</div></div>}
 
   </div>);
 }
