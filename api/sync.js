@@ -1,5 +1,5 @@
 // Vercel Serverless Function: /api/sync
-// Cloud sync via Supabase — stores stats, replays, favorites per sync code
+// Cloud sync via Supabase — stats, replays, favorites, admin PIN
 
 import { createClient } from "@supabase/supabase-js";
 
@@ -19,14 +19,14 @@ export default async function handler(req, res) {
   const supabase = getSupabase();
   if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
 
-  // GET /api/sync?code=xxx — pull data
+  // GET /api/sync?code=xxx — pull data (PIN is NEVER sent to client)
   if (req.method === "GET") {
     const code = req.query.code;
     if (!code) return res.status(400).json({ error: "Missing code" });
 
     const { data, error } = await supabase
       .from("sync_data")
-      .select("stats, replays, favorites, updated_at")
+      .select("stats, replays, favorites, updated_at, admin_pin, pin_updated_at")
       .eq("code", code)
       .single();
 
@@ -36,28 +36,72 @@ export default async function handler(req, res) {
       replays: data.replays || {},
       favorites: data.favorites || [],
       updated_at: data.updated_at,
+      has_pin: !!data.admin_pin,
+      pin_updated_at: data.pin_updated_at || null,
     });
   }
 
-  // POST /api/sync — push data
+  // POST /api/sync
   if (req.method === "POST") {
-    const { code, stats, replays, favorites } = req.body || {};
+    const body = req.body || {};
+    const { code } = body;
     if (!code || typeof code !== "string" || code.length < 3) {
       return res.status(400).json({ error: "Invalid code (min 3 chars)" });
     }
 
+    // --- Action: verify_pin (server-side comparison, PIN never exposed) ---
+    if (body.action === "verify_pin") {
+      const { pin } = body;
+      if (!pin) return res.status(400).json({ error: "Missing pin" });
+      const { data, error } = await supabase
+        .from("sync_data")
+        .select("admin_pin, pin_updated_at")
+        .eq("code", code)
+        .single();
+      if (error || !data) return res.status(404).json({ error: "Not found" });
+      if (!data.admin_pin) return res.status(200).json({ ok: false, reason: "no_pin" });
+      const match = data.admin_pin === pin;
+      return res.status(200).json({
+        ok: match,
+        reason: match ? "verified" : "wrong_pin",
+        pin_updated_at: data.pin_updated_at || null,
+      });
+    }
+
+    // --- Action: create_pin (only if no PIN exists yet) ---
+    if (body.action === "create_pin") {
+      const { pin } = body;
+      if (!pin || pin.length < 4 || pin.length > 6 || !/^\d+$/.test(pin)) {
+        return res.status(400).json({ error: "PIN must be 4-6 digits" });
+      }
+      const { data: existing } = await supabase
+        .from("sync_data")
+        .select("admin_pin")
+        .eq("code", code)
+        .single();
+      if (existing && existing.admin_pin) {
+        return res.status(403).json({ error: "PIN already set. Change via Supabase dashboard only." });
+      }
+      const now = new Date().toISOString();
+      const { error: upErr } = await supabase
+        .from("sync_data")
+        .update({ admin_pin: pin, pin_updated_at: now })
+        .eq("code", code);
+      if (upErr) return res.status(500).json({ error: upErr.message });
+      return res.status(200).json({ ok: true, pin_updated_at: now });
+    }
+
+    // --- Default: push sync data (never overwrites admin_pin) ---
     const payload = {
       code,
-      stats: stats || {},
-      replays: replays || {},
-      favorites: favorites || [],
+      stats: body.stats || {},
+      replays: body.replays || {},
+      favorites: body.favorites || [],
       updated_at: new Date().toISOString(),
     };
-
     const { error } = await supabase
       .from("sync_data")
       .upsert(payload, { onConflict: "code" });
-
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ ok: true });
   }
