@@ -1572,6 +1572,16 @@ const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name
 localStorage.setItem(PROGRESS_KEY,JSON.stringify(snapshot));
 }catch(e){console.warn("Progress save failed:",e);}
 },[history,eliminated,currentTurn,winner]);
+/* iOS safety: also save on pagehide/visibilitychange (fires before app kill) */
+useEffect(()=>{
+const saveNow=()=>{if(winner!==null||history.length===0)return;try{
+const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name:p.name,active:p.active}))})),history,teamOrder,currentOrderIdx,currentTurn,eliminated,gameNumber,plOffsets,dqEndGame:dqEnd,savedAt:Date.now()};
+localStorage.setItem(PROGRESS_KEY,JSON.stringify(snapshot));
+}catch(e){}};
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")saveNow();});
+window.addEventListener("pagehide",saveNow);
+return()=>{document.removeEventListener("visibilitychange",saveNow);window.removeEventListener("pagehide",saveNow);};
+},[history,eliminated,currentTurn,winner,teams,teamOrder,currentOrderIdx,gameNumber,plOffsets]);
 
 useEffect(()=>{if(winner!==null&&!showRes){
 setGW(p=>{const n=[...p];n[winner]++;return n;});setShowRes(true);
@@ -1630,7 +1640,7 @@ useEffect(()=>{if(dbReady&&scr==="loading"){try{const p=JSON.parse(localStorage.
 useEffect(()=>{if(scr==="recover"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));setRecovery(p);}catch(e){setScr("setup");}};},[scr]);
 const doRecover=()=>{if(!recovery)return;const r=recovery;setCfg({t:r.teams,o:r.teamOrder,ng:1,bo:0,dq:r.dqEndGame!==undefined?r.dqEndGame:true,sts:true,recover:r});setScr("game");};
 const dismissRecover=()=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}setRecovery(null);setScr("setup");};
-if(!dbReady||scr==="loading"){return(<div style={{width:"100%",height:"100dvh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(170deg,#0f1f30,#14365a)"}}>
+if(!dbReady||scr==="loading"||(scr==="recover"&&!recovery)){return(<div style={{width:"100%",height:"100dvh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(170deg,#0f1f30,#14365a)"}}>
 <div style={{textAlign:"center"}}><div style={{fontSize:48,marginBottom:12}}>🎯</div><div style={{fontSize:20,fontWeight:700,color:"#fff"}}>データ読み込み中...</div></div>
 
   </div>);}
@@ -1642,7 +1652,7 @@ if(!dbReady||scr==="loading"){return(<div style={{width:"100%",height:"100dvh",d
       <div style={{display:"flex",gap:10}}><button onClick={doRecover} style={{flex:1,padding:"16px 0",border:"none",borderRadius:12,background:"#14365a",color:"#fff",fontSize:18,fontWeight:700,cursor:"pointer"}}>再開する</button><button onClick={dismissRecover} style={{flex:1,padding:"16px 0",border:"2px solid #14365a",borderRadius:12,background:"transparent",color:"#14365a",fontSize:18,fontWeight:700,cursor:"pointer"}}>破棄する</button></div>
     </div>
   </div>);}
-  return(<div style={{width:"100%",height:"100dvh"}}>{scr==="setup"?<SetupScreen savedTeams={saved} isAdmin={isAdmin} onAdminToggle={setIsAdmin} aiEnabled={aiEnabled} onAIToggle={handleAIToggle} onStart={(t,o,ng,bo,dq,sts)=>{setCfg({t,o,ng,bo,dq,sts});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts!==false} recoverData={cfg.recover||null} isAdmin={isAdmin} aiEnabled={aiEnabled} goBack={saveData=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);setScr("setup");setCfg(null);}}/>}</div>);
+  return(<div style={{width:"100%",height:"100dvh"}}>{(scr==="setup"||!cfg)?<SetupScreen savedTeams={saved} isAdmin={isAdmin} onAdminToggle={setIsAdmin} aiEnabled={aiEnabled} onAIToggle={handleAIToggle} onStart={(t,o,ng,bo,dq,sts)=>{setCfg({t,o,ng,bo,dq,sts});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts!==false} recoverData={cfg.recover||null} isAdmin={isAdmin} aiEnabled={aiEnabled} goBack={saveData=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);setScr("setup");setCfg(null);}}/>}</div>);
 }
 
 const SS={
