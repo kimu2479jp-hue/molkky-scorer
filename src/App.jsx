@@ -764,14 +764,14 @@ return(<div style={{position:"fixed",inset:0,background:"linear-gradient(170deg,
 <span style={{fontSize:14,color:isAdmin?"#e6a817":"rgba(255,255,255,0.4)",fontWeight:700}}>🔐 {isAdmin?"管理者":"メンバー"}</span>
 </div>
 <div style={{flex:1,padding:"10px 14px",border:"2px solid "+(getSyncCode()?"#22b56644":"rgba(255,255,255,0.1)"),borderRadius:12,background:getSyncCode()?"rgba(34,181,102,0.08)":"rgba(255,255,255,0.03)",display:"flex",alignItems:"center",gap:6}}>
-<span style={{fontSize:14,color:getSyncCode()?"#22b566":"rgba(255,255,255,0.4)",fontWeight:700}}>☁️ {getSyncCode()?"同期済":"未設定"}</span>
+<span style={{fontSize:14,color:syncCode?"#22b566":"rgba(255,255,255,0.4)",fontWeight:700}}>☁️ {syncCode?"同期済":"未設定"}</span>
 </div>
 </div>
 {/* Admin mode */}
 <div style={{marginBottom:20}}>
 <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>権限管理</div>
-<SW on={isAdmin} onToggle={()=>{if(isAdmin){onAdminToggle(false);}else if(!getSyncCode()){setSyncStatus("❌ 先にクラウド同期を設定してください");}else if(serverHasPin===null){/* still loading */}else{setShowAdminPin(true);}}} label={"🔐 管理者モード "+(isAdmin?"(ON)":"(OFF)")} color="#e6a817"/>
-<div style={{fontSize:12,color:"rgba(255,255,255,0.35)",marginTop:-4,marginBottom:12,paddingLeft:4}}>{!getSyncCode()?"クラウド同期を先に設定してください":"スタッツ削除・同期コード編集・AI無制限"}</div>
+<SW on={isAdmin} onToggle={()=>{setSyncStatus("");if(isAdmin){onAdminToggle(false);}else if(!syncCode&&!getSyncCode()){setSyncStatus("❌ 先にクラウド同期を設定してください");}else{if(!syncCode)setSyncCode(getSyncCode());if(serverHasPin===null){checkServerHasPin().then(r=>{setServerHasPin(r.has_pin);setShowAdminPin(true);});}else{setShowAdminPin(true);}}}} label={"🔐 管理者モード "+(isAdmin?"(ON)":"(OFF)")} color="#e6a817"/>
+<div style={{fontSize:12,color:"rgba(255,255,255,0.35)",marginTop:-4,marginBottom:12,paddingLeft:4}}>{(!syncCode&&!getSyncCode())?"クラウド同期を先に設定してください":"スタッツ削除・同期コード編集・AI無制限"}</div>
 </div>
 {/* Cloud sync */}
 <div style={{marginBottom:20}}>
