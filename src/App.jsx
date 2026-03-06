@@ -325,11 +325,11 @@ return await r.json();
 }catch(e){return{ok:false,error:"network"};}
 }
 async function checkServerHasPin(code){
-if(!code)return{has_pin:false,pin_updated_at:null};
+if(!code)return{has_pin:false,pin_updated_at:null,exists:false};
 try{const r=await fetch("/api/sync?code="+encodeURIComponent(code));
-if(!r.ok)return{has_pin:false,pin_updated_at:null};
-const d=await r.json();return{has_pin:!!d.has_pin,pin_updated_at:d.pin_updated_at||null};
-}catch(e){return{has_pin:false,pin_updated_at:null};}
+if(!r.ok)return{has_pin:false,pin_updated_at:null,exists:false};
+const d=await r.json();return{has_pin:!!d.has_pin,pin_updated_at:d.pin_updated_at||null,exists:true};
+}catch(e){return{has_pin:false,pin_updated_at:null,exists:false};}
 }
 function maskSyncCode(code){if(!code||code.length<=2)return code?"***":"";return code.slice(0,2)+"\u2022".repeat(Math.min(code.length-2,8));}
 
@@ -737,14 +737,17 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
 /* ═══ Settings Page ═══ */
 function SettingsPage({onClose,isAdmin,onAdminToggle,aiEnabled,onAIToggle}){
 const[showAdminPin,setShowAdminPin]=useState(false);
-const[serverHasPin,setServerHasPin]=useState(null);/* null=loading, true/false */
-const[syncCode,setSyncCode]=useState(()=>getSyncCode());const[syncStatus,setSyncStatus]=useState("");
+const[serverHasPin,setServerHasPin]=useState(null);
+const savedCode=getSyncCode();/* from localStorage — may be stale */
+const[syncInput,setSyncInput]=useState(savedCode);/* input field value */
+const[syncConfirmed,setSyncConfirmed]=useState(!!savedCode);/* was a sync ever successful? */
+const[syncStatus,setSyncStatus]=useState("");
 const total=getAnalysisTotal();const totalDisplay=total>=10000?"\u221E":total;
 const costYen=(total*0.1).toFixed(1);
-/* Check server PIN status on mount */
-useEffect(()=>{const sc=syncCode||getSyncCode();if(sc){checkServerHasPin(sc).then(r=>setServerHasPin(r.has_pin));}else{setServerHasPin(false);}},[syncCode]);
-/* Remote kick: check if PIN was changed while we were admin */
-useEffect(()=>{const sc=syncCode||getSyncCode();if(isAdmin&&sc){checkServerHasPin(sc).then(r=>{
+/* On mount: verify saved code is actually valid on server */
+useEffect(()=>{if(savedCode){checkServerHasPin(savedCode).then(r=>{setServerHasPin(r.has_pin);setSyncConfirmed(r.exists);if(!r.exists){setSyncInput("");setSyncCodeLS("");}});}else{setServerHasPin(false);setSyncConfirmed(false);}},[]);
+/* Remote kick */
+useEffect(()=>{if(isAdmin&&savedCode){checkServerHasPin(savedCode).then(r=>{
 const storedTs=getPinAuthTs();
 if(r.pin_updated_at&&storedTs&&r.pin_updated_at!==storedTs){onAdminToggle(false);}
 });}},[isAdmin]);
@@ -763,42 +766,43 @@ return(<div style={{position:"fixed",inset:0,background:"linear-gradient(170deg,
 <div style={{flex:1,padding:"10px 14px",border:"2px solid "+(isAdmin?"#e6a81744":"rgba(255,255,255,0.1)"),borderRadius:12,background:isAdmin?"rgba(230,168,23,0.08)":"rgba(255,255,255,0.03)",display:"flex",alignItems:"center",gap:6}}>
 <span style={{fontSize:14,color:isAdmin?"#e6a817":"rgba(255,255,255,0.4)",fontWeight:700}}>🔐 {isAdmin?"管理者":"メンバー"}</span>
 </div>
-<div style={{flex:1,padding:"10px 14px",border:"2px solid "+((syncCode||getSyncCode())?"#22b56644":"rgba(255,255,255,0.1)"),borderRadius:12,background:(syncCode||getSyncCode())?"rgba(34,181,102,0.08)":"rgba(255,255,255,0.03)",display:"flex",alignItems:"center",gap:6}}>
-<span style={{fontSize:14,color:syncCode?"#22b566":"rgba(255,255,255,0.4)",fontWeight:700}}>☁️ {syncCode?"同期済":"未設定"}</span>
+<div style={{flex:1,padding:"10px 14px",border:"2px solid "+(syncConfirmed?"#22b56644":"rgba(255,255,255,0.1)"),borderRadius:12,background:syncConfirmed?"rgba(34,181,102,0.08)":"rgba(255,255,255,0.03)",display:"flex",alignItems:"center",gap:6}}>
+<span style={{fontSize:14,color:syncConfirmed?"#22b566":"rgba(255,255,255,0.4)",fontWeight:700}}>☁️ {syncConfirmed?"同期済":"未設定"}</span>
 </div>
 </div>
 {/* Admin mode */}
 <div style={{marginBottom:20}}>
 <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>権限管理</div>
-<SW on={isAdmin} onToggle={()=>{setSyncStatus("");const sc=syncCode||getSyncCode();if(isAdmin){onAdminToggle(false);}else if(!sc){setSyncStatus("❌ 先にクラウド同期を設定してください");}else{if(serverHasPin===null){checkServerHasPin(sc).then(r=>{setServerHasPin(r.has_pin);setShowAdminPin(true);});}else{setShowAdminPin(true);}}}} label={"🔐 管理者モード "+(isAdmin?"(ON)":"(OFF)")} color="#e6a817"/>
-<div style={{fontSize:12,color:"rgba(255,255,255,0.35)",marginTop:-4,marginBottom:12,paddingLeft:4}}>{(!(syncCode||getSyncCode()))?"クラウド同期を先に設定してください":"スタッツ削除・同期コード編集・AI無制限"}</div>
+<SW on={isAdmin} onToggle={()=>{setSyncStatus("");if(isAdmin){onAdminToggle(false);}else if(!syncConfirmed){setSyncStatus("❌ 先にクラウド同期を設定してください");}else{const sc=getSyncCode();if(serverHasPin===null){checkServerHasPin(sc).then(r=>{setServerHasPin(r.has_pin);setShowAdminPin(true);});}else{setShowAdminPin(true);}}}} label={"🔐 管理者モード "+(isAdmin?"(ON)":"(OFF)")} color="#e6a817"/>
+<div style={{fontSize:12,color:"rgba(255,255,255,0.35)",marginTop:-4,marginBottom:12,paddingLeft:4}}>{!syncConfirmed?"クラウド同期を先に設定してください":"スタッツ削除・同期コード編集・AI無制限"}</div>
 </div>
 {/* Cloud sync */}
 <div style={{marginBottom:20}}>
 <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>クラウド同期</div>
 <div style={{background:"rgba(255,255,255,0.96)",borderRadius:14,padding:16}}>
-{(isAdmin||!syncCode)?(<>
-<div style={{fontSize:13,color:"#888",marginBottom:10}}>{syncCode?"同期コードを設定すると複数端末でデータを共有できます。":"初回セットアップ: 同期コードを入力してください。"}</div>
+{(isAdmin||!syncConfirmed)?(<>
+<div style={{fontSize:13,color:"#888",marginBottom:10}}>{syncConfirmed?"同期コードを設定すると複数端末でデータを共有できます。":"初回セットアップ: 同期コードを入力してください。"}</div>
 <div style={{display:"flex",gap:8,marginBottom:8}}>
-<input value={syncCode} onChange={e=>setSyncCode(e.target.value.trim().slice(0,30))} placeholder="同期コード（3文字以上）" style={{flex:1,border:"1px solid #ddd",borderRadius:8,padding:"10px 12px",fontSize:16,outline:"none"}}/>
+<input value={syncInput} onChange={e=>setSyncInput(e.target.value.trim().slice(0,30))} placeholder="同期コード（3文字以上）" style={{flex:1,border:"1px solid #ddd",borderRadius:8,padding:"10px 12px",fontSize:16,outline:"none"}}/>
 <button onClick={()=>{
-if(syncCode.length<3){setSyncStatus("❌ 3文字以上");return;}
-setSyncCodeLS(syncCode);setSyncStatus("⏳ 同期中...");
-pullFromServer().then(r=>{if(r.merged)setSyncStatus("✅ 同期完了"+(r.added>0?" (+"+r.added+"件)":""));else setSyncStatus("❌ "+(r.error||"同期失敗"));
-/* Refresh PIN status after sync */
-checkServerHasPin(syncCode).then(p=>setServerHasPin(p.has_pin));
+if(syncInput.length<3){setSyncStatus("❌ 3文字以上");return;}
+setSyncCodeLS(syncInput);setSyncStatus("⏳ 同期中...");
+pullFromServer().then(r=>{
+if(r.merged){setSyncStatus("✅ 同期完了"+(r.added>0?" (+"+r.added+"件)":""));setSyncConfirmed(true);
+checkServerHasPin(syncInput).then(p=>setServerHasPin(p.has_pin));}
+else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 });
 }} style={{padding:"10px 18px",border:"none",borderRadius:8,background:"#2b7de9",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>同期</button>
 </div>
-{isAdmin&&syncCode&&syncCode.length>=3&&<button onClick={()=>{setSyncStatus("⏳ アップロード中...");setSyncCodeLS(syncCode);pushToServer().then(r=>{setSyncStatus(r.ok?"✅ アップロード完了":"❌ "+(r.error||"失敗"));});}} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8,background:"#f8f9fa",color:"#555",fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:8}}>📤 手動アップロード</button>}
+{isAdmin&&syncConfirmed&&syncInput.length>=3&&<button onClick={()=>{setSyncStatus("⏳ アップロード中...");setSyncCodeLS(syncInput);pushToServer().then(r=>{setSyncStatus(r.ok?"✅ アップロード完了":"❌ "+(r.error||"失敗"));});}} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8,background:"#f8f9fa",color:"#555",fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:8}}>📤 手動アップロード</button>}
 </>):(<>
-{syncCode?(<div style={{display:"flex",alignItems:"center",gap:8}}>
-<div style={{flex:1,padding:"10px 12px",border:"1px solid #ddd",borderRadius:8,fontSize:16,color:"#888",background:"#f8f9fa",letterSpacing:2}}>{maskSyncCode(syncCode)}</div>
+{savedCode?(<div style={{display:"flex",alignItems:"center",gap:8}}>
+<div style={{flex:1,padding:"10px 12px",border:"1px solid #ddd",borderRadius:8,fontSize:16,color:"#888",background:"#f8f9fa",letterSpacing:2}}>{maskSyncCode(savedCode)}</div>
 <span style={{fontSize:13,color:"#22b566",fontWeight:700}}>設定済み</span>
 </div>):(<div style={{fontSize:14,color:"#aaa"}}>管理者モードで同期コードを設定できます</div>)}
 </>)}
 {syncStatus&&<div style={{fontSize:14,color:syncStatus.startsWith("✅")?"#22b566":syncStatus.startsWith("❌")?"#c0392b":"#2b7de9",fontWeight:600,marginTop:6}}>{syncStatus}</div>}
-<div style={{fontSize:12,color:"#bbb",marginTop:8}}>{!syncCode?"同期コードを入力して同期ボタンを押してください。":isAdmin?"同じコードを全端末で設定してください。":"編集は管理者モードON時のみ"}</div>
+<div style={{fontSize:12,color:"#bbb",marginTop:8}}>{!syncConfirmed?"同期コードを入力して同期ボタンを押してください。":isAdmin?"同じコードを全端末で設定してください。":"編集は管理者モードON時のみ"}</div>
 </div>
 </div>
 {/* AI analysis */}
@@ -818,7 +822,7 @@ checkServerHasPin(syncCode).then(p=>setServerHasPin(p.has_pin));
 </div>
 </div>
 </div>
-{showAdminPin&&<AdminPinModal mode={serverHasPin?"verify":"create"} syncCode={syncCode||getSyncCode()} onSuccess={()=>{setShowAdminPin(false);onAdminToggle(true);setServerHasPin(true);}} onCancel={()=>setShowAdminPin(false)}/>}
+{showAdminPin&&<AdminPinModal mode={serverHasPin?"verify":"create"} syncCode={getSyncCode()} onSuccess={()=>{setShowAdminPin(false);onAdminToggle(true);setServerHasPin(true);}} onCancel={()=>setShowAdminPin(false)}/>}
 </div>);
 }
 
