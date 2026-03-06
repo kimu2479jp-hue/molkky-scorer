@@ -780,8 +780,8 @@ return(<div style={{position:"fixed",inset:0,background:"linear-gradient(170deg,
 <div style={{marginBottom:20}}>
 <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>クラウド同期</div>
 <div style={{background:"rgba(255,255,255,0.96)",borderRadius:14,padding:16}}>
-{(isAdmin||!syncConfirmed)?(<>
-<div style={{fontSize:13,color:"#888",marginBottom:10}}>{syncConfirmed?"同期コードを設定すると複数端末でデータを共有できます。":"初回セットアップ: 同期コードを入力してください。"}</div>
+{!syncConfirmed?(<>
+<div style={{fontSize:13,color:"#888",marginBottom:10}}>初回セットアップ: 同期コードを入力してください。</div>
 <div style={{display:"flex",gap:8,marginBottom:8}}>
 <input value={syncInput} onChange={e=>setSyncInput(e.target.value.trim().slice(0,30))} placeholder="同期コード（3文字以上）" style={{flex:1,border:"1px solid #ddd",borderRadius:8,padding:"10px 12px",fontSize:16,outline:"none"}}/>
 <button onClick={()=>{
@@ -794,15 +794,16 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 });
 }} style={{padding:"10px 18px",border:"none",borderRadius:8,background:"#2b7de9",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>同期</button>
 </div>
-{isAdmin&&syncConfirmed&&syncInput.length>=3&&<button onClick={()=>{setSyncStatus("⏳ アップロード中...");setSyncCodeLS(syncInput);pushToServer().then(r=>{setSyncStatus(r.ok?"✅ アップロード完了":"❌ "+(r.error||"失敗"));});}} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8,background:"#f8f9fa",color:"#555",fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:8}}>📤 手動アップロード</button>}
+<div style={{fontSize:12,color:"#bbb",marginTop:4}}>同期コードを入力して同期ボタンを押してください。</div>
 </>):(<>
-{savedCode?(<div style={{display:"flex",alignItems:"center",gap:8}}>
+<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
 <div style={{flex:1,padding:"10px 12px",border:"1px solid #ddd",borderRadius:8,fontSize:16,color:"#888",background:"#f8f9fa",letterSpacing:2}}>{maskSyncCode(savedCode)}</div>
 <span style={{fontSize:13,color:"#22b566",fontWeight:700}}>設定済み</span>
-</div>):(<div style={{fontSize:14,color:"#aaa"}}>管理者モードで同期コードを設定できます</div>)}
+</div>
+{isAdmin&&<button onClick={()=>{setSyncStatus("⏳ アップロード中...");pushToServer().then(r=>{setSyncStatus(r.ok?"✅ アップロード完了":"❌ "+(r.error||"失敗"));});}} style={{width:"100%",padding:"10px",border:"1px solid #ddd",borderRadius:8,background:"#f8f9fa",color:"#555",fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:8}}>📤 手動アップロード</button>}
+<div style={{fontSize:12,color:"#bbb"}}>{isAdmin?"同期コードの変更はSupabaseダッシュボードから行えます。":"同じコードを全端末で設定してください。"}</div>
 </>)}
 {syncStatus&&<div style={{fontSize:14,color:syncStatus.startsWith("✅")?"#22b566":syncStatus.startsWith("❌")?"#c0392b":"#2b7de9",fontWeight:600,marginTop:6}}>{syncStatus}</div>}
-<div style={{fontSize:12,color:"#bbb",marginTop:8}}>{!syncConfirmed?"同期コードを入力して同期ボタンを押してください。":isAdmin?"同じコードを全端末で設定してください。":"編集は管理者モードON時のみ"}</div>
 </div>
 </div>
 {/* AI analysis */}
