@@ -1,3 +1,40 @@
+:root {
+  --bg-primary: #0b1526;
+  --bg-secondary: #14365a;
+  --bg-tertiary: #0f1f30;
+  --bg-surface: #fff;
+  --bg-surface-alt: #f0f3f8;
+  --bg-surface-dim: #f8f9fa;
+  --bg-overlay: rgba(0,0,0,0.55);
+  --bg-overlay-light: rgba(0,0,0,0.4);
+  --text-primary: #14365a;
+  --text-secondary: #888;
+  --text-muted: #aaa;
+  --text-inverse: #fff;
+  --text-danger: #c0392b;
+  --text-warning: #e67700;
+  --text-success: #22b566;
+  --accent-blue: #2b7de9;
+  --accent-red: #d93a5e;
+  --accent-green: #22b566;
+  --accent-yellow: #e6a817;
+  --accent-orange: #bf6900;
+  --accent-gold: #ffd700;
+  --border-light: #e0e0e0;
+  --border-lighter: #eee;
+  --border-input: #ddd;
+  --border-focus: #2b7de9;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+  --shadow-md: 0 6px 20px rgba(0,0,0,0.18);
+  --shadow-lg: 0 10px 36px rgba(0,0,0,0.25);
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;
@@ -7,5 +44,88 @@ body {
   overflow: hidden;
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
            env(safe-area-inset-bottom) env(safe-area-inset-left);
-  background: #0b1526;
+  background: var(--bg-primary);
+}
+
+/* ═══ Stage 4: Keyframe Animations ═══ */
+@keyframes mk-scale-bounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.35); }
+  60% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+@keyframes mk-warn-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230, 168, 23, 0); }
+  50% { box-shadow: 0 0 12px 4px rgba(230, 168, 23, 0.5); }
+}
+
+@keyframes mk-danger-flash {
+  0%, 100% { background: transparent; }
+  25% { background: rgba(231, 76, 60, 0.3); }
+  50% { background: transparent; }
+  75% { background: rgba(231, 76, 60, 0.3); }
+}
+
+@keyframes mk-reset-blink {
+  0%, 100% { color: inherit; }
+  25% { color: #e74c3c; }
+  50% { color: inherit; }
+  75% { color: #e74c3c; }
+}
+
+@keyframes mk-confetti {
+  0% { opacity: 1; transform: translateY(0) rotate(0deg); }
+  100% { opacity: 0; transform: translateY(120vh) rotate(720deg); }
+}
+
+@keyframes mk-shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-6px); }
+  20%, 40%, 60%, 80% { transform: translateX(6px); }
+}
+
+/* ═══ Stage 5: Screen Transitions ═══ */
+@keyframes mk-slide-in-left {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes mk-slide-up {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes mk-fade-scale-in {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.mk-slide-in-left {
+  animation: mk-slide-in-left 0.25s ease-out both;
+}
+
+.mk-slide-up {
+  animation: mk-slide-up 0.3s ease-out both;
+}
+
+.mk-fade-scale-in {
+  animation: mk-fade-scale-in 0.2s ease-out both;
+}
+
+/* Confetti container */
+.mk-confetti-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.mk-confetti-piece {
+  position: absolute;
+  top: -20px;
+  width: 10px;
+  height: 10px;
+  animation: mk-confetti 3s ease-in forwards;
 }
