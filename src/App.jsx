@@ -1566,7 +1566,6 @@ prevHistLen.current=history.length;
 
 /* Auto-save progress for crash recovery (includes result screen) */
 useEffect(()=>{
-if(history.length===0&&winner===null)return;
 try{
 const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name:p.name,active:p.active}))})),history,teamOrder,currentOrderIdx,currentTurn,eliminated,gameNumber,plOffsets,dqEndGame:dqEnd,winner,autoEnd:!!autoEnd,gW:gW,numGames,bestOf,savedAt:Date.now()};
 localStorage.setItem(PROGRESS_KEY,JSON.stringify(snapshot));
@@ -1574,7 +1573,7 @@ localStorage.setItem(PROGRESS_KEY,JSON.stringify(snapshot));
 },[history,eliminated,currentTurn,winner,gW]);
 /* iOS safety: also save on pagehide/visibilitychange (fires before app kill) */
 useEffect(()=>{
-const saveNow=()=>{if(history.length===0&&winner===null)return;try{
+const saveNow=()=>{try{
 const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name:p.name,active:p.active}))})),history,teamOrder,currentOrderIdx,currentTurn,eliminated,gameNumber,plOffsets,dqEndGame:dqEnd,winner,autoEnd:!!autoEnd,gW:gW,numGames,bestOf,savedAt:Date.now()};
 localStorage.setItem(PROGRESS_KEY,JSON.stringify(snapshot));
 }catch(e){}};
@@ -1632,12 +1631,12 @@ return(
 export default function App(){
 const[dbReady,setDbReady]=useState(_cache.ready);
 useEffect(()=>{if(!_cache.ready)initDB().then(()=>{setDbReady(true);/* Auto-sync on load */if(getSyncCode())pullFromServer().catch(e=>console.error("auto-pull error",e));}).catch(()=>setDbReady(true));},[]);
-const[scr,setScr]=useState(()=>{if(!dbReady)return"loading";try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0)return"recover";}catch(e){}return"setup";});
+const[scr,setScr]=useState(()=>{if(!dbReady)return"loading";try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.teams)return"recover";}catch(e){}return"setup";});
 const[cfg,setCfg]=useState(null);const[saved,setSaved]=useState(null);const[recovery,setRecovery]=useState(null);
 const[isAdmin,setIsAdmin]=useState(false);
 const[aiEnabled,setAiEnabled]=useState(()=>getAIEnabled());
 const handleAIToggle=(v)=>{setAiEnabled(v);setAIEnabledLS(v);};
-useEffect(()=>{if(dbReady&&scr==="loading"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0){setScr("recover");}else{setScr("setup");}}catch(e){setScr("setup");}}},[dbReady]);
+useEffect(()=>{if(dbReady&&scr==="loading"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.teams){setScr("recover");}else{setScr("setup");}}catch(e){setScr("setup");}}},[dbReady]);
 useEffect(()=>{if(scr==="recover"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p){setRecovery(p);}else{setScr("setup");}}catch(e){setScr("setup");}};},[scr]);
 const doRecover=()=>{if(!recovery)return;const r=recovery;setCfg({t:r.teams,o:r.teamOrder,ng:r.numGames||1,bo:r.bestOf||0,dq:r.dqEndGame!==undefined?r.dqEndGame:true,sts:true,recover:r});setScr("game");};
 const dismissRecover=()=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}setRecovery(null);setScr("setup");};
@@ -1647,9 +1646,9 @@ if(!dbReady||scr==="loading"||(scr==="recover"&&!recovery)){return(<div style={{
   </div>);}
   if(scr==="recover"&&recovery){return(<div style={{width:"100%",height:"100dvh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(170deg,#0f1f30,#14365a)",padding:20}}>
     <div style={{background:"#fff",borderRadius:20,padding:"32px 28px",maxWidth:480,width:"100%",textAlign:"center",boxShadow:"0 10px 36px rgba(0,0,0,0.25)"}}>
-      <div style={{fontSize:44,marginBottom:8}}>🔄</div>
+      <div style={{fontSize:44,marginBottom:8}}>{recovery.winner!=null?"🏆":"🔄"}</div>
       <div style={{fontSize:22,fontWeight:800,color:"#14365a",marginBottom:6}}>{recovery.winner!=null?"試合結果があります":"未完了の試合があります"}</div>
-      <div style={{fontSize:16,color:"#888",marginBottom:14}}>{recovery.winner!=null?"Game "+recovery.gameNumber+"の結果を表示しますか？":"Game "+recovery.gameNumber+"、"+recovery.currentTurn+"ターン目まで記録があります。\n続きから再開しますか？"}</div>
+      <div style={{fontSize:16,color:"#888",marginBottom:14}}>{recovery.winner!=null?"Game "+recovery.gameNumber+"の結果を表示しますか？":((recovery.history||[]).length>0?"Game "+recovery.gameNumber+"、"+recovery.currentTurn+"ターン目まで記録があります。\n続きから再開しますか？":"Game "+recovery.gameNumber+"を開始しています。\n続きから再開しますか？")}</div>
       <div style={{display:"flex",gap:10}}><button onClick={doRecover} style={{flex:1,padding:"16px 0",border:"none",borderRadius:12,background:"#14365a",color:"#fff",fontSize:18,fontWeight:700,cursor:"pointer"}}>{recovery.winner!=null?"表示する":"再開する"}</button><button onClick={dismissRecover} style={{flex:1,padding:"16px 0",border:"2px solid #14365a",borderRadius:12,background:"transparent",color:"#14365a",fontSize:18,fontWeight:700,cursor:"pointer"}}>破棄する</button></div>
     </div>
   </div>);}
