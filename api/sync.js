@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     const { data, error } = await supabase
       .from("sync_data")
       .select("stats, replays, favorites, updated_at, admin_pin, pin_updated_at")
-      .eq("code", code)
+      .eq("sync_code", code)
       .single();
 
     if (error || !data) return res.status(404).json({ error: "Not found" });
@@ -49,14 +49,14 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Invalid code (min 3 chars)" });
     }
 
-    // --- Action: verify_pin (server-side comparison, PIN never exposed) ---
+    // --- Action: verify_pin ---
     if (body.action === "verify_pin") {
       const { pin } = body;
       if (!pin) return res.status(400).json({ error: "Missing pin" });
       const { data, error } = await supabase
         .from("sync_data")
         .select("admin_pin, pin_updated_at")
-        .eq("code", code)
+        .eq("sync_code", code)
         .single();
       if (error || !data) return res.status(404).json({ error: "Not found" });
       if (!data.admin_pin) return res.status(200).json({ ok: false, reason: "no_pin" });
@@ -77,7 +77,7 @@ export default async function handler(req, res) {
       const { data: existing } = await supabase
         .from("sync_data")
         .select("admin_pin")
-        .eq("code", code)
+        .eq("sync_code", code)
         .single();
       if (existing && existing.admin_pin) {
         return res.status(403).json({ error: "PIN already set. Change via Supabase dashboard only." });
@@ -86,14 +86,14 @@ export default async function handler(req, res) {
       const { error: upErr } = await supabase
         .from("sync_data")
         .update({ admin_pin: pin, pin_updated_at: now })
-        .eq("code", code);
+        .eq("sync_code", code);
       if (upErr) return res.status(500).json({ error: upErr.message });
       return res.status(200).json({ ok: true, pin_updated_at: now });
     }
 
     // --- Default: push sync data (never overwrites admin_pin) ---
     const payload = {
-      code,
+      sync_code: code,
       stats: body.stats || {},
       replays: body.replays || {},
       favorites: body.favorites || [],
@@ -101,7 +101,7 @@ export default async function handler(req, res) {
     };
     const { error } = await supabase
       .from("sync_data")
-      .upsert(payload, { onConflict: "code" });
+      .upsert(payload, { onConflict: "sync_code" });
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ ok: true });
   }
