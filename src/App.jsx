@@ -1531,14 +1531,14 @@ const init=recoverData?{
 teams:recoverData.teams.map(t=>({...t,players:t.players.map(p=>typeof p==="string"?{name:p,active:true}:p)})),
 history:recoverData.history,currentOrderIdx:recoverData.currentOrderIdx,currentTurn:recoverData.currentTurn,
 teamOrder:recoverData.teamOrder,eliminated:recoverData.eliminated,
-winner:null,gameNumber:recoverData.gameNumber||1,dqEndGame:recoverData.dqEndGame!==undefined?recoverData.dqEndGame:dqEnd,
-autoEnd:false,turnStartTime:Date.now(),plOffsets:recoverData.plOffsets||recoverData.teams.map(()=>0)
+winner:recoverData.winner!=null?recoverData.winner:null,gameNumber:recoverData.gameNumber||1,dqEndGame:recoverData.dqEndGame!==undefined?recoverData.dqEndGame:dqEnd,
+autoEnd:!!recoverData.autoEnd,turnStartTime:Date.now(),plOffsets:recoverData.plOffsets||recoverData.teams.map(()=>0)
 }:{teams:initialTeams.map(t=>({...t,players:t.players.map(n=>({name:n,active:true}))})),history:[],currentOrderIdx:0,currentTurn:1,teamOrder:initialOrder,eliminated:initialTeams.map(()=>false),winner:null,gameNumber:1,dqEndGame:dqEnd,autoEnd:false,turnStartTime:Date.now(),plOffsets:initialTeams.map(()=>0)};
 const[st,dispatch]=useReducer(reducer,init);const{teams,history,currentOrderIdx,currentTurn,teamOrder,eliminated,winner,gameNumber,plOffsets,autoEnd,dqEndGame}=st;
-const[showPl,setShowPl]=useState(false);const[showRes,setShowRes]=useState(false);
+const[showPl,setShowPl]=useState(false);const[showRes,setShowRes]=useState(()=>!!(recoverData&&recoverData.winner!=null));
 const[view,setView]=useState("both");const[conf,setConf]=useState(null);
-const[gW,setGW]=useState(()=>initialTeams.map(()=>0));
-const[numGames,setNumGames]=useState(iNg);const[bestOf,setBestOf]=useState(iBo);
+const[gW,setGW]=useState(()=>(recoverData&&recoverData.gW)?recoverData.gW:initialTeams.map(()=>0));
+const[numGames,setNumGames]=useState(recoverData&&recoverData.numGames?recoverData.numGames:iNg);const[bestOf,setBestOf]=useState(recoverData&&recoverData.bestOf?recoverData.bestOf:iBo);
 const[saveDialog,setSaveDialog]=useState(false);const[inputMin,setInputMin]=useState(false);
 const[timestamps,setTimestamps]=useState([]);
 const turnStartRef=useRef(Date.now());
@@ -1546,7 +1546,8 @@ const ti=teamOrder[currentOrderIdx];const score=scoreOf(history,ti);const fails=
 const{ap:_ap,pi:cpIdx}=teams[ti]?getPI(teams,history,ti,plOffsets):{ap:[],pi:0};
 const ap=_ap;const cp=ap.length>0?ap[cpIdx]:null;
 const activeCell=winner===null?{teamIndex:ti,playerIndex:cpIdx,turn:currentTurn}:null;
-const statsSavedRef=useRef({});
+const _initSaved=(()=>{const m={};if(recoverData&&recoverData.winner!=null){m[((recoverData.gameNumber||1)+"-"+recoverData.history.length)]=true;}return m;})();
+const statsSavedRef=useRef(_initSaved);
 /* Record timestamp when score is entered */
 const prevHistLen=useRef(0);
 useEffect(()=>{
@@ -1563,26 +1564,25 @@ turnStartRef.current=Date.now();
 prevHistLen.current=history.length;
 },[history.length]);
 
-/* Auto-save progress for crash recovery */
+/* Auto-save progress for crash recovery (includes result screen) */
 useEffect(()=>{
-if(winner!==null){try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}return;}
-if(history.length===0)return;
+if(history.length===0&&winner===null)return;
 try{
-const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name:p.name,active:p.active}))})),history,teamOrder,currentOrderIdx,currentTurn,eliminated,gameNumber,plOffsets,dqEndGame:dqEnd,savedAt:Date.now()};
+const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name:p.name,active:p.active}))})),history,teamOrder,currentOrderIdx,currentTurn,eliminated,gameNumber,plOffsets,dqEndGame:dqEnd,winner,autoEnd:!!autoEnd,gW:gW,numGames,bestOf,savedAt:Date.now()};
 localStorage.setItem(PROGRESS_KEY,JSON.stringify(snapshot));
 }catch(e){console.warn("Progress save failed:",e);}
-},[history,eliminated,currentTurn,winner]);
+},[history,eliminated,currentTurn,winner,gW]);
 /* iOS safety: also save on pagehide/visibilitychange (fires before app kill) */
 useEffect(()=>{
-const saveNow=()=>{if(winner!==null||history.length===0)return;try{
-const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name:p.name,active:p.active}))})),history,teamOrder,currentOrderIdx,currentTurn,eliminated,gameNumber,plOffsets,dqEndGame:dqEnd,savedAt:Date.now()};
+const saveNow=()=>{if(history.length===0&&winner===null)return;try{
+const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name:p.name,active:p.active}))})),history,teamOrder,currentOrderIdx,currentTurn,eliminated,gameNumber,plOffsets,dqEndGame:dqEnd,winner,autoEnd:!!autoEnd,gW:gW,numGames,bestOf,savedAt:Date.now()};
 localStorage.setItem(PROGRESS_KEY,JSON.stringify(snapshot));
 }catch(e){}};
 const onVisChange=()=>{if(document.visibilityState==="hidden")saveNow();};
 document.addEventListener("visibilitychange",onVisChange);
 window.addEventListener("pagehide",saveNow);
 return()=>{document.removeEventListener("visibilitychange",onVisChange);window.removeEventListener("pagehide",saveNow);};
-},[history,eliminated,currentTurn,winner,teams,teamOrder,currentOrderIdx,gameNumber,plOffsets]);
+},[history,eliminated,currentTurn,winner,teams,teamOrder,currentOrderIdx,gameNumber,plOffsets,gW,numGames,bestOf,autoEnd]);
 
 useEffect(()=>{if(winner!==null&&!showRes){
 setGW(p=>{const n=[...p];n[winner]++;return n;});setShowRes(true);
@@ -1632,14 +1632,14 @@ return(
 export default function App(){
 const[dbReady,setDbReady]=useState(_cache.ready);
 useEffect(()=>{if(!_cache.ready)initDB().then(()=>{setDbReady(true);/* Auto-sync on load */if(getSyncCode())pullFromServer().catch(e=>console.error("auto-pull error",e));}).catch(()=>setDbReady(true));},[]);
-const[scr,setScr]=useState(()=>{if(!dbReady)return"loading";try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0&&!p.winner)return"recover";}catch(e){}return"setup";});
+const[scr,setScr]=useState(()=>{if(!dbReady)return"loading";try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0)return"recover";}catch(e){}return"setup";});
 const[cfg,setCfg]=useState(null);const[saved,setSaved]=useState(null);const[recovery,setRecovery]=useState(null);
 const[isAdmin,setIsAdmin]=useState(false);
 const[aiEnabled,setAiEnabled]=useState(()=>getAIEnabled());
 const handleAIToggle=(v)=>{setAiEnabled(v);setAIEnabledLS(v);};
-useEffect(()=>{if(dbReady&&scr==="loading"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0&&!p.winner){setScr("recover");}else{if(p&&p.winner)try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}setScr("setup");}}catch(e){setScr("setup");}}},[dbReady]);
-useEffect(()=>{if(scr==="recover"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&!p.winner){setRecovery(p);}else{localStorage.removeItem(PROGRESS_KEY);setScr("setup");}}catch(e){setScr("setup");}};},[scr]);
-const doRecover=()=>{if(!recovery)return;const r=recovery;setCfg({t:r.teams,o:r.teamOrder,ng:1,bo:0,dq:r.dqEndGame!==undefined?r.dqEndGame:true,sts:true,recover:r});setScr("game");};
+useEffect(()=>{if(dbReady&&scr==="loading"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0){setScr("recover");}else{setScr("setup");}}catch(e){setScr("setup");}}},[dbReady]);
+useEffect(()=>{if(scr==="recover"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p){setRecovery(p);}else{setScr("setup");}}catch(e){setScr("setup");}};},[scr]);
+const doRecover=()=>{if(!recovery)return;const r=recovery;setCfg({t:r.teams,o:r.teamOrder,ng:r.numGames||1,bo:r.bestOf||0,dq:r.dqEndGame!==undefined?r.dqEndGame:true,sts:true,recover:r});setScr("game");};
 const dismissRecover=()=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}setRecovery(null);setScr("setup");};
 if(!dbReady||scr==="loading"||(scr==="recover"&&!recovery)){return(<div style={{width:"100%",height:"100dvh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(170deg,#0f1f30,#14365a)"}}>
 <div style={{textAlign:"center"}}><div style={{fontSize:48,marginBottom:12}}>🎯</div><div style={{fontSize:20,fontWeight:700,color:"#fff"}}>データ読み込み中...</div></div>
@@ -1648,9 +1648,9 @@ if(!dbReady||scr==="loading"||(scr==="recover"&&!recovery)){return(<div style={{
   if(scr==="recover"&&recovery){return(<div style={{width:"100%",height:"100dvh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(170deg,#0f1f30,#14365a)",padding:20}}>
     <div style={{background:"#fff",borderRadius:20,padding:"32px 28px",maxWidth:480,width:"100%",textAlign:"center",boxShadow:"0 10px 36px rgba(0,0,0,0.25)"}}>
       <div style={{fontSize:44,marginBottom:8}}>🔄</div>
-      <div style={{fontSize:22,fontWeight:800,color:"#14365a",marginBottom:6}}>未完了の試合があります</div>
-      <div style={{fontSize:16,color:"#888",marginBottom:14}}>Game {recovery.gameNumber}、{recovery.currentTurn}ターン目まで記録があります。<br/>続きから再開しますか？</div>
-      <div style={{display:"flex",gap:10}}><button onClick={doRecover} style={{flex:1,padding:"16px 0",border:"none",borderRadius:12,background:"#14365a",color:"#fff",fontSize:18,fontWeight:700,cursor:"pointer"}}>再開する</button><button onClick={dismissRecover} style={{flex:1,padding:"16px 0",border:"2px solid #14365a",borderRadius:12,background:"transparent",color:"#14365a",fontSize:18,fontWeight:700,cursor:"pointer"}}>破棄する</button></div>
+      <div style={{fontSize:22,fontWeight:800,color:"#14365a",marginBottom:6}}>{recovery.winner!=null?"試合結果があります":"未完了の試合があります"}</div>
+      <div style={{fontSize:16,color:"#888",marginBottom:14}}>{recovery.winner!=null?"Game "+recovery.gameNumber+"の結果を表示しますか？":"Game "+recovery.gameNumber+"、"+recovery.currentTurn+"ターン目まで記録があります。\n続きから再開しますか？"}</div>
+      <div style={{display:"flex",gap:10}}><button onClick={doRecover} style={{flex:1,padding:"16px 0",border:"none",borderRadius:12,background:"#14365a",color:"#fff",fontSize:18,fontWeight:700,cursor:"pointer"}}>{recovery.winner!=null?"表示する":"再開する"}</button><button onClick={dismissRecover} style={{flex:1,padding:"16px 0",border:"2px solid #14365a",borderRadius:12,background:"transparent",color:"#14365a",fontSize:18,fontWeight:700,cursor:"pointer"}}>破棄する</button></div>
     </div>
   </div>);}
   return(<div style={{width:"100%",height:"100dvh"}}>{(scr==="setup"||!cfg)?<SetupScreen savedTeams={saved} isAdmin={isAdmin} onAdminToggle={setIsAdmin} aiEnabled={aiEnabled} onAIToggle={handleAIToggle} onStart={(t,o,ng,bo,dq,sts)=>{setCfg({t,o,ng,bo,dq,sts});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts!==false} recoverData={cfg.recover||null} isAdmin={isAdmin} aiEnabled={aiEnabled} goBack={saveData=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);setScr("setup");setCfg(null);}}/>}</div>);
