@@ -271,13 +271,12 @@ return records;
 }
 
 /* ═══ Game Replay Storage ═══ */
-function saveReplay(d,teams,history,teamOrder,winner){
+function saveReplay(d,teams,history,teamOrder,winner,autoEnd,dqEndGame){
 try{
 const replays=_cache.replays;
-/* Slim down: only keep what ScoreTable needs */
 const slimTeams=teams.map(t=>({name:t.name,players:t.players.map(p=>({name:typeof p==="object"?p.name:p,active:typeof p==="object"?p.active:true}))}));
 const slimHistory=history.map(h=>({turn:h.turn,teamIndex:h.teamIndex,playerIndex:h.playerIndex,playerName:h.playerName,type:h.type,score:h.score,runningTotal:h.runningTotal,prevScore:h.prevScore,reset25:h.reset25,faultReset:h.faultReset,consecutiveFails:h.consecutiveFails}));
-replays[d]={teams:slimTeams,history:slimHistory,teamOrder,winner};
+replays[d]={teams:slimTeams,history:slimHistory,teamOrder,winner,autoEnd:!!autoEnd,dqEndGame:!!dqEndGame};
 /* Keep max MAX_REPLAYS, remove oldest */
 const keys=Object.keys(replays).sort();
 while(keys.length>MAX_REPLAYS){delete replays[keys.shift()];}
@@ -645,10 +644,12 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 
 const VT={writingMode:"vertical-rl",WebkitWritingMode:"vertical-rl",textOrientation:"upright",WebkitTextOrientation:"upright",letterSpacing:"-1px",lineHeight:1,margin:"0 auto",whiteSpace:"nowrap",overflow:"hidden",display:"inline-block"};
 
-function ScoreTable({teams,history,teamOrder,highlightLast,fontSize,colW,roundW,nameH,activeCell,forCapture}){
+function ScoreTable({teams,history,teamOrder,highlightLast,fontSize,colW,roundW,nameH,activeCell,forCapture,dqWinnerIdx}){
 const fs=fontSize||18;const cw=colW||60;const rw=roundW||44;const nh=nameH||100;
 const maxT=history.length>0?Math.max(...history.map(h=>h.turn)):0;
 const ordered=teamOrder.map(i=>({team:teams[i],idx:i,ap:teams[i].players.filter(p=>p.active)}));
+/* For dqWin: find last turn for winner to override 計 to 50 */
+const dqWinLastTurn=dqWinnerIdx!=null?Math.max(0,...history.filter(h=>h.teamIndex===dqWinnerIdx).map(h=>h.turn)):null;
 const totalCols=1+ordered.reduce((s,o)=>s+o.ap.length+1,0);
 const showRows=activeCell&&activeCell.turn>maxT?activeCell.turn:maxT;
 useEffect(()=>{ensureBlink();},[]);
@@ -677,7 +678,7 @@ if(isP){if((e.type==="miss"||e.type==="fault")&&cf===1)bg="#fff9db";if((e.type==
 const cs={padding:"5px 3px",textAlign:"center",borderBottom:"1px solid #ddd",color:clr,fontWeight:fw,background:bg,borderLeft:pi===0?"3px solid "+C[o.idx].ac+"33":"1px solid #eee",fontSize:fs};
 if(isAct)cs.animation="mk-blink 1s ease-in-out infinite";
 return <td key={pi} style={cs}>{txt}</td>;
-})}<td style={{padding:"5px 3px",textAlign:"center",borderBottom:"1px solid #ddd",fontWeight:900,color:C[o.idx].tx,background:e?"#f0f3f8":"transparent",borderLeft:"2px solid #d0d0d0",fontSize:fs}}>{e?e.runningTotal:""}</td></React.Fragment>);
+})}<td style={{padding:"5px 3px",textAlign:"center",borderBottom:"1px solid #ddd",fontWeight:900,color:C[o.idx].tx,background:e?"#f0f3f8":"transparent",borderLeft:"2px solid #d0d0d0",fontSize:fs}}>{e?(dqWinnerIdx!=null&&o.idx===dqWinnerIdx&&turn===dqWinLastTurn?WIN:e.runningTotal):""}</td></React.Fragment>);
 })}
 </tr>);
 })
@@ -989,8 +990,9 @@ return(<><div style={{display:"flex",gap:6,marginBottom:6}}>{[["same","🔁同�
 }
 
 /* ═══ Canvas image save ═══ */
-function drawScoreImage(teams,history,teamOrder,comments,gameNumber){
+function drawScoreImage(teams,history,teamOrder,comments,gameNumber,isDqWin,winner){
 const ordered=teamOrder.map(i=>({team:teams[i],idx:i,ap:teams[i].players.filter(p=>p.active)}));
+const dqWinLastTurn=(isDqWin&&winner!=null)?Math.max(0,...history.filter(h=>h.teamIndex===winner).map(h=>h.turn)):null;
 const maxT=history.length>0?Math.max(...history.map(h=>h.turn)):0;
 const CW=56,RW=40,RH=34,HDR=30,NMH=84,PAD=20;
 const totalW=RW+ordered.reduce((s,o)=>s+(o.ap.length+1)*CW,0)+PAD*2;
@@ -1004,7 +1006,7 @@ ordered.forEach(o=>{const w=(o.ap.length+1)*CW;ctx.fillStyle=C[o.idx].bg;ctx.fil
 ctx.fillStyle="#1e4a72";ctx.fillRect(x,y,RW,NMH);cx=x+RW;
 ordered.forEach(o=>{o.ap.forEach(p=>{ctx.fillStyle=C[o.idx].bg;ctx.fillRect(cx,y,CW,NMH);ctx.fillStyle=C[o.idx].nm;ctx.font="bold 13px sans-serif";ctx.textAlign="center";p.name.slice(0,MAX_NAME).split("").forEach((ch,ci)=>{ctx.fillText(ch,cx+CW/2,y+16+ci*13);});cx+=CW;});ctx.fillStyle="#0d2a48";ctx.fillRect(cx,y,CW,NMH);ctx.fillStyle="#ffd700";ctx.font="bold 13px sans-serif";ctx.fillText("計",cx+CW/2,y+16);cx+=CW;});y+=NMH;
 for(let turn=1;turn<=Math.max(maxT,1);turn++){ctx.fillStyle=turn%2===0?"#f8f9fb":"#fff";ctx.fillRect(x,y,totalW-PAD*2,RH);ctx.strokeStyle="#ddd";ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(x,y+RH);ctx.lineTo(x+totalW-PAD*2,y+RH);ctx.stroke();ctx.fillStyle="#666";ctx.font="bold 13px sans-serif";ctx.textAlign="center";ctx.fillText(""+turn,x+RW/2,y+23);cx=x+RW;
-ordered.forEach(o=>{const e=history.find(h=>h.turn===turn&&h.teamIndex===o.idx);o.ap.forEach((p,pi)=>{const isP=e&&e.playerIndex===pi;let txt="";if(isP){if(e.type==="miss")txt="−";else if(e.type==="fault")txt=e.faultReset?"F↓":"F";else txt=e.reset25?e.score+"↓":""+e.score;if(e.consecutiveFails>=MF)txt+="✕";}ctx.fillStyle=isP?(e.type==="miss"?"#bf6900":e.type==="fault"?"#c0392b":C[o.idx].tx):"#333";ctx.font=(isP?"bold ":"")+"13px sans-serif";ctx.fillText(txt,cx+CW/2,y+23);cx+=CW;});ctx.fillStyle=e?C[o.idx].tx:"#ccc";ctx.font="bold 14px sans-serif";ctx.fillText(e?""+e.runningTotal:"",cx+CW/2,y+23);cx+=CW;});y+=RH;}
+ordered.forEach(o=>{const e=history.find(h=>h.turn===turn&&h.teamIndex===o.idx);o.ap.forEach((p,pi)=>{const isP=e&&e.playerIndex===pi;let txt="";if(isP){if(e.type==="miss")txt="−";else if(e.type==="fault")txt=e.faultReset?"F↓":"F";else txt=e.reset25?e.score+"↓":""+e.score;if(e.consecutiveFails>=MF)txt+="✕";}ctx.fillStyle=isP?(e.type==="miss"?"#bf6900":e.type==="fault"?"#c0392b":C[o.idx].tx):"#333";ctx.font=(isP?"bold ":"")+"13px sans-serif";ctx.fillText(txt,cx+CW/2,y+23);cx+=CW;});ctx.fillStyle=e?C[o.idx].tx:"#ccc";ctx.font="bold 14px sans-serif";const totalV=e?(dqWinLastTurn!=null&&o.idx===winner&&turn===dqWinLastTurn?50:e.runningTotal):"";ctx.fillText(""+totalV,cx+CW/2,y+23);cx+=CW;});y+=RH;}
 if(comments.length>0){y+=10;ctx.fillStyle="#14365a";ctx.font="bold 15px sans-serif";ctx.textAlign="left";ctx.fillText("💬 メモ",x,y+18);y+=30;comments.forEach(c2=>{ctx.fillStyle="#444";ctx.font="14px sans-serif";ctx.fillText("• "+c2,x+6,y+16);y+=26;});}
 return c;
 }
@@ -1215,7 +1217,7 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
 <button onClick={onClose} style={{padding:"6px 14px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"transparent",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>✕ 閉じる</button>
 </div>
 <div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",background:"#fff"}} onClick={e=>e.stopPropagation()}>
-<ScoreTable teams={replay.teams} history={replay.history} teamOrder={replay.teamOrder} highlightLast={false} forCapture={true}/>
+<ScoreTable teams={replay.teams} history={replay.history} teamOrder={replay.teamOrder} highlightLast={false} forCapture={true} dqWinnerIdx={(replay.autoEnd&&replay.dqEndGame&&replay.winner!=null)?replay.winner:null}/>
 </div>
 
   </div>);
@@ -1478,7 +1480,7 @@ return(<div key={pd.name} style={{marginBottom:12}}>
 }
 
 /* ═══ Game Result — with stats toggle + long-press delete ═══ */
-function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gameNumber,onNext,onBack,onExtend,timestamps,isAdmin,aiEnabled}){
+function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gameNumber,onNext,onBack,onExtend,timestamps,isAdmin,aiEnabled,autoEnd,dqEndGame}){
 const[comment,setComment]=useState("");const[comments,setComments]=useState([]);
 const[ordMode,setOrdMode]=useState("reverse");const[ordVal,setOrdVal]=useState([...teamOrder].reverse());
 const[saving,setSaving]=useState(false);const[showStats,setShowStats]=useState(false);
@@ -1487,9 +1489,10 @@ const tw=gameWins||teams.map(()=>0);const matchWin=bestOf>0?tw.findIndex(w=>w>=b
 const isMatchOver=matchWin>=0;const isLastGame=numGames>0&&gameNumber>=numGames&&!isMatchOver;
 const isAllDone=isMatchOver||isLastGame;const canContinue=!isAllDone;
 const addC=()=>{if(comment.trim()){setComments(p=>[...p,comment.trim()]);setComment("");}};
-const teamStats=teamOrder.map(ti=>{const th=history.filter(h=>h.teamIndex===ti);const sc=th.filter(h=>h.type==="score");return{ti,name:teams[ti].name,final:scoreOf(history,ti),totalPts:sc.reduce((s2,h)=>s2+h.score,0),misses:th.filter(h=>h.type==="miss").length,faults:th.filter(h=>h.type==="fault").length,turns:th.length};});
+const isDqWin=!!(autoEnd&&dqEndGame);
+const teamStats=teamOrder.map(ti=>{const th=history.filter(h=>h.teamIndex===ti);const sc=th.filter(h=>h.type==="score");const rawFinal=scoreOf(history,ti);return{ti,name:teams[ti].name,final:(isDqWin&&ti===winner)?WIN:rawFinal,totalPts:sc.reduce((s2,h)=>s2+h.score,0),misses:th.filter(h=>h.type==="miss").length,faults:th.filter(h=>h.type==="fault").length,turns:th.length};});
 const handleOrd=(m,v)=>{setOrdMode(m);setOrdVal(v);};
-const doSave=async()=>{setSaving(true);try{const canvas=drawScoreImage(teams,history,teamOrder,comments,gameNumber);await saveImage(canvas);}catch(e){console.error(e);}setSaving(false);};
+const doSave=async()=>{setSaving(true);try{const canvas=drawScoreImage(teams,history,teamOrder,comments,gameNumber,isDqWin,winner);await saveImage(canvas);}catch(e){console.error(e);}setSaving(false);};
 /* Build current game records for per-game stats view */
 const favs=loadFavs();
 const currentGameRecords=buildGameRecord(teams,history,teamOrder,winner,timestamps||[],favs);
@@ -1507,7 +1510,7 @@ return(
 <button onClick={doSave} disabled={saving} style={{width:"100%",padding:"14px 0",border:"none",borderRadius:10,background:"#22b566",color:"#fff",fontSize:18,fontWeight:800,cursor:"pointer",marginBottom:10,opacity:saving?0.5:1}}>{saving?"保存中...":"📸 スコア表を画像保存"}</button>
 <div style={{background:"#fff",borderRadius:14,padding:14,marginBottom:14,border:"1px solid #ddd"}}>
 <div style={{fontSize:18,fontWeight:800,color:"#14365a",marginBottom:8}}>📋 スコア表</div>
-<div style={{overflow:"auto",WebkitOverflowScrolling:"touch"}}><ScoreTable teams={teams} history={history} teamOrder={teamOrder} highlightLast={false} fontSize={16} colW={50} roundW={36} nameH={90} forCapture={true}/></div>
+<div style={{overflow:"auto",WebkitOverflowScrolling:"touch"}}><ScoreTable teams={teams} history={history} teamOrder={teamOrder} highlightLast={false} fontSize={16} colW={50} roundW={36} nameH={90} forCapture={true} dqWinnerIdx={isDqWin?winner:null}/></div>
 <div style={{marginTop:10}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:15}}><thead><tr style={{background:"#14365a",color:"#fff"}}><th style={{padding:"7px 8px",textAlign:"left"}}>チーム</th><th style={{padding:"7px"}}>最終</th><th style={{padding:"7px"}}>得点計</th><th style={{padding:"7px"}}>ミス</th><th style={{padding:"7px"}}>フォルト</th><th style={{padding:"7px"}}>ターン</th></tr></thead><tbody>{teamStats.map((ts,i)=>(<tr key={i} style={{background:ts.ti===winner?"#fffde6":"#fff",borderBottom:"1px solid #eee"}}><td style={{padding:"7px 8px",fontWeight:700,color:C[ts.ti].tx}}>{ts.ti===winner?"🏆":""}{ts.name}</td><td style={{padding:"7px",textAlign:"center",fontWeight:800,color:C[ts.ti].ac}}>{ts.final}</td><td style={{padding:"7px",textAlign:"center"}}>{ts.totalPts}</td><td style={{padding:"7px",textAlign:"center",color:"#bf6900"}}>{ts.misses}</td><td style={{padding:"7px",textAlign:"center",color:"#c0392b"}}>{ts.faults}</td><td style={{padding:"7px",textAlign:"center"}}>{ts.turns}</td></tr>))}</tbody></table></div>
 {comments.length>0&&<div style={{marginTop:10,borderTop:"1px solid #eee",paddingTop:8}}><div style={{fontSize:15,fontWeight:700,color:"#14365a",marginBottom:4}}>💬 コメント</div>{comments.map((c2,i)=><div key={i} style={{padding:"5px 10px",background:"#f8f9fa",borderRadius:6,marginBottom:3,fontSize:14,color:"#444"}}>{c2}</div>)}</div>}
 </div>
@@ -1531,7 +1534,7 @@ teamOrder:recoverData.teamOrder,eliminated:recoverData.eliminated,
 winner:null,gameNumber:recoverData.gameNumber||1,dqEndGame:recoverData.dqEndGame!==undefined?recoverData.dqEndGame:dqEnd,
 autoEnd:false,turnStartTime:Date.now(),plOffsets:recoverData.plOffsets||recoverData.teams.map(()=>0)
 }:{teams:initialTeams.map(t=>({...t,players:t.players.map(n=>({name:n,active:true}))})),history:[],currentOrderIdx:0,currentTurn:1,teamOrder:initialOrder,eliminated:initialTeams.map(()=>false),winner:null,gameNumber:1,dqEndGame:dqEnd,autoEnd:false,turnStartTime:Date.now(),plOffsets:initialTeams.map(()=>0)};
-const[st,dispatch]=useReducer(reducer,init);const{teams,history,currentOrderIdx,currentTurn,teamOrder,eliminated,winner,gameNumber,plOffsets}=st;
+const[st,dispatch]=useReducer(reducer,init);const{teams,history,currentOrderIdx,currentTurn,teamOrder,eliminated,winner,gameNumber,plOffsets,autoEnd,dqEndGame}=st;
 const[showPl,setShowPl]=useState(false);const[showRes,setShowRes]=useState(false);
 const[view,setView]=useState("both");const[conf,setConf]=useState(null);
 const[gW,setGW]=useState(()=>initialTeams.map(()=>0));
@@ -1577,7 +1580,7 @@ if(!statsSavedRef.current[key]){
 statsSavedRef.current[key]=true;
 const d=new Date().toISOString();
 /* Save replay for score table viewing */
-saveReplay(d,teams,history,teamOrder,winner);
+saveReplay(d,teams,history,teamOrder,winner,autoEnd,dqEndGame);
 /* Save stats */
 if(saveToStatsProp){const favs=loadFavs();const records=buildGameRecord(teams,history,teamOrder,winner,timestamps,favs,d);saveGameStatsToDB(records);}
 }
@@ -1610,7 +1613,7 @@ return(
 </div>
 {showPl&&<PlModal teams={teams} dispatch={dispatch} onClose={()=>setShowPl(false)}/>}
 {conf&&<Confirm msg={conf.msg} onOk={execConf} onCancel={()=>setConf(null)}/>}
-{showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} timestamps={timestamps} isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
+{showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} timestamps={timestamps} isAdmin={isAdmin} aiEnabled={aiEnabled} autoEnd={!!autoEnd} dqEndGame={!!dqEndGame}/>}
 {saveDialog&&<Confirm msg={"チーム・プレイヤー情報を\n設定画面に保存しますか？"} sub={"保存すると次のゲームで\n同じメンバーをすぐ使えます"} okLabel="保存する" cancelLabel="保存しない" thirdLabel="キャンセル（試合に戻る）" onOk={()=>doBack(true)} onCancel={()=>doBack(false)} onThird={()=>setSaveDialog(false)}/>}
 </div>);
 }
