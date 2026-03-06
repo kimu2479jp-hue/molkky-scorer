@@ -1578,9 +1578,10 @@ const saveNow=()=>{if(winner!==null||history.length===0)return;try{
 const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name:p.name,active:p.active}))})),history,teamOrder,currentOrderIdx,currentTurn,eliminated,gameNumber,plOffsets,dqEndGame:dqEnd,savedAt:Date.now()};
 localStorage.setItem(PROGRESS_KEY,JSON.stringify(snapshot));
 }catch(e){}};
-document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")saveNow();});
+const onVisChange=()=>{if(document.visibilityState==="hidden")saveNow();};
+document.addEventListener("visibilitychange",onVisChange);
 window.addEventListener("pagehide",saveNow);
-return()=>{document.removeEventListener("visibilitychange",saveNow);window.removeEventListener("pagehide",saveNow);};
+return()=>{document.removeEventListener("visibilitychange",onVisChange);window.removeEventListener("pagehide",saveNow);};
 },[history,eliminated,currentTurn,winner,teams,teamOrder,currentOrderIdx,gameNumber,plOffsets]);
 
 useEffect(()=>{if(winner!==null&&!showRes){
@@ -1631,13 +1632,13 @@ return(
 export default function App(){
 const[dbReady,setDbReady]=useState(_cache.ready);
 useEffect(()=>{if(!_cache.ready)initDB().then(()=>{setDbReady(true);/* Auto-sync on load */if(getSyncCode())pullFromServer().catch(e=>console.error("auto-pull error",e));}).catch(()=>setDbReady(true));},[]);
-const[scr,setScr]=useState(()=>{if(!dbReady)return"loading";try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0)return"recover";}catch(e){}return"setup";});
+const[scr,setScr]=useState(()=>{if(!dbReady)return"loading";try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0&&!p.winner)return"recover";}catch(e){}return"setup";});
 const[cfg,setCfg]=useState(null);const[saved,setSaved]=useState(null);const[recovery,setRecovery]=useState(null);
 const[isAdmin,setIsAdmin]=useState(false);
 const[aiEnabled,setAiEnabled]=useState(()=>getAIEnabled());
 const handleAIToggle=(v)=>{setAiEnabled(v);setAIEnabledLS(v);};
-useEffect(()=>{if(dbReady&&scr==="loading"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0){setScr("recover");}else{setScr("setup");}}catch(e){setScr("setup");}}},[dbReady]);
-useEffect(()=>{if(scr==="recover"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));setRecovery(p);}catch(e){setScr("setup");}};},[scr]);
+useEffect(()=>{if(dbReady&&scr==="loading"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.history&&p.history.length>0&&!p.winner){setScr("recover");}else{if(p&&p.winner)try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}setScr("setup");}}catch(e){setScr("setup");}}},[dbReady]);
+useEffect(()=>{if(scr==="recover"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&!p.winner){setRecovery(p);}else{localStorage.removeItem(PROGRESS_KEY);setScr("setup");}}catch(e){setScr("setup");}};},[scr]);
 const doRecover=()=>{if(!recovery)return;const r=recovery;setCfg({t:r.teams,o:r.teamOrder,ng:1,bo:0,dq:r.dqEndGame!==undefined?r.dqEndGame:true,sts:true,recover:r});setScr("game");};
 const dismissRecover=()=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}setRecovery(null);setScr("setup");};
 if(!dbReady||scr==="loading"||(scr==="recover"&&!recovery)){return(<div style={{width:"100%",height:"100dvh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(170deg,#0f1f30,#14365a)"}}>
