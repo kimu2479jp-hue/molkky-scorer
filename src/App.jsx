@@ -1665,7 +1665,7 @@ return(<div key={oi} style={{flex:1,minWidth:0,padding:"10px 6px 8px",textAlign:
 <div style={{fontSize:dashFontSize,fontWeight:900,lineHeight:1.1,fontVariantNumeric:"tabular-nums",color:act?(isReset?"#e74c3c":"#fff"):(isReset?"#e74c3c":"rgba(255,255,255,0.35)"),margin:"2px 0",animation:isBounce?"mk-scale-bounce 0.4s ease":isReset?"mk-reset-blink 0.8s ease":"none"}}>{sc}</div>
 {tcp&&<div style={{fontSize:nTeams<=2?13:11,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",color:act?"rgba(255,255,255,0.8)":"rgba(255,255,255,0.3)",marginBottom:3}}>{tcp.name}</div>}
 {!tcp&&<div style={{fontSize:nTeams<=2?13:11,marginBottom:3,color:"transparent"}}>-</div>}
-<div style={{display:"flex",gap:4,justifyContent:"center"}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:nTeams<=2?12:10,height:nTeams<=2?12:10,borderRadius:"50%",display:"inline-block",background:j<f?(f>=2?"#e6a817":"#fff"):"rgba(255,255,255,0.2)",border:j>=f?"1px solid rgba(255,255,255,0.25)":"none",transition:"background 0.2s ease"}}/>))}</div>
+<div style={{display:"flex",gap:4,justifyContent:"center"}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:nTeams<=2?12:10,height:nTeams<=2?12:10,borderRadius:"50%",display:"inline-block",background:j<f?(j===0?"#e6a817":j===1?"#c0392b":"#fff"):"rgba(255,255,255,0.2)",border:j>=f?"1px solid rgba(255,255,255,0.25)":"none",transition:"background 0.2s ease"}}/>))}</div>
 </div>);})}</div>);
 return(
 <div style={SS.gW} className="mk-slide-in-left">
