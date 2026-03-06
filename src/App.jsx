@@ -42,7 +42,8 @@ function useFavs(){const[f,sF]=useState(()=>loadFavs());return{favs:f,addF:n=>{c
 const STATS_KEY="mk-player-stats";
 const PROGRESS_KEY="mk-game-progress";
 const SYNC_CODE_KEY="mk-sync-code";
-const ADMIN_PIN_KEY="mk-admin-pin";
+const PIN_LOCKOUT_KEY="mk-pin-lockout";
+const PIN_AUTH_TS_KEY="mk-pin-auth-ts";
 const AI_ENABLED_KEY="mk-ai-enabled";
 const ANALYSIS_TOTAL_KEY="mk-analysis-total";
 const ANALYSIS_LIMIT_KEY="mk-analysis-daily";
@@ -289,9 +290,47 @@ _debouncedSync();
 function getSyncCode(){try{return localStorage.getItem(SYNC_CODE_KEY)||"";}catch(e){return "";}}
 function setSyncCodeLS(c){try{localStorage.setItem(SYNC_CODE_KEY,c);}catch(e){}}
 
-/* ═══ Admin PIN ═══ */
-function getAdminPin(){try{return localStorage.getItem(ADMIN_PIN_KEY)||"";}catch(e){return "";}}
-function setAdminPin(p){try{localStorage.setItem(ADMIN_PIN_KEY,p);}catch(e){}}
+/* ═══ Admin PIN — server-side only (Supabase) ═══ */
+/* PIN is NEVER stored in localStorage. Verification is done via /api/sync */
+function getPinLockout(){
+try{const d=JSON.parse(localStorage.getItem(PIN_LOCKOUT_KEY)||"{}");
+if(d.until&&Date.now()<d.until)return{locked:true,remaining:Math.ceil((d.until-Date.now())/1000),attempts:d.attempts||0};
+return{locked:false,remaining:0,attempts:d.until&&Date.now()>=d.until?0:(d.attempts||0)};
+}catch(e){return{locked:false,remaining:0,attempts:0};}
+}
+function incPinAttempt(){
+try{const d=JSON.parse(localStorage.getItem(PIN_LOCKOUT_KEY)||"{}");
+const attempts=(d.until&&Date.now()>=d.until)?1:((d.attempts||0)+1);
+const lockout=attempts>=5?{attempts,until:Date.now()+600000}:{attempts,until:null};
+localStorage.setItem(PIN_LOCKOUT_KEY,JSON.stringify(lockout));
+return lockout;
+}catch(e){return{attempts:99,until:Date.now()+600000};}
+}
+function clearPinLockout(){try{localStorage.removeItem(PIN_LOCKOUT_KEY);}catch(e){}}
+function getPinAuthTs(){try{return localStorage.getItem(PIN_AUTH_TS_KEY)||"";}catch(e){return "";}}
+function setPinAuthTs(ts){try{localStorage.setItem(PIN_AUTH_TS_KEY,ts||"");}catch(e){}}
+
+async function verifyPinOnServer(pin){
+const code=getSyncCode();if(!code)return{ok:false,reason:"no_code"};
+try{const r=await fetch("/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},
+body:JSON.stringify({code,action:"verify_pin",pin})});
+return await r.json();
+}catch(e){return{ok:false,reason:"network"};}
+}
+async function createPinOnServer(pin){
+const code=getSyncCode();if(!code)return{ok:false,error:"no_code"};
+try{const r=await fetch("/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},
+body:JSON.stringify({code,action:"create_pin",pin})});
+return await r.json();
+}catch(e){return{ok:false,error:"network"};}
+}
+async function checkServerHasPin(){
+const code=getSyncCode();if(!code)return{has_pin:false,pin_updated_at:null};
+try{const r=await fetch("/api/sync?code="+encodeURIComponent(code));
+if(!r.ok)return{has_pin:false,pin_updated_at:null};
+const d=await r.json();return{has_pin:!!d.has_pin,pin_updated_at:d.pin_updated_at||null};
+}catch(e){return{has_pin:false,pin_updated_at:null};}
+}
 function maskSyncCode(code){if(!code||code.length<=2)return code?"***":"";return code.slice(0,2)+"\u2022".repeat(Math.min(code.length-2,8));}
 
 /* ═══ AI Enabled Setting ═══ */
@@ -654,24 +693,43 @@ return(<div ref={ref} style={{height:"100%",overflow:"auto",WebkitOverflowScroll
 }
 
 /* ═══ Setup — 1.5x bigger + stats toggle ═══ */
-/* ═══ Admin PIN Modal ═══ */
+/* ═══ Admin PIN Modal — server-verified with lockout ═══ */
 function AdminPinModal({mode,onSuccess,onCancel}){
-const[pin,setPin]=useState("");const[pin2,setPin2]=useState("");const[err,setErr]=useState("");const[step,setStep]=useState(mode==="create"?1:0);
-const submit=()=>{
+const[pin,setPin]=useState("");const[pin2,setPin2]=useState("");const[err,setErr]=useState("");const[busy,setBusy]=useState(false);
+const[step,setStep]=useState(mode==="create"?1:0);
+const[lockInfo,setLockInfo]=useState(()=>getPinLockout());
+/* Lockout countdown */
+useEffect(()=>{if(!lockInfo.locked)return;const t=setInterval(()=>{const li=getPinLockout();setLockInfo(li);if(!li.locked)clearInterval(t);},1000);return()=>clearInterval(t);},[lockInfo.locked]);
+
+const submit=async()=>{
+if(busy)return;
+/* Check lockout */
+const lo=getPinLockout();if(lo.locked){setErr("ロック中（残"+Math.ceil(lo.remaining)+"秒）");return;}
 if(mode==="create"){
   if(step===1){if(pin.length<4||pin.length>6){setErr("4〜6桁で入力");return;}setStep(2);setErr("");return;}
-  if(step===2){if(pin!==pin2){setErr("PINが一致しません");setPin2("");return;}setAdminPin(pin);onSuccess();}
+  if(step===2){if(pin!==pin2){setErr("PINが一致しません");setPin2("");return;}
+    setBusy(true);const r=await createPinOnServer(pin);setBusy(false);
+    if(r.ok){setPinAuthTs(r.pin_updated_at);clearPinLockout();onSuccess();}
+    else{setErr(r.error||"作成に失敗しました");}
+  }
 }else{
-  if(pin===getAdminPin()){onSuccess();}else{setErr("PINが違います");setPin("");}
+  setBusy(true);const r=await verifyPinOnServer(pin);setBusy(false);
+  if(r.ok){setPinAuthTs(r.pin_updated_at);clearPinLockout();onSuccess();}
+  else{const lo2=incPinAttempt();setLockInfo(lo2);
+    if(lo2.until){setErr("5回失敗のため10分間ロック");setPin("");}
+    else{setErr("PINが違います（残"+String(5-(lo2.attempts||0))+"回）");setPin("");}
+  }
 }};
+const isLocked=lockInfo.locked;
 return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
 <div style={{background:"#fff",borderRadius:18,padding:28,maxWidth:340,width:"100%",textAlign:"center"}}>
 <div style={{fontSize:22,fontWeight:800,color:"#14365a",marginBottom:6}}>{mode==="create"?"🔐 管理者PINを作成":"🔐 管理者PIN入力"}</div>
-<div style={{fontSize:14,color:"#888",marginBottom:16}}>{mode==="create"?(step===1?"4〜6桁の数字を設定":"もう一度入力してください"):"PINを入力してください"}</div>
-<input type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={step===2?pin2:pin} onChange={e=>{const v=e.target.value.replace(/\D/g,"").slice(0,6);step===2?setPin2(v):setPin(v);setErr("");}} placeholder="●●●●" style={{width:"100%",padding:"16px",border:"2px solid "+(err?"#c0392b":"#ddd"),borderRadius:12,fontSize:28,fontWeight:700,textAlign:"center",letterSpacing:12,outline:"none",marginBottom:8}}/>
+<div style={{fontSize:14,color:"#888",marginBottom:16}}>{mode==="create"?(step===1?"4〜6桁の数字を設定":"もう一度入力してください"):(isLocked?"ロック中です":"PINを入力してください")}</div>
+<input type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={step===2?pin2:pin} onChange={e=>{const v=e.target.value.replace(/\D/g,"").slice(0,6);step===2?setPin2(v):setPin(v);setErr("");}} placeholder="●●●●" disabled={isLocked||busy} style={{width:"100%",padding:"16px",border:"2px solid "+(err?"#c0392b":isLocked?"#e6a817":"#ddd"),borderRadius:12,fontSize:28,fontWeight:700,textAlign:"center",letterSpacing:12,outline:"none",marginBottom:8,opacity:isLocked?0.4:1}}/>
 {err&&<div style={{color:"#c0392b",fontSize:14,fontWeight:600,marginBottom:8}}>{err}</div>}
+{isLocked&&<div style={{color:"#e6a817",fontSize:13,fontWeight:600,marginBottom:8}}>🔒 残り{Math.ceil(lockInfo.remaining)}秒でロック解除</div>}
 <div style={{display:"flex",gap:8,marginTop:8}}>
-<button onClick={submit} style={{flex:1,padding:"14px 0",border:"none",borderRadius:12,background:"#14365a",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>{mode==="create"?(step===1?"次へ":"設定する"):"解除"}</button>
+<button onClick={submit} disabled={isLocked||busy} style={{flex:1,padding:"14px 0",border:"none",borderRadius:12,background:isLocked?"#ccc":"#14365a",color:"#fff",fontSize:16,fontWeight:700,cursor:isLocked?"not-allowed":"pointer"}}>{busy?"確認中...":mode==="create"?(step===1?"次へ":"設定する"):"解除"}</button>
 <button onClick={onCancel} style={{flex:1,padding:"14px 0",border:"2px solid #ccc",borderRadius:12,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
 </div></div></div>);
 }
@@ -679,9 +737,17 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
 /* ═══ Settings Page ═══ */
 function SettingsPage({onClose,isAdmin,onAdminToggle,aiEnabled,onAIToggle}){
 const[showAdminPin,setShowAdminPin]=useState(false);
+const[serverHasPin,setServerHasPin]=useState(null);/* null=loading, true/false */
 const[syncCode,setSyncCode]=useState(()=>getSyncCode());const[syncStatus,setSyncStatus]=useState("");
 const total=getAnalysisTotal();const totalDisplay=total>=10000?"\u221E":total;
 const costYen=(total*0.1).toFixed(1);
+/* Check server PIN status on mount */
+useEffect(()=>{if(getSyncCode()){checkServerHasPin().then(r=>setServerHasPin(r.has_pin));}else{setServerHasPin(false);}},[]);
+/* Remote kick: check if PIN was changed while we were admin */
+useEffect(()=>{if(isAdmin&&getSyncCode()){checkServerHasPin().then(r=>{
+const storedTs=getPinAuthTs();
+if(r.pin_updated_at&&storedTs&&r.pin_updated_at!==storedTs){onAdminToggle(false);}
+});}},[isAdmin]);
 const SW=({on,onToggle,label,color})=>(<div onClick={onToggle} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 18px",background:on?"rgba(255,255,255,0.08)":"rgba(255,255,255,0.03)",border:"2px solid "+(on?(color||"#2b7de9")+"44":"rgba(255,255,255,0.1)"),borderRadius:14,cursor:"pointer",marginBottom:10}}>
 <span style={{color:on?(color||"#2b7de9"):"rgba(255,255,255,0.5)",fontSize:16,fontWeight:700}}>{label}</span>
 <div style={{width:52,height:30,borderRadius:15,padding:2,background:on?(color||"#2b7de9"):"rgba(255,255,255,0.25)",transition:"background 0.2s",display:"flex",alignItems:"center",justifyContent:on?"flex-end":"flex-start"}}>
@@ -704,8 +770,8 @@ return(<div style={{position:"fixed",inset:0,background:"linear-gradient(170deg,
 {/* Admin mode */}
 <div style={{marginBottom:20}}>
 <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>権限管理</div>
-<SW on={isAdmin} onToggle={()=>{if(isAdmin){onAdminToggle(false);}else{setShowAdminPin(true);}}} label={"🔐 管理者モード "+(isAdmin?"(ON)":"(OFF)")} color="#e6a817"/>
-<div style={{fontSize:12,color:"rgba(255,255,255,0.35)",marginTop:-4,marginBottom:12,paddingLeft:4}}>スタッツ削除・同期コード編集・AI無制限</div>
+<SW on={isAdmin} onToggle={()=>{if(isAdmin){onAdminToggle(false);}else if(!getSyncCode()){setSyncStatus("❌ 先にクラウド同期を設定してください");}else if(serverHasPin===null){/* still loading */}else{setShowAdminPin(true);}}} label={"🔐 管理者モード "+(isAdmin?"(ON)":"(OFF)")} color="#e6a817"/>
+<div style={{fontSize:12,color:"rgba(255,255,255,0.35)",marginTop:-4,marginBottom:12,paddingLeft:4}}>{!getSyncCode()?"クラウド同期を先に設定してください":"スタッツ削除・同期コード編集・AI無制限"}</div>
 </div>
 {/* Cloud sync */}
 <div style={{marginBottom:20}}>
@@ -749,7 +815,7 @@ pullFromServer().then(r=>{if(r.merged)setSyncStatus("✅ 同期完了"+(r.added>
 </div>
 </div>
 </div>
-{showAdminPin&&<AdminPinModal mode={getAdminPin()?"verify":"create"} onSuccess={()=>{setShowAdminPin(false);onAdminToggle(true);}} onCancel={()=>setShowAdminPin(false)}/>}
+{showAdminPin&&<AdminPinModal mode={serverHasPin?"verify":"create"} onSuccess={()=>{setShowAdminPin(false);onAdminToggle(true);setServerHasPin(true);}} onCancel={()=>setShowAdminPin(false)}/>}
 </div>);
 }
 
