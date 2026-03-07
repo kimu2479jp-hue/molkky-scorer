@@ -1051,7 +1051,7 @@ return(
 <div style={{flex:1,minWidth:0}}>
 <div style={{fontSize:isNarrow?13:15,fontWeight:800,color:teamColor,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{teamName}</div>
 <div style={{display:"flex",alignItems:"baseline",gap:6,flexWrap:"nowrap"}}>
-<span style={{fontSize:isNarrow?12:14,fontWeight:600,color:"var(--text-muted)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:isNarrow?80:120}}>{playerName||""}</span>
+<span style={{fontSize:(playerName||"").length<=4?(isNarrow?14:16):(playerName||"").length<=7?(isNarrow?13:15):(playerName||"").length<=10?(isNarrow?12:14):(isNarrow?11:13),fontWeight:600,color:"var(--text-muted)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",flex:1,minWidth:0}}>{playerName||""}</span>
 <span style={{fontSize:isNarrow?22:30,fontWeight:900,color:"var(--text-primary)",lineHeight:1}}>{teamScore}<span style={{fontSize:isNarrow?13:16,fontWeight:700}}>点</span></span>
 <div style={{display:"flex",gap:3,alignItems:"center"}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:isNarrow?14:18,height:isNarrow?14:18,borderRadius:"50%",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:isNarrow?8:10,fontWeight:900,background:j<fails?"#e74c3c":"var(--border-input)",color:j<fails?"var(--text-inverse)":"#bbb"}}>{j<fails?"✕":""}</span>))}</div>
 </div>
