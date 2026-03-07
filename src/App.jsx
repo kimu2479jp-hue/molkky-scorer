@@ -629,11 +629,11 @@ const[dropPos,setDropPos]=useState({top:0,right:0,maxHeight:300});
 const longRef=useRef(null);const wrapRef=useRef(null);const dropRef=useRef(null);
 const available=favs.filter(f=>!(usedNames||[]).includes(f));
 useEffect(()=>{if(!open)return;const h=e=>{if(wrapRef.current&&wrapRef.current.contains(e.target))return;if(dropRef.current&&dropRef.current.contains(e.target))return;setOpen(false);};document.addEventListener("pointerdown",h);return()=>document.removeEventListener("pointerdown",h);},[open]);
-useEffect(()=>{if(!open||!wrapRef.current)return;const rect=wrapRef.current.getBoundingClientRect();const spBelow=window.innerHeight-rect.bottom-12;const spAbove=rect.top-12;const useBelow=spBelow>=200||spBelow>=spAbove;const mH=Math.min(useBelow?spBelow:spAbove,420);const r=window.innerWidth-rect.right;if(useBelow){setDropPos({top:rect.bottom+4,right:Math.max(r,8),maxHeight:mH});}else{setDropPos({bottom:window.innerHeight-rect.top+4,right:Math.max(r,8),maxHeight:mH});}},[open]);
+useEffect(()=>{if(!open||!wrapRef.current)return;const rect=wrapRef.current.getBoundingClientRect();const vh=window.innerHeight||document.documentElement.clientHeight;const vw=window.innerWidth||document.documentElement.clientWidth;const spBelow=vh-rect.bottom-12;const spAbove=rect.top-12;const useBelow=spBelow>=200||spBelow>=spAbove;const mH=Math.min(useBelow?spBelow:spAbove,420);const r=vw-rect.right;if(useBelow){setDropPos({top:rect.bottom+4,right:Math.max(r,8),maxHeight:mH});}else{setDropPos({bottom:vh-rect.top+4,right:Math.max(r,8),maxHeight:mH});}},[open]);
 const startLP=name=>{if(!isAdminProp)return;longRef.current=setTimeout(()=>setDelTarget(name),600);};const cancelLP=()=>{if(longRef.current)clearTimeout(longRef.current);};
 return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
-<button onClick={()=>{setOpen(!open);setDelTarget(null);}} style={{width:40,height:40,border:"1px solid #d0dff0",borderRadius:8,background:open?"var(--accent-blue)":"#f0f6ff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:open?"#fff":"#d9a83a"}}><Star size={18}/></button>
-{open&&(<div ref={dropRef} style={{position:"fixed",...dropPos,background:"var(--bg-surface)",border:"1px solid var(--border-input)",borderRadius:12,boxShadow:"var(--shadow-md)",zIndex:9999,minWidth:220,maxWidth:300,padding:10,display:"flex",flexDirection:"column"}}>
+<button onTouchEnd={e=>{e.preventDefault();setOpen(!open);setDelTarget(null);}} onClick={e=>{if(e.detail===0)return;setOpen(!open);setDelTarget(null);}} style={{width:40,height:40,border:"1px solid #d0dff0",borderRadius:8,background:open?"var(--accent-blue)":"#f0f6ff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:open?"#fff":"#d9a83a",WebkitTapHighlightColor:"transparent",touchAction:"manipulation"}}><Star size={18}/></button>
+{open&&(<div ref={dropRef} style={{position:"fixed",...dropPos,background:"var(--bg-surface)",border:"1px solid var(--border-input)",borderRadius:12,boxShadow:"var(--shadow-md)",zIndex:9999,minWidth:220,maxWidth:300,padding:10,display:"flex",flexDirection:"column",WebkitOverflowScrolling:"touch"}}>
 {available.length===0&&<div style={{padding:12,textAlign:"center",color:"var(--text-muted)",fontSize:16}}>{favs.length===0?"登録なし":"全員配置済み"}</div>}
 <div style={{flex:1,minHeight:0,overflow:"auto",WebkitOverflowScrolling:"touch"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid var(--border-lighter)",background:delTarget===f?"#fde8e8":"transparent",fontSize:18,fontWeight:600,color:"var(--text-primary)",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<span onClick={e=>{e.stopPropagation();setDelConf(f);}} style={{padding:"5px 12px",background:"#e74c3c",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700}}>削除</span>}</button></div>))}</div>
 <div style={{borderTop:"1px solid var(--border-lighter)",paddingTop:10,marginTop:4,flexShrink:0}}><div style={{display:"flex",gap:6}}>
@@ -771,7 +771,7 @@ return(<div className="mk-fade-scale-in" style={{position:"fixed",inset:0,backgr
 <h2 style={{fontSize:24,fontWeight:900,color:"var(--text-inverse)",margin:0,display:"flex",alignItems:"center",gap:6}}><Settings size={22}/> 詳細設定</h2>
 <button onClick={onClose} style={{padding:"8px 18px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"transparent",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>✕ 閉じる</button>
 </div>
-<div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:"16px 20px",overscrollBehavior:"contain"}}>
+<div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:"16px 20px",paddingBottom:"calc(16px + env(safe-area-inset-bottom, 0px))",overscrollBehavior:"contain"}}>
 {/* Status overview */}
 <div style={{display:"flex",gap:8,marginBottom:16}}>
 <div style={{flex:1,padding:"10px 14px",border:"2px solid "+(isAdmin?"#e6a81744":"rgba(255,255,255,0.1)"),borderRadius:12,background:isAdmin?"rgba(230,168,23,0.08)":"rgba(255,255,255,0.03)",display:"flex",alignItems:"center",gap:6}}>
@@ -868,7 +868,7 @@ const TIN={flex:1,border:"none",borderBottom:"2px solid var(--border-input)",pad
 return(
 <div style={{height:"100dvh",display:"flex",flexDirection:"column",overflow:"auto",background:"linear-gradient(170deg,var(--bg-tertiary),var(--bg-secondary))",WebkitOverflowScrolling:"touch",overscrollBehavior:"none"}}>
 <div style={{padding:"36px 20px 8px",textAlign:"center",position:"relative"}}><button onClick={()=>setShowSettings(true)} style={{position:"absolute",top:40,right:20,padding:"8px 14px",border:"1px solid rgba(255,255,255,0.25)",borderRadius:10,background:"rgba(255,255,255,0.08)",color:"var(--text-inverse)",fontSize:18,cursor:"pointer",zIndex:10}}><Settings size={18}/></button><img src={MASCOT_S} alt="モルック" style={{width:200,height:200,objectFit:"contain",display:"block",margin:"0 auto -6px"}}/><h1 style={{fontSize:38,fontWeight:900,color:"var(--text-inverse)",letterSpacing:4}}>モルック スコアラー</h1><div style={{fontSize:13,color:"rgba(255,255,255,0.3)",fontWeight:600,letterSpacing:5}}>MÖLKKY SCORER</div></div>
-<div style={{flex:1,padding:"0 20px 36px",maxWidth:720,margin:"0 auto",width:"100%"}}>
+<div style={{flex:1,padding:"0 20px",paddingBottom:"calc(36px + env(safe-area-inset-bottom, 0px))",maxWidth:720,margin:"0 auto",width:"100%"}}>
 <div style={{marginBottom:14}}><label style={SL}>入力モード</label><div style={{display:"flex",gap:8}}>{[["manual","✏️ 手動"],["shuffle","🎲 ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>{setMode(k);setSp(null);}} style={{...CH,...(mode===k?CHA:{})}}>{l}</button>))}</div></div>
 <div style={{display:"flex",gap:14,marginBottom:14}}><div style={{flex:1}}><label style={SL}>チーム数</label><div style={{display:"flex",gap:8}}>{[2,3,4].map(n=>(<button key={n} onClick={()=>{setTc(n);setSp(null);}} style={{...CH,...(tc===n?CHA:{}),padding:"16px 0"}}>{n}</button>))}</div></div><div style={{flex:1}}><label style={SL}>投げ順</label><div style={{display:"flex",gap:8}}>{[["normal","通常"],["random","ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>setOm(k)} style={{...CH,...(om===k?CHA:{})}}>{l}</button>))}</div></div></div>
 <div style={{display:"flex",gap:8,marginBottom:14}}><div style={{flex:"1 1 0"}}><label style={SL}>ゲーム数</label><select value={numGames} onChange={e=>setNumGames(+e.target.value)} style={SEL}>{Array.from({length:10},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}ゲーム</option>)}</select></div><div style={{flex:"1 1 0"}}><label style={SL}>先取機能</label><select value={bestOf} onChange={e=>setBestOf(+e.target.value)} style={SEL}><option value={0}>なし</option>{Array.from({length:11},(_,i)=>i+2).map(n=><option key={n} value={n}>{n}先取</option>)}</select></div><div style={{flex:"1 1 0"}}><label style={SL}>失格時</label><select value={dqEnd?"end":"cont"} onChange={e=>setDqEnd(e.target.value==="end")} style={SEL}><option value="end">即終了</option><option value="cont">継続</option></select></div></div>
@@ -916,7 +916,7 @@ if(minimized){return(<div onClick={onToggleMin} style={{background:"var(--bg-sec
 <div style={{display:"flex",alignItems:"center",gap:12}}><span style={{fontSize:32,fontWeight:900,color:teamColor}}>{teamName}</span><span style={{fontSize:36,fontWeight:900,color:"var(--text-inverse)"}}>{teamScore}点</span>{playerName&&<span style={{fontSize:18,fontWeight:600,color:"rgba(255,255,255,0.6)"}}>▶{playerName}</span>}<div style={{display:"flex",gap:4}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:18,height:18,borderRadius:9,background:j<fails?"#e74c3c":"rgba(255,255,255,0.2)"}}/>))}</div></div>
 <span style={{fontSize:28,color:"var(--text-inverse)",fontWeight:900,padding:"12px 24px",background:"rgba(255,255,255,0.15)",borderRadius:12}}>▲ 入力</span></div>);}
 return(
-<div style={{background:"var(--bg-surface)",borderTop:"3px solid #dde1e6",padding:"14px 18px 20px",flexShrink:0}}>
+<div style={{background:"var(--bg-surface)",borderTop:"3px solid #dde1e6",padding:"14px 18px",paddingBottom:"calc(20px + env(safe-area-inset-bottom, 0px))",flexShrink:0,overflow:"auto",WebkitOverflowScrolling:"touch",maxHeight:"65vh"}}>
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
 <div style={{display:"flex",alignItems:"baseline",gap:10,flexWrap:"wrap"}}>
 <span style={{fontSize:30,fontWeight:900,color:teamColor}}>(プレーヤー：{playerName||"−"})</span>
@@ -952,7 +952,7 @@ const rmPlayer=(ti,pi)=>{const nt=teams.map((t,i)=>i===ti?{...t,players:t.player
 const doAdd=(n,tI)=>{const nm=(n||name).trim().slice(0,MAX_NAME);const tg=tI??sel;if(!nm||teams[tg].players.length>=MAX_PL)return;setAddConf({nm,tg});};
 const confirmAdd=()=>{if(!addConf)return;const{nm,tg}=addConf;const nt=teams.map((t,i)=>i===tg?{...t,players:[...t.players,{name:nm,active:true}]}:t);dispatch({type:"SET_TEAMS",teams:nt});setName("");setAddConf(null);};
 const allUsed=teams.flatMap(t=>t.players.filter(p=>p.active).map(p=>p.name));
-return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" style={{...SS.mod,position:"relative"}} onClick={e=>e.stopPropagation()}>
+return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" style={{...SS.mod,position:"relative",overflow:"visible"}} onClick={e=>e.stopPropagation()}><div style={{maxHeight:"90vh",overflow:"auto",WebkitOverflowScrolling:"touch"}}>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><h2 style={{fontSize:32,fontWeight:900,color:"var(--text-primary)",display:"flex",alignItems:"center",gap:6}}><Users size={28}/> メンバー</h2><button style={SS.clsB} onClick={onClose}>✕</button></div>
 {teams.map((team,ti)=>(<div key={ti} style={{marginBottom:12}}>
 <div style={{fontSize:18,fontWeight:700,color:C[ti].tx,borderBottom:"2px solid "+C[ti].ac,paddingBottom:4,marginBottom:5}}>{team.name}（{team.players.filter(p=>p.active).length}人）</div>
@@ -971,6 +971,7 @@ return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" st
 <input value={name} onChange={e=>setName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder="名前" style={{flex:1,minWidth:80,padding:8,borderRadius:8,border:"1px solid var(--border-input)",fontSize:16}}/>
 <button onClick={()=>doAdd()} style={{padding:"8px 14px",borderRadius:8,border:"none",background:"var(--accent-blue)",color:"var(--text-inverse)",fontWeight:700,fontSize:16,cursor:"pointer",opacity:name.trim()?1:0.3}}>追加</button>
 <FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={n=>doAdd(n)} usedNames={allUsed} isAdmin={isAdmin}/>
+</div>
 </div>
 </div>
 {addConf&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}}>
@@ -1061,9 +1062,12 @@ return <React.Fragment key={pi}><polygon points={poly} fill={pd.color+"33"} stro
 /* ═══ Recharts Dashboard Components ═══ */
 function RechartsRadar({playersData}){
 const axes=["勝率","上がり率","ミス率(反転)","平均得点","お邪魔成功率"];
-const data=axes.map((axis,i)=>({axis,...Object.fromEntries(playersData.map(pd=>{const m=pd.metrics;const vals=[m.winRate*100,m.finishRate*100,(1-m.missRate)*100,Math.min((m.avgPts/12)*100,100),m.ojamaRate*100];return[pd.name,Math.round(vals[i]*10)/10];}))}));
+const rawFns=[m=>m.winRate*100,m=>m.finishRate*100,m=>(1-m.missRate)*100,m=>Math.min((m.avgPts/12)*100,100),m=>m.ojamaRate*100];
+const fmtFns=[m=>(m.winRate*100).toFixed(1)+"%",m=>(m.finishRate*100).toFixed(1)+"%",m=>(m.missRate*100).toFixed(1)+"%",m=>m.avgPts.toFixed(1)+"pt",m=>(m.ojamaRate*100).toFixed(1)+"%"];
+const data=axes.map((axis,i)=>({axis,...Object.fromEntries(playersData.map(pd=>{const m=pd.metrics;return[pd.name,Math.round(rawFns[i](m)*10)/10];}))}));
+const customTick=({payload,x,y,textAnchor})=>{const idx=axes.indexOf(payload.value);return(<g><text x={x} y={y} textAnchor={textAnchor} fontSize={12} fontWeight={700} fill="var(--text-primary)">{payload.value}</text>{playersData.map((pd,pi)=>(<text key={pd.name} x={x} y={y+14+pi*13} textAnchor={textAnchor} fontSize={11} fontWeight={700} fill={pd.color}>{fmtFns[idx](pd.metrics)}</text>))}</g>);};
 return(<div style={{background:"var(--bg-surface)",borderRadius:14,padding:14,marginBottom:14,border:"1px solid var(--border-input)"}}><div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",marginBottom:8,display:"flex",alignItems:"center",gap:4}}><Target size={16}/> 5軸レーダーチャート</div>
-<ResponsiveContainer width="100%" height={320}><RCRadar data={data}><PolarGrid/><PolarAngleAxis dataKey="axis" tick={{fontSize:12,fontWeight:700,fill:"var(--text-primary)"}}/><PolarRadiusAxis angle={90} domain={[0,100]} tick={false}/>
+<ResponsiveContainer width="100%" height={360}><RCRadar data={data} outerRadius="60%"><PolarGrid/><PolarAngleAxis dataKey="axis" tick={customTick}/><PolarRadiusAxis angle={90} domain={[0,100]} tick={false}/>
 {playersData.map((pd,i)=>(<Radar key={pd.name} name={pd.name} dataKey={pd.name} stroke={pd.color} fill={pd.color} fillOpacity={0.15} strokeWidth={2}/>))}
 <Legend wrapperStyle={{fontSize:13,fontWeight:700}}/></RCRadar></ResponsiveContainer></div>);
 }
@@ -1390,12 +1394,12 @@ const tabBtnStyle=(k)=>({padding:isTab?"10px 24px":"8px 16px",border:"none",bord
 /* Games filtered for display in calendar tab */
 const calFilteredGames=(calStart&&calEnd)?filterGamesByDates(allGames,calStart,calEnd):calStart?filterGamesByDates(allGames,calStart,calStart):[];
 
-return(<div className="mk-fade-scale-in" style={{position:"fixed",inset:0,background:"var(--bg-surface-alt)",zIndex:150,display:"flex",flexDirection:"column",overflow:"hidden",overscrollBehavior:"none"}}>
+return(<div className="mk-fade-scale-in" style={{position:"fixed",inset:0,background:"var(--bg-surface-alt)",zIndex:200,display:"flex",flexDirection:"column",overflow:"hidden",overscrollBehavior:"none"}}>
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(10px + env(safe-area-inset-top, 0px)) 20px 10px",background:"var(--bg-secondary)",flexShrink:0}}>
 <h2 style={{fontSize:isTab?32:24,fontWeight:900,color:"var(--text-inverse)",margin:0,display:"flex",alignItems:"center",gap:6}}><BarChart3 size={24}/> {source==="setup"?"累計スタッツ":"プレイヤースタッツ"}</h2>
 <button onClick={onClose} style={{padding:"8px 18px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"transparent",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>✕ 閉じる</button>
 </div>
-<div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:"12px 20px",overscrollBehavior:"contain"}}>
+<div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:"12px 20px",paddingBottom:"calc(12px + env(safe-area-inset-bottom, 0px))",overscrollBehavior:"contain"}}>
 {names.length===0?<div style={{textAlign:"center",padding:40,color:"var(--text-secondary)",fontSize:18}}><Star size={18} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> お気に入り登録プレイヤーのデータなし</div>:(<>
 {/* View mode toggle: cumulative vs current game (only from game result) */}
 {source!=="setup"&&currentGameRecords&&currentGameRecords.length>0&&(
@@ -1505,7 +1509,7 @@ return(<div key={pd.name} style={{marginBottom:12}}>
 {/* Score table modal */}
 {scoreGame&&<GameScoreModal gameKey={scoreGame} onClose={()=>setScoreGame(null)}/>}
 {/* Delete dialogs */}
-{delStep===1&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}}>
+{delStep===1&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}}>
 {isAdmin?(<>
 <div style={{fontSize:18,fontWeight:800,color:"var(--text-danger)",marginBottom:12,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}><AlertTriangle size={18}/> スタッツを削除しますか？</div>
 <div style={{display:"flex",gap:8}}><button onClick={()=>setDelStep(2)} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>する</button><button onClick={()=>setDelStep(0)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
@@ -1516,7 +1520,7 @@ return(<div key={pd.name} style={{marginBottom:12}}>
 <button onClick={()=>setDelStep(0)} style={{width:"100%",padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>閉じる</button>
 </>)}
 </div></div>}
-{delStep===2&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:400,width:"90%",textAlign:"center"}}>
+{delStep===2&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:400,width:"90%",textAlign:"center"}}>
 <div style={{fontSize:18,fontWeight:800,color:"var(--text-danger)",marginBottom:12}}>削除する期間を選択</div>
 <div style={{display:"flex",flexDirection:"column",gap:6}}>{[["day","今日"],["week","今週"],["month","今月"],["year","今年"],["all","全期間"]].map(([k,l])=>(<button key={k} onClick={()=>doDelete(k)} style={{padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>{l}のデータを削除</button>))}<button onClick={()=>setDelStep(0)} style={{padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
 </div></div>}
@@ -1549,7 +1553,7 @@ return(
 <h2 style={{fontSize:24,fontWeight:900,color:"var(--text-inverse)",margin:0,display:"flex",alignItems:"center",gap:6}}><Trophy size={22}/> Game {gameNumber} 結果</h2>
 <button onPointerDown={startLP} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(showStats!=="delete")setShowStats(true);}} style={{padding:"8px 18px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"rgba(255,255,255,0.1)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}><BarChart3 size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> スタッツ</button>
 </div>
-<div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:"14px 20px",overscrollBehavior:"contain"}}>
+<div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:"14px 20px",paddingBottom:"calc(14px + env(safe-area-inset-bottom, 0px))",overscrollBehavior:"contain"}}>
 <div style={{textAlign:"center",marginBottom:12}}><h2 style={{fontSize:30,fontWeight:900,color:C[winner]?.ac||"var(--text-primary)",margin:0}}>{teams[winner]?.name} 勝利！</h2>{isMatchOver&&<div style={{fontSize:32,fontWeight:900,color:"var(--text-success)",marginTop:4}}><Trophy size={28} style={{display:"inline",verticalAlign:"middle",marginRight:6}}/> {teams[matchWin].name} {bestOf}先取達成！</div>}</div>
 <div style={{display:"flex",gap:12,justifyContent:"center",marginBottom:14,flexWrap:"wrap"}}>{teamOrder.map(ti=>(<div key={ti} style={{textAlign:"center",padding:"12px 24px",borderRadius:16,background:ti===winner?C[ti].lt:"#fff",border:ti===winner?"3px solid "+C[ti].ac:"2px solid #e0e0e0"}}><div style={{fontSize:17,fontWeight:700,color:C[ti].tx}}>{teams[ti].name}</div><div style={{fontSize:44,fontWeight:900,color:C[ti].ac,lineHeight:1.1}}>{tw[ti]}</div><div style={{fontSize:13,fontWeight:800,color:"var(--text-secondary)"}}>勝</div></div>))}</div>
 <button onClick={doSave} disabled={saving} style={{width:"100%",padding:"14px 0",border:"none",borderRadius:10,background:"var(--accent-green)",color:"var(--text-inverse)",fontSize:18,fontWeight:800,cursor:"pointer",marginBottom:10,opacity:saving?0.5:1}}>{saving?"保存中...":<><Camera size={18} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> スコア表を画像保存</>}</button>
@@ -1675,7 +1679,7 @@ return(<div key={oi} style={{flex:1,minWidth:0,padding:"10px 6px 8px",textAlign:
 </div>);})}</div>);
 return(
 <div style={SS.gW} className="mk-slide-in-left">
-<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"5px 10px",background:"var(--bg-secondary)",flexShrink:0,gap:6}}>
+<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(5px + env(safe-area-inset-top, 0px)) 10px 5px",background:"var(--bg-secondary)",flexShrink:0,gap:6}}>
 <div style={{display:"flex",gap:5,flexShrink:0}}><button style={SS.tBtn} onClick={handleBack}><ChevronLeft size={16}/></button><button style={SS.tBtn} onClick={()=>setShowPl(true)}><Users size={16}/></button></div>
 <span style={{fontSize:32,fontWeight:900,color:"var(--text-inverse)",letterSpacing:0,textAlign:"center",flex:1,lineHeight:1.2}}>{gameNumber}試合目、{currentTurn}ターン{cp?"("+cp.name+")":""}{bestOf>0?" "+bestOf+"先取":""}</span>
 <div style={{display:"flex",background:"rgba(255,255,255,0.12)",borderRadius:7,padding:2,gap:2,flexShrink:0}}>{[["both","両方"],["sheet","表"],["input","入力"]].map(([k,l])=>(<button key={k} onClick={()=>setView(k)} style={{padding:"5px 11px",border:"none",borderRadius:5,background:view===k?"rgba(255,255,255,0.2)":"transparent",color:view===k?"#fff":"rgba(255,255,255,0.4)",fontSize:13,fontWeight:600,cursor:"pointer"}}>{l}</button>))}</div>
