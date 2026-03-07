@@ -660,9 +660,10 @@ function ShuffleAnimation({names,teams,onDone}){
 const nCards=names.length;const nTeams=teams.length;
 const shufDur=nCards<=4?2:nCards<=6?3:nCards<=8?3.5:4;
 const dealDur=nCards*1;
-const T={p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur,end:2.5+shufDur+dealDur+3.5};
+const T={p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur};
 const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(Date.now());const frameRef=useRef(null);
 const[flash,setFlash]=useState(false);const dealIdxRef=useRef(-1);const revealTeamRef=useRef(-1);
+const[closing,setClosing]=useState(false);const closeTRef=useRef(null);
 const cardW=110,cardH=60;
 const cx=typeof window!=="undefined"?window.innerWidth/2:200;
 const cy=typeof window!=="undefined"?window.innerHeight*0.45:300;
@@ -677,13 +678,13 @@ else if(el<T.p2e){setPhase(2);
 const shufT=el-T.p2;const mid=shufDur/2;if(shufT>0.3&&shufT<shufDur-0.3&&Math.random()<0.08)setFlash(true);
 }
 else if(el<T.p3e){setPhase(3);const dT=el-T.p3;const di=Math.floor(dT);if(di!==dealIdxRef.current&&di<nCards){dealIdxRef.current=di;}}
-else if(el<T.end){setPhase(4);const rT=el-T.p4;const ri=Math.floor(rT/(0.8/nTeams));if(ri!==revealTeamRef.current&&ri<nTeams){revealTeamRef.current=ri;}}
-else{onDone();return;}
+else{setPhase(4);const rT=el-T.p4;const ri=Math.floor(rT/(0.8/nTeams));if(ri!==revealTeamRef.current&&ri<nTeams){revealTeamRef.current=ri;}}
 frameRef.current=requestAnimationFrame(animate);};
 frameRef.current=requestAnimationFrame(animate);
 return()=>{if(frameRef.current)cancelAnimationFrame(frameRef.current);};
 },[]);
 useEffect(()=>{if(flash){const tid=setTimeout(()=>setFlash(false),100);return()=>clearTimeout(tid);}},[flash]);
+useEffect(()=>{if(closing){closeTRef.current=setTimeout(()=>onDone(),400);return()=>clearTimeout(closeTRef.current);}},[closing]);
 /* Compute card positions based on phase */
 const getCardStyle=(idx)=>{
 const base={position:"fixed",width:cardW,height:cardH,borderRadius:12,background:"#fff",boxShadow:"0 4px 20px rgba(0,0,0,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:800,color:"var(--text-primary)",zIndex:9001+idx,willChange:"transform",transition:"none",backfaceVisibility:"hidden"};
@@ -722,9 +723,8 @@ return{...base,left:cx-cardW/2,top:cy-cardH/2,opacity:0};
 /* Dealer zoom */
 const dealerScale=phase===0?1+Math.min(t/2,1)*0.8:1.8;
 const dealerOp=phase>=4?(1-Math.min((t-T.p4)/0.5,1)):Math.min(t*2,1);
-const revealDur=3.0;const fadeStart=T.p4+revealDur;
-const overlayOp=t>=fadeStart?(1-Math.min((t-fadeStart)/0.5,1)):1;
-return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*overlayOp)+")",zIndex:9000,pointerEvents:"auto"}}>
+const overlayOp=closing?0:1;
+return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*overlayOp)+")",zIndex:9000,pointerEvents:"auto",transition:closing?"opacity 0.4s ease":"none",opacity:closing?0:1}}>
 {/* Dealer CSS figure */}
 <div style={{position:"fixed",left:cx-40,top:cy-140,opacity:dealerOp*0.7,transform:"scale("+dealerScale+")",transformOrigin:"50% 80%",transition:"none",willChange:"transform",zIndex:9000}}>
 <div style={{width:50,height:50,borderRadius:25,background:"#555",margin:"0 auto"}}/>
@@ -742,7 +742,7 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*over
 {/* Cards (phases 0-3) */}
 {phase<4&&names.map((name,idx)=>(<div key={idx} style={getCardStyle(idx)}>{name}</div>))}
 {/* Team reveal panel (phase 4) */}
-{phase===4&&(<div style={{position:"fixed",inset:0,zIndex:9050,display:"flex",alignItems:"center",justifyContent:"center",padding:16,opacity:t>=fadeStart?Math.max(0,1-(t-fadeStart)/0.5):Math.min(1,(t-T.p4)/0.3)}}>
+{phase===4&&(<div style={{position:"fixed",inset:0,zIndex:9050,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16,opacity:Math.min(1,(t-T.p4)/0.3)}}>
 <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",maxWidth:"100%"}}>
 {teams.map((tm,ti)=>(<div key={ti} style={{background:"rgba(0,0,0,0.6)",border:"3px solid "+C[ti].ac,borderRadius:16,padding:"16px 20px",minWidth:140,maxWidth:200,flex:"1 1 0",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",transform:"scale("+(Math.min(1,(t-T.p4-ti*0.15)/0.3))+")",transition:"none"}}>
 <div style={{fontSize:22,fontWeight:900,color:C[ti].ac,textAlign:"center",marginBottom:8,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{tm.name}</div>
@@ -751,6 +751,7 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*over
 </div>
 </div>))}
 </div>
+<button onClick={()=>setClosing(true)} style={{marginTop:20,padding:"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:12,background:"transparent",color:"#fff",fontSize:18,fontWeight:800,cursor:"pointer",opacity:Math.min(1,Math.max(0,(t-T.p4-0.5)/0.3)),transition:"opacity 0.2s"}}>閉じる</button>
 </div>)}
 </div>);
 }
@@ -1721,7 +1722,7 @@ return(
 <button onClick={doSave} disabled={saving} style={{width:"100%",padding:"14px 0",border:"none",borderRadius:10,background:"var(--accent-green)",color:"var(--text-inverse)",fontSize:18,fontWeight:800,cursor:"pointer",marginBottom:10,opacity:saving?0.5:1}}>{saving?"保存中...":<><Camera size={18} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> スコア表を画像保存</>}</button>
 <div style={{background:"var(--bg-surface)",borderRadius:14,padding:14,marginBottom:14,border:"1px solid var(--border-input)"}}>
 <div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:8}}><ClipboardList size={18} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> スコア表</div>
-<div style={{overflow:"auto",WebkitOverflowScrolling:"touch"}}><ScoreTable teams={teams} history={history} teamOrder={teamOrder} highlightLast={false} fontSize={16} colW={50} roundW={36} nameH={90} forCapture={true} dqWinnerIdx={isDqWin?winner:null}/></div>
+{(()=>{const vw2=typeof window!=="undefined"?window.innerWidth:375;const isTab2=vw2>=768;const tc2=teamOrder.reduce((s2,i)=>s2+teams[i].players.filter(p=>p.active).length,0)+teamOrder.length+1;const rfs=isTab2?16:tc2>=14?8:tc2>=12?9:tc2>=10?10:tc2>=8?12:16;const rrw=isTab2?36:tc2>=12?22:tc2>=10?26:36;const rnh=rfs<=10?50:rfs<=12?70:90;return(<div style={{overflowY:"auto",overflowX:"hidden",WebkitOverflowScrolling:"touch"}}><ScoreTable teams={teams} history={history} teamOrder={teamOrder} highlightLast={false} fontSize={rfs} colW={0} roundW={rrw} nameH={rnh} forCapture={true} dqWinnerIdx={isDqWin?winner:null}/></div>);})()}
 <div style={{marginTop:10}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:15}}><thead><tr style={{background:"var(--bg-secondary)",color:"var(--text-inverse)"}}><th style={{padding:"7px 8px",textAlign:"left"}}>チーム</th><th style={{padding:"7px"}}>最終</th><th style={{padding:"7px"}}>得点計</th><th style={{padding:"7px"}}>ミス</th><th style={{padding:"7px"}}>フォルト</th><th style={{padding:"7px"}}>ターン</th></tr></thead><tbody>{teamStats.map((ts,i)=>(<tr key={i} style={{background:ts.ti===winner?"#fffde6":"#fff",borderBottom:"1px solid var(--border-lighter)"}}><td style={{padding:"7px 8px",fontWeight:700,color:C[ts.ti].tx}}>{ts.ti===winner?<Trophy size={14} style={{display:"inline",verticalAlign:"middle",marginRight:2}}/>:""}{ts.name}</td><td style={{padding:"7px",textAlign:"center",fontWeight:800,color:C[ts.ti].ac}}>{ts.final}</td><td style={{padding:"7px",textAlign:"center"}}>{ts.totalPts}</td><td style={{padding:"7px",textAlign:"center",color:"var(--accent-orange)"}}>{ts.misses}</td><td style={{padding:"7px",textAlign:"center",color:"var(--text-danger)"}}>{ts.faults}</td><td style={{padding:"7px",textAlign:"center"}}>{ts.turns}</td></tr>))}</tbody></table></div>
 {comments.length>0&&<div style={{marginTop:10,borderTop:"1px solid var(--border-lighter)",paddingTop:8}}><div style={{fontSize:15,fontWeight:700,color:"var(--text-primary)",marginBottom:4}}><MessageCircle size={14} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> コメント</div>{comments.map((c2,i)=><div key={i} style={{padding:"5px 10px",background:"var(--bg-surface-dim)",borderRadius:6,marginBottom:3,fontSize:14,color:"#444"}}>{c2}</div>)}</div>}
 </div>
