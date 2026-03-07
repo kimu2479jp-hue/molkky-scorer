@@ -57,6 +57,9 @@ const IDB_VER=2;
 const MAX_GAMES=100000;
 const MAX_REPLAYS=100000;
 const MAX_SYNC_CODES=1;
+const SHUF_ANIM_KEY="mk-shuffle-anim";
+function getShufAnim(){try{const v=localStorage.getItem(SHUF_ANIM_KEY);return v===null?true:v==="true";}catch(e){return true;}}
+function setShufAnimLS(v){try{localStorage.setItem(SHUF_ANIM_KEY,v?"true":"false");}catch(e){}}
 
 /* In-memory cache — loaded from IndexedDB at startup */
 const _cache={stats:{},replays:{},analysis:{},ready:false};
@@ -652,6 +655,99 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 
 function CSSConfetti(){const colors=["#2b7de9","#d93a5e","#22b566","#d9a83a","#9b59b6","#e67e22","#1abc9c","#e74c3c","#ffd700","#ff69b4"];const pieces=Array.from({length:50},(_,i)=>({id:i,left:Math.random()*100,delay:Math.random()*2,color:colors[i%colors.length],size:6+Math.random()*8,shape:Math.random()>0.5?"50%":"0"}));return(<div className="mk-confetti-container">{pieces.map(p=>(<div key={p.id} className="mk-confetti-piece" style={{left:p.left+"%",width:p.size,height:p.size,background:p.color,borderRadius:p.shape,animationDelay:p.delay+"s"}}/>))}</div>);}
 
+/* ═══ Shuffle Card Animation ═══ */
+function ShuffleAnimation({names,teams,onDone}){
+const nCards=names.length;const nTeams=teams.length;
+const shufDur=nCards<=4?2:nCards<=6?3:nCards<=8?3.5:4;
+const dealDur=nCards*1;
+const T={p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur,end:2.5+shufDur+dealDur+1.2};
+const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(Date.now());const frameRef=useRef(null);
+const[flash,setFlash]=useState(false);const dealIdxRef=useRef(-1);const revealTeamRef=useRef(-1);
+const cardW=110,cardH=60;
+const cx=typeof window!=="undefined"?window.innerWidth/2:200;
+const cy=typeof window!=="undefined"?window.innerHeight*0.45:300;
+/* Team slot positions: spread across bottom */
+const teamSlots=teams.map((_,i)=>{const margin=40;const totalW=(typeof window!=="undefined"?window.innerWidth:400)-margin*2;const gap=totalW/(nTeams);return{x:margin+gap*i+gap/2,y:(typeof window!=="undefined"?window.innerHeight*0.82:500)};});
+/* Initial card positions: scattered */
+const initPos=useRef(names.map((_,i)=>({x:cx-cardW/2+((i%3)-1)*130,y:40+Math.floor(i/3)*80}))).current;
+useEffect(()=>{const animate=()=>{const el=(Date.now()-startRef.current)/1000;setT(el);
+if(el<T.p1)setPhase(0);
+else if(el<T.p1e)setPhase(1);
+else if(el<T.p2e){setPhase(2);
+const shufT=el-T.p2;const mid=shufDur/2;if(shufT>0.3&&shufT<shufDur-0.3&&Math.random()<0.08)setFlash(true);
+}
+else if(el<T.p3e){setPhase(3);const dT=el-T.p3;const di=Math.floor(dT);if(di!==dealIdxRef.current&&di<nCards){dealIdxRef.current=di;}}
+else if(el<T.end){setPhase(4);const rT=el-T.p4;const ri=Math.floor(rT/(0.8/nTeams));if(ri!==revealTeamRef.current&&ri<nTeams){revealTeamRef.current=ri;}}
+else{onDone();return;}
+frameRef.current=requestAnimationFrame(animate);};
+frameRef.current=requestAnimationFrame(animate);
+return()=>{if(frameRef.current)cancelAnimationFrame(frameRef.current);};
+},[]);
+useEffect(()=>{if(flash){const tid=setTimeout(()=>setFlash(false),100);return()=>clearTimeout(tid);}},[flash]);
+/* Compute card positions based on phase */
+const getCardStyle=(idx)=>{
+const base={position:"fixed",width:cardW,height:cardH,borderRadius:12,background:"#fff",boxShadow:"0 4px 20px rgba(0,0,0,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:800,color:"var(--text-primary)",zIndex:9001+idx,willChange:"transform",transition:"none",backfaceVisibility:"hidden"};
+if(phase===0){/* Entering: slide toward center */
+const prog=Math.min((t-T.p0)/2,1);const ease=1-Math.pow(1-prog,3);
+const ix=initPos[idx].x;const iy=initPos[idx].y;
+const tx=cx-cardW/2;const ty=cy-cardH/2;
+return{...base,left:ix+(tx-ix)*ease,top:iy+(ty-iy)*ease,transform:"scale("+(0.6+0.4*ease)+")",opacity:Math.min(prog*3,1)};}
+if(phase===1){/* Gathering: stack at center */
+const prog=Math.min((t-T.p1)/0.5,1);const ease=1-Math.pow(1-prog,2);
+const stackOff=idx*2;
+return{...base,left:cx-cardW/2+stackOff*(1-ease),top:cy-cardH/2-stackOff*(1-ease),transform:"scale(1)",opacity:1};}
+if(phase===2){/* Shuffling: cards fly left/right */
+const shufT=t-T.p2;const speed=8+idx*1.5;const amp=90+idx*15;const offX=Math.sin(shufT*speed)*amp;const offY=Math.cos(shufT*speed*0.7)*30;const rot=Math.sin(shufT*speed)*45;
+return{...base,left:cx-cardW/2+offX,top:cy-cardH/2+offY,transform:"rotate("+rot+"deg)",opacity:1};}
+if(phase===3){/* Dealing: move to team slot one by one */
+const cardDealTime=T.p3+idx;const dealt=t>=cardDealTime+0.5;const dealing=t>=cardDealTime&&!dealt;
+/* Find which team this card goes to */
+let teamIdx=-1,inTeamIdx=0,count=0;
+for(let ti=0;ti<nTeams;ti++){for(let pi=0;pi<teams[ti].players.length;pi++){if(count===idx){teamIdx=ti;inTeamIdx=pi;break;}count++;}if(teamIdx>=0)break;}
+if(teamIdx<0)teamIdx=0;
+const target=teamSlots[teamIdx];
+if(!dealing&&!dealt){/* Still in stack */
+return{...base,left:cx-cardW/2,top:cy-cardH/2,transform:"scale(1)",opacity:1};}
+if(dealing){const prog=Math.min((t-cardDealTime)/0.5,1);const ease=1-Math.pow(1-prog,3);
+const tx=target.x-cardW/2;const ty=target.y-cardH/2+inTeamIdx*8;
+const bounce=prog>0.8?1+(1-prog)*0.75:1;
+return{...base,left:(cx-cardW/2)+(tx-(cx-cardW/2))*ease,top:(cy-cardH/2)+(ty-(cy-cardH/2))*ease,transform:"scale("+bounce+")",opacity:1,boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+(ease>0.8?", 0 0 20px "+C[teamIdx].ac+"88":"")};}
+/* dealt */
+const tx2=target.x-cardW/2;const ty2=target.y-cardH/2+inTeamIdx*8;
+return{...base,left:tx2,top:ty2,transform:"scale(1)",opacity:1,borderLeft:"4px solid "+C[teamIdx].ac};}
+if(phase===4){/* Reveal: cards at final position */
+let teamIdx2=-1,inTeamIdx2=0,count2=0;
+for(let ti=0;ti<nTeams;ti++){for(let pi=0;pi<teams[ti].players.length;pi++){if(count2===idx){teamIdx2=ti;inTeamIdx2=pi;break;}count2++;}if(teamIdx2>=0)break;}
+if(teamIdx2<0)teamIdx2=0;
+const target2=teamSlots[teamIdx2];
+const isRevealing=revealTeamRef.current>=teamIdx2;
+return{...base,left:target2.x-cardW/2,top:target2.y-cardH/2+inTeamIdx2*8,transform:"scale("+(isRevealing?1.08:1)+")",opacity:1,borderLeft:"4px solid "+C[teamIdx2].ac,boxShadow:isRevealing?"0 0 24px "+C[teamIdx2].ac:"0 4px 20px rgba(0,0,0,0.3)"};}
+return{...base,left:cx-cardW/2,top:cy-cardH/2,opacity:0};
+};
+/* Dealer zoom */
+const dealerScale=phase===0?1+Math.min(t/2,1)*0.8:1.8;
+const dealerOp=phase>=4?(1-Math.min((t-T.p4)/0.5,1)):Math.min(t*2,1);
+const overlayOp=phase>=4?(1-Math.min((t-T.p4)/0.8,1)):1;
+return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*overlayOp)+")",zIndex:9000,pointerEvents:"auto"}}>
+{/* Dealer CSS figure */}
+<div style={{position:"fixed",left:cx-40,top:cy-140,opacity:dealerOp*0.7,transform:"scale("+dealerScale+")",transformOrigin:"50% 80%",transition:"none",willChange:"transform",zIndex:9000}}>
+<div style={{width:50,height:50,borderRadius:25,background:"#555",margin:"0 auto"}}/>
+<div style={{width:60,height:70,borderRadius:"8px 8px 0 0",background:"#333",margin:"-5px auto 0",display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:8}}>
+<div style={{width:20,height:14,borderRadius:3,background:"#e74c3c",border:"2px solid #fff",transform:"rotate(-10deg)"}}/>
+<div style={{width:20,height:14,borderRadius:3,background:"#2b7de9",border:"2px solid #fff",marginLeft:-6,transform:"rotate(10deg)"}}/>
+</div>
+</div>
+{/* Flash effect */}
+{flash&&<div style={{position:"fixed",inset:0,background:"rgba(255,255,255,0.4)",zIndex:9050,pointerEvents:"none"}}/>}
+{/* Team labels at bottom */}
+{phase>=3&&teamSlots.map((sl,ti)=>{const isRev=revealTeamRef.current>=ti;return(<div key={ti} style={{position:"fixed",left:sl.x-55,top:sl.y-35,width:110,textAlign:"center",zIndex:9001,opacity:isRev?1:0.6,transition:"opacity 0.3s",pointerEvents:"none"}}>
+<div style={{fontSize:14,fontWeight:900,color:C[ti].ac,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{teams[ti].name}</div>
+</div>);})}
+{/* Cards */}
+{names.map((name,idx)=>(<div key={idx} style={getCardStyle(idx)}>{name}</div>))}
+</div>);
+}
+
 const VT={writingMode:"vertical-rl",WebkitWritingMode:"vertical-rl",textOrientation:"upright",WebkitTextOrientation:"upright",letterSpacing:"-1px",lineHeight:1,margin:"0 auto",whiteSpace:"nowrap",overflow:"hidden",display:"inline-block"};
 
 function ScoreTable({teams,history,teamOrder,highlightLast,fontSize,colW,roundW,nameH,activeCell,forCapture,dqWinnerIdx}){
@@ -746,7 +842,7 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
 }
 
 /* ═══ Settings Page ═══ */
-function SettingsPage({onClose,isAdmin,onAdminToggle,aiEnabled,onAIToggle}){
+function SettingsPage({onClose,isAdmin,onAdminToggle,aiEnabled,onAIToggle,shufAnim,onShufAnimToggle}){
 const[showAdminPin,setShowAdminPin]=useState(false);
 const[serverHasPin,setServerHasPin]=useState(null);
 const savedCode=getSyncCode();/* from localStorage — may be stale */
@@ -817,6 +913,12 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 {syncStatus&&<div style={{fontSize:14,color:syncStatus.startsWith("✅")?"var(--text-success)":syncStatus.startsWith("❌")?"var(--text-danger)":"var(--accent-blue)",fontWeight:600,marginTop:6}}>{syncStatus}</div>}
 </div>
 </div>
+{/* Shuffle animation */}
+<div style={{marginBottom:20}}>
+<div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>演出</div>
+<SW on={shufAnim} onToggle={()=>onShufAnimToggle(!shufAnim)} label={"シャッフル演出 "+(shufAnim?"(ON)":"(OFF)")} color="var(--accent-green)"/>
+<div style={{fontSize:12,color:"rgba(255,255,255,0.35)",marginTop:-4,marginBottom:12,paddingLeft:4}}>{shufAnim?"カードシャッフルアニメーションを表示":"アニメーションなしで即座に結果表示"}</div>
+</div>
 {/* AI analysis */}
 <div style={{marginBottom:20}}>
 <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>AI分析</div>
@@ -838,14 +940,14 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 </div>);
 }
 
-function SetupScreen({onStart,savedTeams,isAdmin,onAdminToggle,aiEnabled,onAIToggle}){
+function SetupScreen({onStart,savedTeams,isAdmin,onAdminToggle,aiEnabled,onAIToggle,shufAnim,onShufAnimToggle}){
 const{favs,addF,rmF}=useFavs();
 const[mode,setMode]=useState("manual");const[tc,setTc]=useState(savedTeams?savedTeams.length:2);
 const[om,setOm]=useState("normal");const[numGames,setNumGames]=useState(1);const[bestOf,setBestOf]=useState(0);const[dqEnd,setDqEnd]=useState(true);
 const[saveToStats,setSaveToStats]=useState(true);
 const[teams,setTeams]=useState(()=>{if(savedTeams){const base=savedTeams.map(t=>({name:t.name,players:t.players.length>0?t.players:[""]}));while(base.length<MAX_TEAMS)base.push({name:"チーム"+(base.length+1),players:[""]});return base.slice(0,MAX_TEAMS);}return Array.from({length:MAX_TEAMS},(_,i)=>({name:"チーム"+(i+1),players:[""]}));});
 const[mems,setMems]=useState(Array(4).fill(""));const[sp,setSp]=useState(null);const[showSetupStats,setShowSetupStats]=useState(false);
-const[showSettings,setShowSettings]=useState(false);
+const[showSettings,setShowSettings]=useState(false);const[shufAnimData,setShufAnimData]=useState(null);
 const uN=(i,v)=>setTeams(p=>p.map((t,j)=>j===i?{...t,name:v}:t));
 const uP=(ti,pi,v)=>setTeams(p=>p.map((t,i)=>i===ti?{...t,players:t.players.map((pl,j)=>j===pi?v.slice(0,MAX_NAME):pl)}:t));
 const aP=ti=>setTeams(p=>p.map((t,i)=>i===ti&&t.players.length<MAX_PL?{...t,players:[...t.players,""]}:t));
@@ -853,7 +955,17 @@ const rP=(ti,pi)=>setTeams(p=>p.map((t,i)=>i===ti&&t.players.length>1?{...t,play
 const uM=(i,v)=>setMems(p=>p.map((m,j)=>j===i?v.slice(0,MAX_NAME):m));
 const aM=()=>{if(mems.length<MAX_SHUF)setMems(p=>[...p,""]);};
 const rM=i=>{if(mems.length>2)setMems(p=>p.filter((_,j)=>j!==i));};
-const doShuf=()=>{const names=mems.filter(m=>m.trim());if(names.length<tc)return;const s=shuf(names);const r=Array.from({length:tc},(_,i)=>({name:"チーム"+(i+1),players:[]}));s.forEach((n,i)=>r[i%tc].players.push(n));setSp(r);};
+const doShufCore=()=>{const names=mems.filter(m=>m.trim());if(names.length<tc)return null;
+const prevSets=sp?sp.map(t=>new Set(t.players)):null;
+const teamSizes=[];{const base=Math.floor(names.length/tc);const rem=names.length%tc;for(let i=0;i<tc;i++)teamSizes.push(base+(i<rem?1:0));}
+const tryOnce=()=>{const s=shuf(names);const r=Array.from({length:tc},(_,i)=>({name:sp?sp[i]?.name||("チーム"+(i+1)):"チーム"+(i+1),players:[]}));let idx=0;for(let i=0;i<tc;i++){r[i].players=s.slice(idx,idx+teamSizes[i]);idx+=teamSizes[i];}return r;};
+let result=tryOnce();
+if(prevSets&&names.length>tc){for(let att=0;att<10;att++){const same=result.some(t=>{const ts=new Set(t.players);return prevSets.some(ps=>ps.size===ts.size&&[...ts].every(n=>ps.has(n)));});if(!same)break;result=tryOnce();}}
+const ord=shuf(Array.from({length:tc},(_,i)=>i));
+return ord.map(i=>result[i]);};
+const doShuf=()=>{const result=doShufCore();if(!result)return;
+if(shufAnim){const allNames=result.flatMap(t=>t.players);setShufAnimData({names:allNames,teams:result});}
+else{setSp(result);}};
 const okM=teams.slice(0,tc).every(t=>t.name.trim()&&t.players.some(p=>p.trim()));const okS=mems.filter(m=>m.trim()).length>=tc;
 const go=()=>{let ft;if(mode==="manual")ft=teams.slice(0,tc).map(t=>({...t,players:t.players.filter(p=>p.trim())}));else{if(!sp)return;ft=sp;}let ord=Array.from({length:ft.length},(_,i)=>i);if(om==="random")ord=shuf(ord);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats);};
 const usedManual=teams.slice(0,tc).flatMap(t=>t.players).filter(p=>p.trim()).map(p=>p.trim());
@@ -869,7 +981,7 @@ return(
 <div style={{height:"100dvh",display:"flex",flexDirection:"column",overflow:"auto",background:"linear-gradient(170deg,var(--bg-tertiary),var(--bg-secondary))",WebkitOverflowScrolling:"touch",overscrollBehavior:"none"}}>
 <div style={{padding:"36px 20px 8px",textAlign:"center",position:"relative"}}><button onClick={()=>setShowSettings(true)} style={{position:"absolute",top:40,right:20,padding:"8px 14px",border:"1px solid rgba(255,255,255,0.25)",borderRadius:10,background:"rgba(255,255,255,0.08)",color:"var(--text-inverse)",fontSize:18,cursor:"pointer",zIndex:10}}><Settings size={18}/></button><img src={MASCOT_S} alt="モルック" style={{width:200,height:200,objectFit:"contain",display:"block",margin:"0 auto -6px"}}/><h1 style={{fontSize:38,fontWeight:900,color:"var(--text-inverse)",letterSpacing:4}}>モルック スコアラー</h1><div style={{fontSize:13,color:"rgba(255,255,255,0.3)",fontWeight:600,letterSpacing:5}}>MÖLKKY SCORER</div></div>
 <div style={{flex:1,padding:"0 20px",paddingBottom:"calc(36px + env(safe-area-inset-bottom, 0px))",maxWidth:720,margin:"0 auto",width:"100%"}}>
-<div style={{marginBottom:14}}><label style={SL}>入力モード</label><div style={{display:"flex",gap:8}}>{[["manual","✏️ 手動"],["shuffle","🎲 ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>{setMode(k);setSp(null);}} style={{...CH,...(mode===k?CHA:{})}}>{l}</button>))}</div></div>
+<div style={{marginBottom:14}}><label style={SL}>入力モード</label><div style={{display:"flex",gap:8}}>{[["manual","✏️ 手動"],["shuffle","🎲 ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>{if(k===mode)return;if(k==="shuffle"){const ns=teams.slice(0,tc).flatMap(t=>t.players).filter(p=>p.trim());if(ns.length>0)setMems(ns.length<2?[...ns,""]:ns);}else if(k==="manual"){const ns=mems.filter(m=>m.trim());if(ns.length>0){setTeams(p=>{const nt=p.map((t,i)=>i<tc?{...t,players:[]}:t);ns.forEach((n,j)=>{const ti=j%tc;nt[ti]={...nt[ti],players:[...nt[ti].players,n]};});for(let i=0;i<tc;i++){if(nt[i].players.length===0)nt[i]={...nt[i],players:[""]};} return nt;});}}setMode(k);setSp(null);}} style={{...CH,...(mode===k?CHA:{})}}>{l}</button>))}</div></div>
 <div style={{display:"flex",gap:14,marginBottom:14}}><div style={{flex:1}}><label style={SL}>チーム数</label><div style={{display:"flex",gap:8}}>{[2,3,4].map(n=>(<button key={n} onClick={()=>{setTc(n);setSp(null);}} style={{...CH,...(tc===n?CHA:{}),padding:"16px 0"}}>{n}</button>))}</div></div><div style={{flex:1}}><label style={SL}>投げ順</label><div style={{display:"flex",gap:8}}>{[["normal","通常"],["random","ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>setOm(k)} style={{...CH,...(om===k?CHA:{})}}>{l}</button>))}</div></div></div>
 <div style={{display:"flex",gap:8,marginBottom:14}}><div style={{flex:"1 1 0"}}><label style={SL}>ゲーム数</label><select value={numGames} onChange={e=>setNumGames(+e.target.value)} style={SEL}>{Array.from({length:10},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}ゲーム</option>)}</select></div><div style={{flex:"1 1 0"}}><label style={SL}>先取機能</label><select value={bestOf} onChange={e=>setBestOf(+e.target.value)} style={SEL}><option value={0}>なし</option>{Array.from({length:11},(_,i)=>i+2).map(n=><option key={n} value={n}>{n}先取</option>)}</select></div><div style={{flex:"1 1 0"}}><label style={SL}>失格時</label><select value={dqEnd?"end":"cont"} onChange={e=>setDqEnd(e.target.value==="end")} style={SEL}><option value="end">即終了</option><option value="cont">継続</option></select></div></div>
 {/* Stats toggle (UISwitch) + Stats button */}
@@ -900,7 +1012,8 @@ return(
 </>)}
 </div>
 {showSetupStats&&<StatsModal onClose={()=>setShowSetupStats(false)} source="setup" isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
-{showSettings&&<SettingsPage onClose={()=>setShowSettings(false)} isAdmin={isAdmin} onAdminToggle={onAdminToggle} aiEnabled={aiEnabled} onAIToggle={onAIToggle}/>}
+{showSettings&&<SettingsPage onClose={()=>setShowSettings(false)} isAdmin={isAdmin} onAdminToggle={onAdminToggle} aiEnabled={aiEnabled} onAIToggle={onAIToggle} shufAnim={shufAnim} onShufAnimToggle={onShufAnimToggle}/>}
+{shufAnimData&&<ShuffleAnimation names={shufAnimData.names} teams={shufAnimData.teams} onDone={()=>{setSp(shufAnimData.teams);setShufAnimData(null);}}/>}
 </div>);
 }
 
@@ -1543,7 +1656,7 @@ return(<div key={pd.name} style={{marginBottom:12}}>
 }
 
 /* ═══ Game Result — with stats toggle + long-press delete ═══ */
-function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gameNumber,onNext,onBack,onExtend,timestamps,isAdmin,aiEnabled,autoEnd,dqEndGame}){
+function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gameNumber,onNext,onBack,onExtend,timestamps,isAdmin,aiEnabled,autoEnd,dqEndGame,shufAnim}){
 const[comment,setComment]=useState("");const[comments,setComments]=useState([]);
 const[ordMode,setOrdMode]=useState("reverse");const[ordVal,setOrdVal]=useState([...teamOrder].reverse());
 const[saving,setSaving]=useState(false);const[showStats,setShowStats]=useState(false);
@@ -1589,7 +1702,7 @@ return(
 }
 
 /* ═══ Game Screen — with timing ═══ */
-function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goBack,saveToStatsProp,recoverData,isAdmin,aiEnabled}){
+function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goBack,saveToStatsProp,recoverData,isAdmin,aiEnabled,shufAnim}){
 const init=recoverData?{
 teams:recoverData.teams.map(t=>({...t,players:t.players.map(p=>typeof p==="string"?{name:p,active:true}:p)})),
 history:recoverData.history,currentOrderIdx:recoverData.currentOrderIdx,currentTurn:recoverData.currentTurn,
@@ -1705,7 +1818,7 @@ return(
 </div>
 {showPl&&<PlModal teams={teams} dispatch={dispatch} onClose={()=>setShowPl(false)} isAdmin={isAdmin}/>}
 {conf&&<Confirm msg={conf.msg} onOk={execConf} onCancel={()=>setConf(null)}/>}
-{showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} timestamps={timestamps} isAdmin={isAdmin} aiEnabled={aiEnabled} autoEnd={!!autoEnd} dqEndGame={!!dqEndGame}/>}
+{showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} timestamps={timestamps} isAdmin={isAdmin} aiEnabled={aiEnabled} autoEnd={!!autoEnd} dqEndGame={!!dqEndGame} shufAnim={shufAnim}/>}
 {animState.confetti&&<CSSConfetti/>}
 {saveDialog&&<Confirm msg={"チーム・プレイヤー情報を\n設定画面に保存しますか？"} sub={"保存すると次のゲームで\n同じメンバーをすぐ使えます"} okLabel="保存する" cancelLabel="保存しない" thirdLabel="キャンセル（試合に戻る）" onOk={()=>doBack(true)} onCancel={()=>doBack(false)} onThird={()=>setSaveDialog(false)}/>}
 </div>);
@@ -1719,6 +1832,8 @@ const[cfg,setCfg]=useState(null);const[saved,setSaved]=useState(null);const[reco
 const[isAdmin,setIsAdmin]=useState(false);
 const[aiEnabled,setAiEnabled]=useState(()=>getAIEnabled());
 const handleAIToggle=(v)=>{setAiEnabled(v);setAIEnabledLS(v);};
+const[shufAnim,setShufAnim]=useState(()=>getShufAnim());
+const handleShufAnimToggle=(v)=>{setShufAnim(v);setShufAnimLS(v);};
 useEffect(()=>{if(dbReady&&scr==="loading"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p&&p.teams){setScr("recover");}else{setScr("setup");}}catch(e){setScr("setup");}}},[dbReady]);
 useEffect(()=>{if(scr==="recover"){try{const p=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(p){setRecovery(p);}else{setScr("setup");}}catch(e){setScr("setup");}};},[scr]);
 const doRecover=()=>{if(!recovery)return;const r=recovery;setCfg({t:r.teams,o:r.teamOrder,ng:r.numGames||1,bo:r.bestOf||0,dq:r.dqEndGame!==undefined?r.dqEndGame:true,sts:true,recover:r});setScr("game");};
@@ -1735,7 +1850,7 @@ if(!dbReady||scr==="loading"||(scr==="recover"&&!recovery)){return(<div style={{
       <div style={{display:"flex",gap:10}}><button onClick={doRecover} style={{flex:1,padding:"16px 0",border:"none",borderRadius:12,background:"var(--bg-secondary)",color:"var(--text-inverse)",fontSize:18,fontWeight:700,cursor:"pointer"}}>{recovery.winner!=null?"表示する":"再開する"}</button><button onClick={dismissRecover} style={{flex:1,padding:"16px 0",border:"2px solid var(--bg-secondary)",borderRadius:12,background:"transparent",color:"var(--text-primary)",fontSize:18,fontWeight:700,cursor:"pointer"}}>破棄する</button></div>
     </div>
   </div>);}
-  return(<div style={{width:"100%",height:"100dvh"}}>{(scr==="setup"||!cfg)?<SetupScreen savedTeams={saved} isAdmin={isAdmin} onAdminToggle={setIsAdmin} aiEnabled={aiEnabled} onAIToggle={handleAIToggle} onStart={(t,o,ng,bo,dq,sts)=>{setCfg({t,o,ng,bo,dq,sts});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts!==false} recoverData={cfg.recover||null} isAdmin={isAdmin} aiEnabled={aiEnabled} goBack={saveData=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);setScr("setup");setCfg(null);}}/>}</div>);
+  return(<div style={{width:"100%",height:"100dvh"}}>{(scr==="setup"||!cfg)?<SetupScreen savedTeams={saved} isAdmin={isAdmin} onAdminToggle={setIsAdmin} aiEnabled={aiEnabled} onAIToggle={handleAIToggle} shufAnim={shufAnim} onShufAnimToggle={handleShufAnimToggle} onStart={(t,o,ng,bo,dq,sts)=>{setCfg({t,o,ng,bo,dq,sts});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts!==false} recoverData={cfg.recover||null} isAdmin={isAdmin} aiEnabled={aiEnabled} shufAnim={shufAnim} goBack={saveData=>{try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);setScr("setup");setCfg(null);}}/>}</div>);
 }
 
 const SS={
