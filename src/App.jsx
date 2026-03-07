@@ -1047,10 +1047,16 @@ if(minimized){return(<div onClick={onToggleMin} style={{background:"var(--bg-sec
 <span style={{fontSize:22,color:"var(--text-inverse)",fontWeight:900,padding:"8px 16px",background:"rgba(255,255,255,0.15)",borderRadius:10}}>▲ 入力</span></div>);}
 return(
 <div style={{background:"var(--bg-surface)",borderTop:"2px solid #dde1e6",padding:"6px "+PAD+"px",paddingBottom:"calc(8px + env(safe-area-inset-bottom, 0px))",flexShrink:0}}>
-<div style={{display:"flex",alignItems:"center",justifyContent:"center",marginBottom:2,gap:8,position:"relative"}}>
-<span style={{fontSize:isNarrow?32:50,fontWeight:900,color:"var(--text-primary)",lineHeight:1}}>{teamScore}</span>
-{fails>0&&<div style={{display:"flex",gap:3,alignItems:"center"}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:isNarrow?18:22,height:isNarrow?18:22,borderRadius:"50%",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:isNarrow?10:12,fontWeight:900,background:j<fails?"#e74c3c":"var(--border-input)",color:j<fails?"var(--text-inverse)":"#999"}}>{j<fails?"✕":""}</span>))}</div>}
-<button onClick={onToggleMin} style={{position:"absolute",right:0,padding:"4px 8px",border:"1px solid var(--bg-secondary)",borderRadius:8,background:"transparent",color:"var(--text-primary)",fontSize:14,fontWeight:800,cursor:"pointer",flexShrink:0}}>▼</button>
+<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:2}}>
+<div style={{flex:1,minWidth:0}}>
+<div style={{fontSize:isNarrow?13:15,fontWeight:800,color:teamColor,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{teamName}</div>
+<div style={{display:"flex",alignItems:"baseline",gap:6,flexWrap:"nowrap"}}>
+<span style={{fontSize:isNarrow?12:14,fontWeight:600,color:"var(--text-muted)",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:isNarrow?80:120}}>{playerName||""}</span>
+<span style={{fontSize:isNarrow?22:30,fontWeight:900,color:"var(--text-primary)",lineHeight:1}}>{teamScore}<span style={{fontSize:isNarrow?13:16,fontWeight:700}}>点</span></span>
+<div style={{display:"flex",gap:3,alignItems:"center"}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:isNarrow?14:18,height:isNarrow?14:18,borderRadius:"50%",display:"inline-flex",alignItems:"center",justifyContent:"center",fontSize:isNarrow?8:10,fontWeight:900,background:j<fails?"#e74c3c":"var(--border-input)",color:j<fails?"var(--text-inverse)":"#bbb"}}>{j<fails?"✕":""}</span>))}</div>
+</div>
+</div>
+<button onClick={onToggleMin} style={{padding:"4px 8px",border:"1px solid var(--border-input)",borderRadius:8,background:"transparent",color:"var(--text-muted)",fontSize:14,fontWeight:800,cursor:"pointer",flexShrink:0}}>▼</button>
 </div>
 {teamScore>=PEN&&<div style={{fontSize:13,fontWeight:700,color:"var(--text-warning)",marginBottom:2,display:"flex",alignItems:"center",gap:3}}><AlertTriangle size={14}/> フォルト=25点</div>}
 <div style={{maxWidth:isTabletSI?520:undefined,margin:isTabletSI?"0 auto":undefined}}>
@@ -1062,7 +1068,7 @@ return(
 <div style={{width:ACT_W,display:"flex",flexDirection:"column",gap:isNarrow?4:6,flexShrink:0}}>
 <button style={{flex:1,border:"none",borderRadius:isNarrow?10:14,background:sel!=null?"var(--bg-secondary)":"#ccc",color:"var(--text-inverse)",fontSize:isNarrow?22:28,fontWeight:900,cursor:"pointer",boxShadow:sel!=null?"0 2px 8px rgba(20,54,90,0.3)":"none",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doScore}>決定</button>
 <button style={{padding:isNarrow?"10px 0":"12px 0",border:"2px solid #f0b0b0",borderRadius:isNarrow?8:10,background:"#fde8e8",color:"var(--text-danger)",fontSize:isNarrow?14:16,fontWeight:800,cursor:"pointer",flexShrink:0}} onClick={doFault}>✕ フォルト</button>
-<button style={{flex:1,border:"2px solid #f0d4a0",borderRadius:isNarrow?10:14,background:"#fff3e0",color:"var(--accent-orange)",fontSize:isNarrow?22:26,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doMiss}>➖ ミス</button>
+<button style={{flex:1,border:"2px solid #f0d4a0",borderRadius:isNarrow?10:14,background:"#fff3e0",color:"var(--accent-orange)",fontSize:isNarrow?16:18,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doMiss}>－ミス</button>
 </div>
 </div>
 </div>
