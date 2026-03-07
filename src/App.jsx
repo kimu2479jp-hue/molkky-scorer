@@ -745,7 +745,7 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*over
 {phase===4&&(<div style={{position:"fixed",inset:0,zIndex:9050,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16,opacity:Math.min(1,(t-T.p4)/0.3)}}>
 <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",maxWidth:"100%"}}>
 {teams.map((tm,ti)=>(<div key={ti} style={{background:"rgba(0,0,0,0.6)",border:"3px solid "+C[ti].ac,borderRadius:16,padding:"16px 20px",minWidth:140,maxWidth:200,flex:"1 1 0",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",transform:"scale("+(Math.min(1,(t-T.p4-ti*0.15)/0.3))+")",transition:"none"}}>
-<div style={{fontSize:22,fontWeight:900,color:C[ti].ac,textAlign:"center",marginBottom:8,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{tm.name}</div>
+<div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.7)",textAlign:"center",marginBottom:2}}>{ti+1}番目</div><div style={{fontSize:22,fontWeight:900,color:C[ti].ac,textAlign:"center",marginBottom:8,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{tm.name}</div>
 <div style={{borderTop:"2px solid "+C[ti].ac+"66",paddingTop:8}}>
 {tm.players.map((p,pi)=>(<div key={pi} style={{fontSize:18,fontWeight:700,color:"#fff",textAlign:"center",padding:"4px 0",textShadow:"0 1px 2px rgba(0,0,0,0.4)"}}>{p}</div>))}
 </div>
