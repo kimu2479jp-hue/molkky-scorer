@@ -1032,13 +1032,13 @@ const doScore=()=>{if(sel==null)return;if(win){onConfirm("score",sel,teamName+"�
 const doMiss=()=>{if(fails>=MF-1){onConfirm("miss",0,teamName+"の"+MF+"回連続です。\n失格になります。確定しますか？");setSel(null);return;}dispatch({type:"MISS"});setSel(null);};
 const doFault=()=>{if(fails>=MF-1){onConfirm("fault",0,teamName+"の"+MF+"回連続です。\n失格になります。確定しますか？");setSel(null);return;}if(teamScore>=PEN){onConfirm("fault",0,teamName+"は"+teamScore+"点（37点以上）。\nフォルトで25点に戻ります。確定しますか？");setSel(null);return;}dispatch({type:"FAULT"});setSel(null);};
 const vw=typeof window!=="undefined"?window.innerWidth:375;
-const isNarrow=vw<420;const actW=isNarrow?76:160;const padX=isNarrow?8:18;const gapX=isNarrow?6:12;
-const numW=vw-padX*2-actW-gapX;const NB=isNarrow?Math.floor((numW-15)/4):90;const NG=isNarrow?5:8;const NFS=isNarrow?Math.floor(NB*0.42):38;
+const isNarrow=vw<420;const PAD=8;const ACT_W=isNarrow?90:160;const GAP=isNarrow?6:12;const NG=isNarrow?4:8;
+const gridW=vw-PAD*2-ACT_W-GAP;const NB=Math.floor((gridW-NG*2)/3);const NFS=Math.max(Math.floor(NB*0.4),16);
 if(minimized){return(<div onClick={onToggleMin} style={{background:"var(--bg-secondary)",padding:"10px 16px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><span style={{fontSize:24,fontWeight:900,color:teamColor}}>{teamName}</span><span style={{fontSize:28,fontWeight:900,color:"var(--text-inverse)"}}>{teamScore}点</span>{playerName&&<span style={{fontSize:14,fontWeight:600,color:"rgba(255,255,255,0.6)"}}>▶{playerName}</span>}<div style={{display:"flex",gap:3}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:14,height:14,borderRadius:7,background:j<fails?"#e74c3c":"rgba(255,255,255,0.2)"}}/>))}</div></div>
 <span style={{fontSize:22,color:"var(--text-inverse)",fontWeight:900,padding:"8px 16px",background:"rgba(255,255,255,0.15)",borderRadius:10}}>▲ 入力</span></div>);}
 return(
-<div style={{background:"var(--bg-surface)",borderTop:"2px solid #dde1e6",padding:"6px "+padX+"px",paddingBottom:"calc(8px + env(safe-area-inset-bottom, 0px))",flexShrink:0}}>
+<div style={{background:"var(--bg-surface)",borderTop:"2px solid #dde1e6",padding:"6px "+PAD+"px",paddingBottom:"calc(8px + env(safe-area-inset-bottom, 0px))",flexShrink:0}}>
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:2}}>
 <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap",flex:1,minWidth:0}}>
 <span style={{fontSize:isNarrow?16:22,fontWeight:900,color:teamColor,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{playerName||"−"}</span>
@@ -1049,15 +1049,15 @@ return(
 <button onClick={onToggleMin} style={{padding:"6px 12px",border:"2px solid var(--bg-secondary)",borderRadius:8,background:"transparent",color:"var(--text-primary)",fontSize:16,fontWeight:800,cursor:"pointer",flexShrink:0}}>▼</button>
 </div>
 {teamScore>=PEN&&<div style={{fontSize:13,fontWeight:700,color:"var(--text-warning)",marginBottom:2,display:"flex",alignItems:"center",gap:3}}><AlertTriangle size={14}/> フォルト=25点</div>}
-<div style={{display:"flex",gap:gapX,justifyContent:"center",alignItems:"flex-start"}}>
-<div style={{display:"flex",flexDirection:"column",gap:NG,alignItems:"center",flex:1,minWidth:0}}>
-{[[7,9,8],[5,11,12,6],[3,10,4],[1,2]].map((row,ri)=>(<div key={ri} style={{display:"flex",gap:NG,justifyContent:"center"}}>{row.map(n=>{const isSel=sel===n;return(<button key={n} onClick={()=>setSel(sel===n?null:n)} style={{width:NB,height:NB,borderRadius:NB/2,border:isSel?"3px solid var(--bg-secondary)":"2px solid #b0bec5",background:isSel?"var(--bg-secondary)":"var(--bg-surface)",color:isSel?"var(--text-inverse)":"var(--text-primary)",fontSize:NFS,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.1s",boxShadow:isSel?"0 2px 8px rgba(20,54,90,0.3)":"none",padding:0}}>{n}</button>);})}</div>))}
-<button style={{width:"100%",maxWidth:NB*3+NG*2,padding:"6px 0",border:"2px solid var(--border-input)",borderRadius:8,background:"#f5f5f5",color:"#666",fontSize:14,fontWeight:800,cursor:"pointer",opacity:canUndo?1:0.2,marginTop:2}} onClick={canUndo?()=>dispatch({type:"UNDO"}):undefined}><Undo2 size={14} style={{display:"inline",verticalAlign:"middle",marginRight:3}}/> 戻る</button>
+<div style={{display:"flex",gap:GAP,alignItems:"stretch"}}>
+<div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:NG}}>
+{[[1,2,3],[4,5,6],[7,8,9],[10,11,12]].map((row,ri)=>(<div key={ri} style={{display:"flex",gap:NG,justifyContent:"center"}}>{row.map(n=>{const isSel=sel===n;return(<button key={n} onClick={()=>setSel(sel===n?null:n)} style={{width:NB,height:NB,borderRadius:NB/2,border:isSel?"3px solid var(--bg-secondary)":"2px solid #b0bec5",background:isSel?"var(--bg-secondary)":"var(--bg-surface)",color:isSel?"var(--text-inverse)":"var(--text-primary)",fontSize:NFS,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.1s",boxShadow:isSel?"0 2px 8px rgba(20,54,90,0.3)":"none",padding:0}}>{n}</button>);})}</div>))}
+<button style={{width:"100%",padding:"5px 0",border:"2px solid var(--border-input)",borderRadius:8,background:"#f5f5f5",color:"#666",fontSize:14,fontWeight:800,cursor:"pointer",opacity:canUndo?1:0.2}} onClick={canUndo?()=>dispatch({type:"UNDO"}):undefined}><Undo2 size={14} style={{display:"inline",verticalAlign:"middle",marginRight:3}}/> 戻る</button>
 </div>
-<div style={{width:actW,display:"flex",flexDirection:"column",gap:isNarrow?4:6,flexShrink:0}}>
-<button style={{flex:1,minHeight:isNarrow?NB*1.5:100,border:"none",borderRadius:isNarrow?10:14,background:sel!=null?"var(--bg-secondary)":"#ccc",color:"var(--text-inverse)",fontSize:isNarrow?20:28,fontWeight:900,cursor:"pointer",boxShadow:sel!=null?"0 2px 8px rgba(20,54,90,0.3)":"none",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doScore}>決定</button>
-<button style={{padding:isNarrow?"8px 0":"10px 0",border:"2px solid #f0b0b0",borderRadius:isNarrow?8:10,background:"#fde8e8",color:"var(--text-danger)",fontSize:isNarrow?13:16,fontWeight:800,cursor:"pointer",flexShrink:0}} onClick={doFault}>✕ フォルト</button>
-<button style={{flex:1,minHeight:isNarrow?NB*1.2:80,border:"2px solid #f0d4a0",borderRadius:isNarrow?10:14,background:"#fff3e0",color:"var(--accent-orange)",fontSize:isNarrow?20:26,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doMiss}>〇 ミス</button>
+<div style={{width:ACT_W,display:"flex",flexDirection:"column",gap:isNarrow?4:6,flexShrink:0}}>
+<button style={{flex:1,border:"none",borderRadius:isNarrow?10:14,background:sel!=null?"var(--bg-secondary)":"#ccc",color:"var(--text-inverse)",fontSize:isNarrow?22:28,fontWeight:900,cursor:"pointer",boxShadow:sel!=null?"0 2px 8px rgba(20,54,90,0.3)":"none",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doScore}>決定</button>
+<button style={{padding:isNarrow?"10px 0":"12px 0",border:"2px solid #f0b0b0",borderRadius:isNarrow?8:10,background:"#fde8e8",color:"var(--text-danger)",fontSize:isNarrow?14:16,fontWeight:800,cursor:"pointer",flexShrink:0}} onClick={doFault}>✕ フォルト</button>
+<button style={{flex:1,border:"2px solid #f0d4a0",borderRadius:isNarrow?10:14,background:"#fff3e0",color:"var(--accent-orange)",fontSize:isNarrow?22:26,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doMiss}>〇 ミス</button>
 </div>
 </div>
 </div>);
