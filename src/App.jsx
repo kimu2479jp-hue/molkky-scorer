@@ -1314,10 +1314,15 @@ const[scoreGame,setScoreGame]=useState(null);
 
 const currentNames=(currentGameRecords||[]).map(r=>r.nm);
 const allNames=favs.filter(n=>(stats[n]&&stats[n].length>0)||currentNames.includes(n));
-const names=viewMode==="current"?allNames.filter(n=>currentNames.includes(n)):allNames;
-const[selected,setSelected]=useState(()=>allNames.slice(0,4));
+/* Fix 6: game source shows only participating fav members */
+const gameParticipants=source==="game"?allNames.filter(n=>currentNames.includes(n)):allNames;
+const names=viewMode==="current"?gameParticipants:source==="game"?gameParticipants:allNames;
+const[selected,setSelected]=useState(()=>{
+if(source==="game"){const gp=favs.filter(n=>((stats[n]&&stats[n].length>0)||currentNames.includes(n))&&currentNames.includes(n));return gp.slice(0,6);}
+return allNames.slice(0,4);
+});
 const effectiveSelected=viewMode==="current"?selected.filter(n=>currentNames.includes(n)):selected;
-const toggleSel=n=>{setSelected(p=>p.includes(n)?p.filter(x=>x!==n):[...p,n].slice(0,6));};
+const toggleSel=n=>{setSelected(p=>{if(p.includes(n))return p.filter(x=>x!==n);if(p.length<6)return[...p,n];return[...p.slice(1),n];});};
 
 const allGames=getAvailableGames(stats,names);
 const gameDateSet=getGameDates(stats,names);
@@ -1458,8 +1463,17 @@ return(<button key={k} onClick={applyPreset} style={{padding:"6px 12px",border:"
 {Array.from({length:totalPages},(_,i)=>(<button key={i} onClick={()=>setRecentPage(i)} style={{width:36,height:36,border:recentPage===i?"2px solid var(--accent-blue)":"1px solid var(--border-input)",borderRadius:8,background:recentPage===i?"var(--accent-blue)":"var(--bg-surface)",color:recentPage===i?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{i+1}</button>))}
 </div>)}
 </div>)}
-{/* Player select chips */}
-<div style={{display:"flex",gap:isTab?12:6,marginBottom:10,flexWrap:"wrap",marginTop:6}}>{names.map((nm,i)=>(<button key={nm} onClick={()=>toggleSel(nm)} style={{padding:isTab?"12px 28px":"6px 14px",border:"2px solid "+(effectiveSelected.includes(nm)?PC[effectiveSelected.indexOf(nm)%PC.length]:"var(--border-input)"),borderRadius:isTab?36:20,background:effectiveSelected.includes(nm)?PC[effectiveSelected.indexOf(nm)%PC.length]+"22":"#fff",color:effectiveSelected.includes(nm)?PC[effectiveSelected.indexOf(nm)%PC.length]:"#888",fontSize:isTab?28:14,fontWeight:700,cursor:"pointer"}}>{nm}</button>))}</div>
+{/* Player selection */}
+{source==="setup"?(<div style={{background:"var(--bg-surface)",borderRadius:12,border:"1px solid var(--border-input)",padding:12,marginBottom:10,marginTop:6}}>
+<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+<span style={{fontSize:14,fontWeight:700,color:"var(--text-primary)"}}>{effectiveSelected.length}/6 人選択中</span>
+<button onClick={()=>setSelected([])} style={{padding:"4px 12px",border:"1px solid var(--border-input)",borderRadius:6,background:"var(--bg-surface)",color:"var(--text-secondary)",fontSize:12,fontWeight:700,cursor:"pointer"}}>全解除</button>
+</div>
+<div style={{display:"grid",gridTemplateColumns:isTab?"1fr 1fr 1fr":"1fr 1fr",gap:6}}>{names.map(nm=>{const isSel=effectiveSelected.includes(nm);const ci=isSel?effectiveSelected.indexOf(nm)%PC.length:0;return(<button key={nm} onClick={()=>toggleSel(nm)} style={{display:"flex",alignItems:"center",gap:8,padding:isTab?"10px 14px":"8px 10px",border:"2px solid "+(isSel?PC[ci]:"var(--border-input)"),borderRadius:10,background:isSel?PC[ci]+"15":"var(--bg-surface)",cursor:"pointer",textAlign:"left"}}>
+<div style={{width:20,height:20,borderRadius:4,border:"2px solid "+(isSel?PC[ci]:"#ccc"),background:isSel?PC[ci]:"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{isSel&&<span style={{color:"#fff",fontSize:14,fontWeight:900,lineHeight:1}}>&#10003;</span>}</div>
+<span style={{fontSize:isTab?18:14,fontWeight:700,color:isSel?PC[ci]:"var(--text-secondary)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{nm}</span>
+</button>);})}</div>
+</div>):(<div style={{display:"flex",gap:isTab?12:6,marginBottom:10,flexWrap:"wrap",marginTop:6}}>{names.map(nm=>{const isSel=effectiveSelected.includes(nm);const ci=isSel?effectiveSelected.indexOf(nm)%PC.length:0;return(<button key={nm} onClick={()=>toggleSel(nm)} style={{padding:isTab?"12px 28px":"6px 14px",border:"2px solid "+(isSel?PC[ci]:"var(--border-input)"),borderRadius:isTab?36:20,background:isSel?PC[ci]+"22":"#fff",color:isSel?PC[ci]:"#888",fontSize:isTab?28:14,fontWeight:700,cursor:"pointer"}}>{nm}</button>);})}</div>)}
 {playersData.length>0&&(<>
 {/* Dashboard grid */}
 <div style={{display:"grid",gridTemplateColumns:isTab?"1fr 1fr":"1fr",gap:14,marginBottom:14}}>
