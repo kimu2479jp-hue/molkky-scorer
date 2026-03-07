@@ -659,25 +659,28 @@ function CSSConfetti(){const colors=["#2b7de9","#d93a5e","#22b566","#d9a83a","#9
 function ShuffleAnimation({names,teams,onDone}){
 const nCards=names.length;const nTeams=teams.length;
 const shufDur=nCards<=4?2:nCards<=6?3:nCards<=8?3.5:4;
-const dealDur=nCards*1;
+const perCard=2.1;const dealDur=nCards*perCard;
+const SUITS=["\u2660","\u2665","\u2666","\u2663"];
+const maxPT=Math.max(...teams.map(tm=>tm.players.length));const viewH=typeof window!=="undefined"?window.innerHeight:700;const dealtGap=4;const dealtAreaTop=viewH*0.48;const dealtAreaBot=viewH-30;const availH=dealtAreaBot-dealtAreaTop;const dealtScale=Math.min(0.7,Math.max(0.35,(availH-(maxPT-1)*dealtGap)/(maxPT*126)));const effH=126*dealtScale;const fanSp=effH+dealtGap;
 const T={p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur};
 const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(Date.now());const frameRef=useRef(null);
 const[flash,setFlash]=useState(false);const dealIdxRef=useRef(-1);const revealTeamRef=useRef(-1);
-const[closing,setClosing]=useState(false);const closeTRef=useRef(null);
-const cardW=110,cardH=60;
+const[closing,setClosing]=useState(false);const closeTRef=useRef(null);const[skipConfirm,setSkipConfirm]=useState(false);
+const revealRef=useRef(null);if(!revealRef.current){const a=Array.from({length:nCards},(_,i)=>i);for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));const tmp=a[i];a[i]=a[j];a[j]=tmp;}const p=new Array(nCards);a.forEach(function(ci,di){p[ci]=di;});revealRef.current=p;}const revealPos=revealRef.current;
+const cardW=90,cardH=126;
 const cx=typeof window!=="undefined"?window.innerWidth/2:200;
 const cy=typeof window!=="undefined"?window.innerHeight*0.45:300;
 /* Team slot positions: spread across bottom */
-const teamSlots=teams.map((_,i)=>{const margin=40;const totalW=(typeof window!=="undefined"?window.innerWidth:400)-margin*2;const gap=totalW/(nTeams);return{x:margin+gap*i+gap/2,y:(typeof window!=="undefined"?window.innerHeight*0.82:500)};});
+const teamSlots=teams.map((_,i)=>{const margin=40;const totalW=(typeof window!=="undefined"?window.innerWidth:400)-margin*2;const gap=totalW/(nTeams);return{x:margin+gap*i+gap/2,y:(dealtAreaTop+dealtAreaBot)/2};});
 /* Initial card positions: scattered */
 const initPos=useRef(names.map((_,i)=>({x:cx-cardW/2+((i%3)-1)*130,y:40+Math.floor(i/3)*80}))).current;
 useEffect(()=>{const animate=()=>{const el=(Date.now()-startRef.current)/1000;setT(el);
 if(el<T.p1)setPhase(0);
 else if(el<T.p1e)setPhase(1);
 else if(el<T.p2e){setPhase(2);
-const shufT=el-T.p2;const mid=shufDur/2;if(shufT>0.3&&shufT<shufDur-0.3&&Math.random()<0.08)setFlash(true);
+const shufT=el-T.p2;if(shufT>0.3&&shufT<shufDur-0.3&&Math.random()<0.04)setFlash(true);
 }
-else if(el<T.p3e){setPhase(3);const dT=el-T.p3;const di=Math.floor(dT);if(di!==dealIdxRef.current&&di<nCards){dealIdxRef.current=di;}}
+else if(el<T.p3e){setPhase(3);const dT=el-T.p3;const di=Math.floor(dT/perCard);if(di!==dealIdxRef.current&&di<nCards){dealIdxRef.current=di;}}
 else{setPhase(4);const rT=el-T.p4;const ri=Math.floor(rT/(0.8/nTeams));if(ri!==revealTeamRef.current&&ri<nTeams){revealTeamRef.current=ri;}}
 frameRef.current=requestAnimationFrame(animate);};
 frameRef.current=requestAnimationFrame(animate);
@@ -685,9 +688,11 @@ return()=>{if(frameRef.current)cancelAnimationFrame(frameRef.current);};
 },[]);
 useEffect(()=>{if(flash){const tid=setTimeout(()=>setFlash(false),100);return()=>clearTimeout(tid);}},[flash]);
 useEffect(()=>{if(closing){closeTRef.current=setTimeout(()=>onDone(),400);return()=>clearTimeout(closeTRef.current);}},[closing]);
+/* Card team lookup */
+const getCardTeam=(idx)=>{let count=0;for(let ti=0;ti<nTeams;ti++){for(let pi=0;pi<teams[ti].players.length;pi++){if(count===idx)return{teamIdx:ti,inTeamIdx:pi};count++;}}return{teamIdx:0,inTeamIdx:0};};
 /* Compute card positions based on phase */
 const getCardStyle=(idx)=>{
-const base={position:"fixed",width:cardW,height:cardH,borderRadius:12,background:"#fff",boxShadow:"0 4px 20px rgba(0,0,0,0.3)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:800,color:"var(--text-primary)",zIndex:9001+idx,willChange:"transform",transition:"none",backfaceVisibility:"hidden"};
+const base={position:"fixed",width:cardW,height:cardH,borderRadius:10,background:"#fffef7",boxShadow:"0 2px 12px rgba(0,0,0,0.25)",display:"flex",flexDirection:"column",alignItems:"stretch",justifyContent:"center",fontSize:14,fontWeight:800,color:"#1a1a2e",zIndex:9001+idx,willChange:"transform",transition:"none",backfaceVisibility:"hidden",overflow:"hidden"};
 if(phase===0){/* Entering: slide toward center */
 const prog=Math.min((t-T.p0)/2,1);const ease=1-Math.pow(1-prog,3);
 const ix=initPos[idx].x;const iy=initPos[idx].y;
@@ -700,22 +705,30 @@ return{...base,left:cx-cardW/2+stackOff*(1-ease),top:cy-cardH/2-stackOff*(1-ease
 if(phase===2){/* Shuffling: cards fly left/right */
 const shufT=t-T.p2;const speed=8+idx*1.5;const amp=90+idx*15;const offX=Math.sin(shufT*speed)*amp;const offY=Math.cos(shufT*speed*0.7)*30;const rot=Math.sin(shufT*speed)*45;
 return{...base,left:cx-cardW/2+offX,top:cy-cardH/2+offY,transform:"rotate("+rot+"deg)",opacity:1};}
-if(phase===3){/* Dealing: move to team slot one by one */
-const cardDealTime=T.p3+idx;const dealt=t>=cardDealTime+0.5;const dealing=t>=cardDealTime&&!dealt;
-/* Find which team this card goes to */
-let teamIdx=-1,inTeamIdx=0,count=0;
-for(let ti=0;ti<nTeams;ti++){for(let pi=0;pi<teams[ti].players.length;pi++){if(count===idx){teamIdx=ti;inTeamIdx=pi;break;}count++;}if(teamIdx>=0)break;}
-if(teamIdx<0)teamIdx=0;
-const target=teamSlots[teamIdx];
-if(!dealing&&!dealt){/* Still in stack */
-return{...base,left:cx-cardW/2,top:cy-cardH/2,transform:"scale(1)",opacity:1};}
-if(dealing){const prog=Math.min((t-cardDealTime)/0.5,1);const ease=1-Math.pow(1-prog,3);
-const tx=target.x-cardW/2;const ty=target.y-cardH/2+inTeamIdx*8;
-const bounce=prog>0.8?1+(1-prog)*0.75:1;
-return{...base,left:(cx-cardW/2)+(tx-(cx-cardW/2))*ease,top:(cy-cardH/2)+(ty-(cy-cardH/2))*ease,transform:"scale("+bounce+")",opacity:1,boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+(ease>0.8?", 0 0 20px "+C[teamIdx].ac+"88":"")};}
-/* dealt */
-const tx2=target.x-cardW/2;const ty2=target.y-cardH/2+inTeamIdx*8;
-return{...base,left:tx2,top:ty2,transform:"scale(1)",opacity:1,borderLeft:"4px solid "+C[teamIdx].ac};}
+if(phase===3){/* Dealing: flip -> hold -> travel -> dealt */
+const flipDur=0.5,holdDur=1.0,trvDur=0.4;const cardStart=T.p3+revealPos[idx]*perCard;
+const flipEnd=cardStart+flipDur;const holdEnd=flipEnd+holdDur;const trvEnd=holdEnd+trvDur;
+const{teamIdx,inTeamIdx}=getCardTeam(idx);
+const target=teamSlots[teamIdx];const nPT=teams[teamIdx].players.length;
+const scOff=cardH*(1-dealtScale)/2;const fanH=(nPT-1)*fanSp+effH;const fanY=target.y-fanH/2+inTeamIdx*fanSp-scOff;
+if(t<cardStart){/* Waiting face-down in deck */
+return{...base,left:cx-cardW/2,top:cy-cardH/2,transform:"scale(1)",opacity:1,zIndex:9001+(nCards-revealPos[idx])};}
+if(t<flipEnd){/* Flipping: scaleX flip at deck position */
+const fp=Math.min((t-cardStart)/flipDur,1);const flipX=fp<0.5?1-fp*2:(fp-0.5)*2;
+const sc=1+0.1*Math.sin(fp*Math.PI);const liftY=-10*Math.sin(fp*Math.PI);
+return{...base,left:cx-cardW/2,top:cy-cardH/2+liftY,transform:"scale("+sc+") scaleX("+Math.max(0.02,flipX)+")",opacity:1,zIndex:9100,boxShadow:"0 8px 32px rgba(0,0,0,0.4)"};}
+if(t<holdEnd){/* Hold: premium reveal at deck with glow */
+const hp=Math.min((t-flipEnd)/holdDur,1);const pulse=Math.sin(hp*Math.PI*2)*0.5+0.5;
+const sc=1.08+0.04*Math.sin(hp*Math.PI);const ac=C[teamIdx]?C[teamIdx].ac:"#888";
+return{...base,left:cx-cardW/2,top:cy-cardH/2-10,transform:"scale("+sc+")",opacity:1,zIndex:9100,boxShadow:"0 12px 40px rgba(0,0,0,0.5), 0 0 "+(20+pulse*12)+"px "+ac+"88, 0 0 "+(30+pulse*16)+"px "+ac+"44"};}
+if(t<trvEnd){/* Traveling to team slot */
+const tp=Math.min((t-holdEnd)/trvDur,1);const ease=1-Math.pow(1-tp,3);
+const sc=1.08+(dealtScale-1.08)*ease;
+const tx=target.x-cardW/2;const ty=fanY;
+return{...base,left:(cx-cardW/2)+(tx-(cx-cardW/2))*ease,top:(cy-cardH/2-10)+(ty-(cy-cardH/2-10))*ease,transform:"scale("+sc+")",opacity:1,zIndex:9100,boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+(ease>0.8?", 0 0 20px "+C[teamIdx].ac+"88":"")};}
+/* Dealt */
+const tx2=target.x-cardW/2;const ty2=fanY;
+return{...base,left:tx2,top:ty2,transform:"scale("+dealtScale+")",opacity:1,border:"1.5px solid "+(C[teamIdx]?C[teamIdx].ac:"#888")+"99"};}
 if(phase===4){/* Reveal: hide individual cards, show team panel instead */
 return{...base,left:cx-cardW/2,top:cy-cardH/2,opacity:0};}
 return{...base,left:cx-cardW/2,top:cy-cardH/2,opacity:0};
@@ -725,22 +738,77 @@ const dealerScale=phase===0?1+Math.min(t/2,1)*0.8:1.8;
 const dealerOp=phase>=4?(1-Math.min((t-T.p4)/0.5,1)):Math.min(t*2,1);
 const overlayOp=closing?0:1;
 return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*overlayOp)+")",zIndex:9000,pointerEvents:"auto",transition:closing?"opacity 0.4s ease":"none",opacity:closing?0:1}}>
-{/* Dealer CSS figure */}
-<div style={{position:"fixed",left:cx-40,top:cy-140,opacity:dealerOp*0.7,transform:"scale("+dealerScale+")",transformOrigin:"50% 80%",transition:"none",willChange:"transform",zIndex:9000}}>
-<div style={{width:50,height:50,borderRadius:25,background:"#555",margin:"0 auto"}}/>
-<div style={{width:60,height:70,borderRadius:"8px 8px 0 0",background:"#333",margin:"-5px auto 0",display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:8}}>
-<div style={{width:20,height:14,borderRadius:3,background:"#e74c3c",border:"2px solid #fff",transform:"rotate(-10deg)"}}/>
-<div style={{width:20,height:14,borderRadius:3,background:"#2b7de9",border:"2px solid #fff",marginLeft:-6,transform:"rotate(10deg)"}}/>
-</div>
+{/* Dealer inline SVG character */}
+<div style={{position:"fixed",left:cx-60,top:cy-180,opacity:dealerOp*0.85,transform:"scale("+dealerScale+")",transformOrigin:"50% 85%",transition:"none",willChange:"transform",zIndex:9000,pointerEvents:"none"}}>
+<svg width="120" height="180" viewBox="0 0 120 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+{/* Hat brim */}
+<ellipse cx="60" cy="28" rx="32" ry="6" fill="#2d2d44"/>
+<rect x="36" y="22" width="48" height="8" rx="2" fill="#2d2d44"/>
+{/* Hat band */}
+<rect x="38" y="10" width="44" height="16" rx="4" fill="#1a1a2e"/>
+<rect x="38" y="24" width="44" height="3" fill="#4a4a6a" opacity="0.5"/>
+{/* Head */}
+<ellipse cx="60" cy="46" rx="22" ry="24" fill="#d4a574"/>
+{/* Eyes */}
+<ellipse cx="52" cy="44" rx="2.5" ry="2" fill="#1a1a2e"/>
+<ellipse cx="68" cy="44" rx="2.5" ry="2" fill="#1a1a2e"/>
+{/* Smile */}
+<path d="M53 52 Q60 57 67 52" stroke="#1a1a2e" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+{/* Neck */}
+<rect x="54" y="68" width="12" height="8" fill="#d4a574"/>
+{/* Shirt collar */}
+<path d="M44 76 L60 86 L76 76" fill="#f0ede8" stroke="#e0ddd6" strokeWidth="0.5"/>
+{/* Vest body */}
+<path d="M36 78 Q36 76 40 76 L80 76 Q84 76 84 78 L84 140 Q84 144 80 144 L40 144 Q36 144 36 140 Z" fill="#1a1a2e"/>
+{/* Shirt visible under vest */}
+<path d="M48 76 L60 88 L72 76" fill="#f0ede8"/>
+{/* Vest lapel lines */}
+<line x1="48" y1="78" x2="56" y2="92" stroke="#3a3a54" strokeWidth="1" opacity="0.5"/>
+<line x1="72" y1="78" x2="64" y2="92" stroke="#3a3a54" strokeWidth="1" opacity="0.5"/>
+{/* Bow tie */}
+<path d="M54 78 L60 82 L66 78 L60 80 Z" fill="#8b1a1a"/>
+<path d="M54 82 L60 78 L66 82 L60 80 Z" fill="#a02020"/>
+<circle cx="60" cy="80" r="1.5" fill="#c03030"/>
+{/* Left arm */}
+<path d={"M36 84 Q20 100 "+(phase===2?"14":"18")+" 130 Q"+(phase===2?"12":"16")+" 134 "+(phase===2?"18":"22")+" 136"} stroke="#f0ede8" strokeWidth="10" fill="none" strokeLinecap="round"/>
+{/* Left hand */}
+<ellipse cx={phase===2?16:20} cy="134" rx="8" ry="6" fill="#d4a574"/>
+{/* Right arm */}
+<path d={"M84 84 Q100 100 "+(phase===2?"106":"102")+" 130 Q"+(phase===2?"108":"104")+" 134 "+(phase===2?"102":"98")+" 136"} stroke="#f0ede8" strokeWidth="10" fill="none" strokeLinecap="round"/>
+{/* Right hand */}
+<ellipse cx={phase===2?104:100} cy="134" rx="8" ry="6" fill="#d4a574"/>
+</svg>
 </div>
 {/* Flash effect */}
-{flash&&<div style={{position:"fixed",inset:0,background:"rgba(255,255,255,0.4)",zIndex:9050,pointerEvents:"none"}}/>}
+{flash&&<div style={{position:"fixed",inset:0,background:"rgba(255,255,255,0.2)",zIndex:9050,pointerEvents:"none"}}/>}
 {/* Team labels at bottom (phases 3) */}
-{phase===3&&teamSlots.map((sl,ti)=>(<div key={ti} style={{position:"fixed",left:sl.x-55,top:sl.y-35,width:110,textAlign:"center",zIndex:9001,opacity:0.8,pointerEvents:"none"}}>
+{phase===3&&teamSlots.map((sl,ti)=>{const nPT=teams[ti].players.length;const fH=(nPT-1)*fanSp+effH;const labelY=sl.y-fH/2-22;return(<div key={ti} style={{position:"fixed",left:sl.x-55,top:labelY,width:110,textAlign:"center",zIndex:9001,opacity:0.8,pointerEvents:"none"}}>
 <div style={{fontSize:14,fontWeight:900,color:C[ti].ac,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{teams[ti].name}</div>
-</div>))}
+</div>);})}
 {/* Cards (phases 0-3) */}
-{phase<4&&names.map((name,idx)=>(<div key={idx} style={getCardStyle(idx)}>{name}</div>))}
+{phase<4&&names.map((name,idx)=>{const ct=getCardTeam(idx);const ac=C[ct.teamIdx]?C[ct.teamIdx].ac:"#888";const suit=SUITS[ct.teamIdx]||SUITS[0];const orderNum=ct.inTeamIdx+1;const cardStart=T.p3+revealPos[idx]*perCard;const flipEnd=cardStart+0.5;const holdEnd=flipEnd+1.0;const isFlipping=phase===3&&t>=cardStart&&t<flipEnd;const flipProg=isFlipping?(t-cardStart)/0.5:0;const isHolding=phase===3&&t>=flipEnd&&t<holdEnd;const holdProg=isHolding?(t-flipEnd)/1.0:0;const showBack=phase<=2||(phase===3&&(t<cardStart||(isFlipping&&flipProg<0.5)));const vName=name.length>7?name.slice(0,7):name;const vFs=name.length<=2?22:name.length<=4?18:name.length<=7?15:13;
+return(<div key={idx} style={getCardStyle(idx)}>{showBack?(<>
+<div style={{position:"absolute",inset:0,borderRadius:10,background:"linear-gradient(135deg,#1a1a2e 0%,#2d2d44 100%)"}}/>
+<div style={{position:"absolute",inset:6,borderRadius:6,border:"1px solid rgba(255,255,255,0.15)",background:"repeating-linear-gradient(45deg,transparent,transparent 4px,rgba(255,255,255,0.04) 4px,rgba(255,255,255,0.04) 8px)"}}/>
+<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:20,height:28,borderRadius:3,border:"1.5px solid rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+<div style={{width:6,height:12,borderRadius:"3px 3px 1px 1px",background:"rgba(255,255,255,0.25)"}}/>
+</div>
+</>):(<>
+<div style={{position:"absolute",top:0,left:0,right:0,height:3,borderRadius:"10px 10px 0 0",background:ac}}/>
+<div style={{position:"absolute",inset:"6px 6px 6px 6px",border:"1px solid "+ac+"4d",borderRadius:6}}/>
+<div style={{position:"absolute",top:4,left:5,textAlign:"center",lineHeight:1}}>
+<div style={{fontSize:20,fontWeight:900,color:ac}}>{orderNum}</div>
+<div style={{fontSize:18,color:ac,marginTop:-2}}>{suit}</div>
+</div>
+<div style={{position:"absolute",bottom:4,right:5,textAlign:"center",lineHeight:1,transform:"rotate(180deg)"}}>
+<div style={{fontSize:20,fontWeight:900,color:ac}}>{orderNum}</div>
+<div style={{fontSize:18,color:ac,marginTop:-2}}>{suit}</div>
+</div>
+<div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",display:"flex",alignItems:"center",justifyContent:"center",height:"calc(100% - 52px)"}}>
+<div style={{writingMode:"vertical-rl",WebkitWritingMode:"vertical-rl",textOrientation:"upright",WebkitTextOrientation:"upright",fontSize:vFs,fontWeight:800,color:"#1a1a2e",letterSpacing:name.length<=2?"4px":name.length<=4?"2px":"0px",lineHeight:1,whiteSpace:"nowrap"}}>{vName}</div>
+</div>
+{isHolding&&<div style={{position:"absolute",top:0,bottom:0,width:40,background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent)",borderRadius:10,left:-40+(holdProg*(cardW+80)),pointerEvents:"none"}}/>}
+</>)}</div>);})}
 {/* Team reveal panel (phase 4) */}
 {phase===4&&(<div style={{position:"fixed",inset:0,zIndex:9050,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16,opacity:Math.min(1,(t-T.p4)/0.3)}}>
 <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",maxWidth:"100%"}}>
@@ -753,6 +821,18 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*over
 </div>
 <button onClick={()=>setClosing(true)} style={{marginTop:20,padding:"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:12,background:"transparent",color:"#fff",fontSize:18,fontWeight:800,cursor:"pointer",opacity:Math.min(1,Math.max(0,(t-T.p4-0.5)/0.3)),transition:"opacity 0.2s"}}>閉じる</button>
 </div>)}
+{/* Skip button during animation */}
+{phase<4&&!closing&&!skipConfirm&&<button onClick={()=>setSkipConfirm(true)} style={{position:"fixed",bottom:"calc(24px + env(safe-area-inset-bottom, 0px))",right:20,padding:"8px 16px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:20,background:"rgba(0,0,0,0.4)",color:"rgba(255,255,255,0.7)",fontSize:13,fontWeight:600,cursor:"pointer",zIndex:9200,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>スキップ ⏭</button>}
+{/* Skip confirm dialog */}
+{skipConfirm&&<div style={{position:"fixed",inset:0,zIndex:9300,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>
+<div style={{background:"#1a1a2e",border:"1px solid rgba(255,255,255,0.2)",borderRadius:16,padding:"24px 28px",textAlign:"center",maxWidth:280}}>
+<div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>スキップしますか？</div>
+<div style={{display:"flex",gap:10,justifyContent:"center"}}>
+<button onClick={()=>{setSkipConfirm(false);onDone();}} style={{flex:1,padding:"10px 0",border:"none",borderRadius:10,background:"var(--accent-blue,#2b7de9)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>はい</button>
+<button onClick={()=>setSkipConfirm(false)} style={{flex:1,padding:"10px 0",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>いいえ</button>
+</div>
+</div>
+</div>}
 </div>);
 }
 
@@ -1024,7 +1104,7 @@ return(
 <button style={{width:"100%",padding:16,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"var(--text-inverse)",fontSize:20,fontWeight:800,cursor:"pointer",opacity:okS?1:0.3}} onClick={okS?doShuf:undefined}>🎲 シャッフル</button>
 {sp&&(<div style={{marginTop:8}}>{sp.map((t,ti)=>(<div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac,padding:"10px 16px",marginBottom:6}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:26,height:26,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-inverse)",fontWeight:900,fontSize:14,background:C[ti].ac}}>{ti+1}</div><input value={t.name} onChange={e=>setSp(p=>p.map((x,i)=>i===ti?{...x,name:e.target.value}:x))} style={{...TIN,fontSize:18}}/></div><div style={{paddingLeft:34,fontSize:16,color:"#555"}}>{t.players.join("、")}</div></div>))}
 <button style={{width:"100%",padding:20,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"var(--text-inverse)",fontSize:32,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:4}} onClick={go}><Target size={28} style={{display:"inline",verticalAlign:"middle",marginRight:6}}/> 開始</button>
-<button style={{width:"100%",padding:14,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"var(--text-inverse)",fontSize:18,fontWeight:800,cursor:"pointer",marginTop:6}} onClick={doShuf}><RefreshCw size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 再シャッフル</button></div>)}
+<button style={{width:"100%",padding:14,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"var(--text-inverse)",fontSize:18,fontWeight:800,cursor:"pointer",marginTop:6}} onClick={()=>{if(window.confirm("\u30b7\u30e3\u30c3\u30d5\u30eb\u3057\u76f4\u3057\u307e\u3059\u304b\uff1f"))doShuf();}}><RefreshCw size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 再シャッフル</button></div>)}
 </>)}
 </div>
 {showSetupStats&&<StatsModal onClose={()=>setShowSetupStats(false)} source="setup" isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
@@ -1142,7 +1222,7 @@ else onChangeOrd("manual",man,null);};
 const dispTeams=value==="random"&&randTeams?randTeams:teams;
 const disp=value==="reverse"?rev:value==="manual"?man:value==="same"?[...teamOrder]:value==="random"?(randOrd||[...teamOrder]):null;
 return(<><div style={{display:"flex",gap:6,marginBottom:6}}>{[["same","🔁同順"],["reverse","🔄裏"],["random","🎲ランダム"],["manual","✏️手動"]].map(([k,l])=>(<button key={k} onClick={()=>pick(k)} style={{flex:1,padding:"8px 0",border:"1px solid var(--border-input)",borderRadius:8,background:value===k?"var(--bg-secondary)":"var(--bg-surface)",color:value===k?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}}>{l}</button>))}</div>
-{value==="random"&&<button onClick={doRand} style={{width:"100%",marginBottom:6,padding:"10px 0",border:"2px dashed var(--accent-blue)",borderRadius:8,background:"transparent",color:"var(--accent-blue)",fontSize:15,fontWeight:700,cursor:"pointer"}}><RefreshCw size={14} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> {hasShuffled?"再シャッフル":"シャッフル"}</button>}
+{value==="random"&&<button onClick={()=>{if(!hasShuffled||window.confirm("\u30b7\u30e3\u30c3\u30d5\u30eb\u3057\u76f4\u3057\u307e\u3059\u304b\uff1f"))doRand();}} style={{width:"100%",marginBottom:6,padding:"10px 0",border:"2px dashed var(--accent-blue)",borderRadius:8,background:"transparent",color:"var(--accent-blue)",fontSize:15,fontWeight:700,cursor:"pointer"}}><RefreshCw size={14} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> {hasShuffled?"再シャッフル":"シャッフル"}</button>}
 {disp&&(<div style={{background:"var(--bg-surface-dim)",borderRadius:8,padding:8,marginBottom:6}}>{disp.map((ti,i)=>{const t=dispTeams[ti];const ap=t?.players?t.players.filter(p=>typeof p==="object"?p.active:true):[];return(<div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:i<disp.length-1?"1px solid var(--border-lighter)":"none"}}><span style={{fontSize:16,fontWeight:800,color:C[ti]?.ac||"#aaa",width:24,textAlign:"center"}}>{i+1}</span><span style={{fontSize:17,fontWeight:700,color:C[ti]?.tx||"#333"}}>{t?.name||""}</span><span style={{fontSize:13,color:"var(--text-secondary)",marginLeft:2}}>{ap.map(p=>typeof p==="object"?p.name:p).join("・")}</span>{value==="manual"&&i>0&&<button onClick={()=>mvUp(i)} style={{marginLeft:"auto",padding:"4px 10px",border:"1px solid var(--border-input)",borderRadius:5,background:"var(--bg-surface)",fontSize:12,cursor:"pointer"}}>▲</button>}</div>);})}
 </div>)}
 {shufAnimData&&<ShuffleAnimation names={shufAnimData.names} teams={shufAnimData.teams} onDone={()=>{onChangeOrd("random",shufAnimData.order,shufAnimData.newTeams);setShufAnimData(null);}}/>}
