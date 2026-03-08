@@ -664,7 +664,7 @@ const maxPT=Math.max(...teams.map(tm=>tm.players.length));const viewH=typeof win
 const T={p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur};
 const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(Date.now());const frameRef=useRef(null);
 const[flash,setFlash]=useState(false);const dealIdxRef=useRef(-1);const revealTeamRef=useRef(-1);
-const[closing,setClosing]=useState(false);const closeTRef=useRef(null);
+const[closing,setClosing]=useState(false);const closeTRef=useRef(null);const[skipConfirm,setSkipConfirm]=useState(false);
 const revealPos=useRef(names.map((_,i)=>i)).current;
 const lastPhaseRef=useRef({p:0,t:Date.now()});
 const vwSA=typeof window!=="undefined"?window.innerWidth:375;const isTabletSA=vwSA>=768;
@@ -819,13 +819,13 @@ return(<table style={{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"
 <colgroup><col style={{width:rw}}/>{ordered.map(o=><React.Fragment key={o.idx}>{o.ap.map((_,pi)=><col key={pi}/>)}<col style={{minWidth:28}}/></React.Fragment>)}</colgroup>
 <thead><tr style={{height:H1}}>
 <th style={{background:"var(--bg-secondary)",color:"var(--text-inverse)",fontWeight:700,fontSize:fs*0.8,textAlign:"center",position:forCapture?"static":"sticky",top:0,zIndex:7,padding:0,lineHeight:H1+"px",borderBottom:"none"}}>R</th>
-{ordered.map(o=>(<th key={o.idx} colSpan={o.ap.length+1} style={{background:C[o.idx].bg,color:"var(--text-inverse)",fontWeight:700,fontSize:fs*0.75,textAlign:"center",borderLeft:bl+C[o.idx].ac,position:forCapture?"static":"sticky",top:0,zIndex:7,padding:0,lineHeight:H1+"px",borderBottom:"none",whiteSpace:"nowrap",overflow:"hidden"}}>{o.team.name}</th>))}
+{ordered.map(o=>{const isAcTeam=activeCell&&activeCell.teamIndex===o.idx;return(<th key={o.idx} colSpan={o.ap.length+1} style={{background:isAcTeam?"#14365a":"#3d5a80",color:"#fff",fontWeight:700,fontSize:fs*0.75,textAlign:"center",borderLeft:bl+(isAcTeam?"#ffc107":"#4b5563"),position:forCapture?"static":"sticky",top:0,zIndex:7,padding:0,lineHeight:H1+"px",borderBottom:"none",whiteSpace:"nowrap",overflow:"hidden"}}>{o.team.name}</th>);})}
 </tr><tr>
 <th style={{background:"#1e4a72",position:forCapture?"static":"sticky",top:H1,zIndex:7,padding:0,borderTop:"none",borderBottom:"2px solid #0d2a48"}}/>
-{ordered.map(o=><React.Fragment key={o.idx}>
-{o.ap.map((p,pi)=>(<th key={pi} style={{background:"linear-gradient(180deg,"+C[o.idx].bg+",#1e4a72)",color:"#fff",fontWeight:800,fontSize:fs*0.78,textAlign:"center",verticalAlign:"top",borderLeft:pi===0?bl+C[o.idx].ac:"1px solid rgba(255,255,255,0.15)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,letterSpacing:fs<=11?0:1,textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>{p.name.slice(0,MAX_NAME)}</span></th>))}
+{ordered.map(o=>{const isAcTeam=activeCell&&activeCell.teamIndex===o.idx;return(<React.Fragment key={o.idx}>
+{o.ap.map((p,pi)=>(<th key={pi} style={{background:isAcTeam?"#14365a":"#3d5a80",color:"#fff",fontWeight:800,fontSize:fs*0.78,textAlign:"center",verticalAlign:"top",borderLeft:pi===0?bl+(isAcTeam?"#ffc107":"#4b5563"):"1px solid rgba(255,255,255,0.15)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,letterSpacing:fs<=11?0:1,textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>{p.name.slice(0,MAX_NAME)}</span></th>))}
 <th style={{background:"#0d2a48",color:"#ffd700",fontWeight:900,textAlign:"center",verticalAlign:"top",borderLeft:"1px solid rgba(255,255,255,0.2)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>計</span></th>
-</React.Fragment>)}
+</React.Fragment>);})}
 </tr></thead>
 <tbody>{showRows===0?(<tr><td colSpan={totalCols} style={{color:"#bbb",padding:24,fontSize:fs*0.8,textAlign:"center",borderBottom:"1px solid var(--border-lighter)"}}>スコアを入力してください</td></tr>):(
 Array.from({length:showRows},(_,i)=>i+1).map(turn=>{
@@ -1038,7 +1038,7 @@ const doShuf=()=>{const result=doShufCore();if(!result)return;
 if(shufAnim){const allNames=result.flatMap(t=>t.players);setShufAnimData({names:allNames,teams:result});}
 else{setSp(result);}};
 const okM=teams.slice(0,tc).every(t=>t.name.trim()&&t.players.some(p=>p.trim()));const okS=mems.filter(m=>m.trim()).length>=tc;
-const go=()=>{let ft;if(mode==="manual")ft=teams.slice(0,tc).map(t=>({...t,players:t.players.filter(p=>p.trim())}));else{if(!sp)return;ft=sp;}let ord=Array.from({length:ft.length},(_,i)=>i);if(om==="random")ord=shuf(ord);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats);};
+const go=()=>{let ft;if(mode==="manual")ft=teams.slice(0,tc).map(t=>({...t,players:t.players.filter(p=>p.trim())}));else{if(!sp)return;ft=sp;}let ord=Array.from({length:ft.length},(_,i)=>i);if(om==="random")ord=shuf(ord);if(om==="random"&&shufAnim){const allNames=[];ord.forEach(ti=>{ft[ti].players.forEach(p=>{const n=typeof p==="object"?p.name||p:typeof p==="string"?p:String(p);allNames.push(n);});});const animTeams=ord.map(ti=>({name:ft[ti].name,players:ft[ti].players.map(p=>typeof p==="object"?p.name||p:typeof p==="string"?p:String(p))}));setShufAnimData({names:allNames,teams:animTeams,goData:{ft,ord}});}else{onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats);}};
 const usedManual=teams.slice(0,tc).flatMap(t=>t.players).filter(p=>p.trim()).map(p=>p.trim());
 const usedShuffle=mems.filter(m=>m.trim()).map(m=>m.trim());const used=mode==="manual"?usedManual:usedShuffle;
 const SL={display:"block",fontSize:14,fontWeight:700,color:"rgba(255,255,255,0.5)",letterSpacing:3,marginBottom:8};
@@ -1098,7 +1098,7 @@ return(
 </div>
 {showSetupStats&&<StatsModal onClose={()=>setShowSetupStats(false)} source="setup" isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
 {showSettings&&<SettingsPage onClose={()=>setShowSettings(false)} isAdmin={isAdmin} onAdminToggle={onAdminToggle} aiEnabled={aiEnabled} onAIToggle={onAIToggle} shufAnim={shufAnim} onShufAnimToggle={onShufAnimToggle}/>}
-{shufAnimData&&<ShuffleAnimation names={shufAnimData.names} teams={shufAnimData.teams} onDone={()=>{setSp(shufAnimData.teams);setShufAnimData(null);}}/>}
+{shufAnimData&&<ShuffleAnimation names={shufAnimData.names} teams={shufAnimData.teams} onDone={()=>{if(shufAnimData.goData){const{ft,ord}=shufAnimData.goData;setShufAnimData(null);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats);}else{setSp(shufAnimData.teams);setShufAnimData(null);}}}/>}
 </div>);
 }
 
@@ -1115,8 +1115,8 @@ const gridW=vw-PAD*2-ACT_W-GAP;const NB=isTabletSI?Math.min(Math.floor((gridW-NG
 /* Info font size: scale player name to fit without ellipsis */
 const pnLen=(playerName||"").length;const pnFS=isTabletSI?(pnLen<=4?52:pnLen<=7?46:38):(isNarrow?(pnLen<=4?16:pnLen<=7?14:12):(pnLen<=4?18:pnLen<=7?16:14));
 const scFS=isTabletSI?64:(isNarrow?20:24);
-if(minimized){return(<div onClick={onToggleMin} style={{background:"var(--bg-secondary)",padding:"8px 16px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-<span style={{fontSize:18,color:"var(--text-inverse)",fontWeight:800}}>▲ 入力</span></div>);}
+if(minimized){return(<div onClick={onToggleMin} style={{background:"var(--bg-secondary)",padding:isTabletSI?"12px 20px":"8px 16px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+<span style={{fontSize:isTabletSI?24:18,color:"var(--text-inverse)",fontWeight:800}}>▲ 入力</span></div>);}
 return(
 <div style={{background:"var(--bg-surface)",borderTop:"2px solid #dde1e6",padding:(isTabletSI?"10px ":"6px ")+PAD+"px",paddingBottom:"calc("+(isTabletSI?"12":"8")+"px + env(safe-area-inset-bottom, 0px))",flexShrink:0}}>
 {/* Top info: player name + score left, minimize button right */}
@@ -1128,13 +1128,13 @@ return(
 </div>
 <div style={{display:"flex",gap:isTabletSI?6:3,alignItems:"center",marginTop:isTabletSI?6:2}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:isTabletSI?30:(isNarrow?10:13),height:isTabletSI?30:(isNarrow?10:13),borderRadius:"50%",display:"inline-block",background:j<fails?"#e74c3c":"#ddd"}}/>))}</div>
 </div>
-<button onClick={onToggleMin} style={{padding:isTabletSI?"6px 12px":"4px 8px",border:"1px solid var(--border-input)",borderRadius:8,background:"transparent",color:"var(--text-muted)",fontSize:isTabletSI?18:14,fontWeight:800,cursor:"pointer",flexShrink:0}}>▼</button>
+<button onClick={onToggleMin} style={{padding:isTabletSI?"10px 18px":"4px 8px",border:"1px solid var(--border-input)",borderRadius:isTabletSI?10:8,background:"transparent",color:"var(--text-muted)",fontSize:isTabletSI?22:14,fontWeight:800,cursor:"pointer",flexShrink:0}}>▼</button>
 </div>
 {teamScore>=PEN&&<div style={{fontSize:isTabletSI?18:13,fontWeight:700,color:"var(--text-warning)",marginBottom:isTabletSI?4:2,display:"flex",alignItems:"center",gap:3}}><AlertTriangle size={isTabletSI?18:14}/> フォルト=25点</div>}
-<div style={{padding:isTabletSI?"0 40px":undefined}}>
+<div style={{display:"flex",justifyContent:"center"}}>
 <div style={{display:"flex",gap:GAP,alignItems:"stretch"}}>
 {/* Pin layout buttons + undo */}
-<div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:NG}}>
+<div style={{display:"flex",flexDirection:"column",gap:NG}}>
 {[[7,9,8],[5,11,12,6],[3,10,4],[1,2]].map((row,ri)=>(<div key={ri} style={{display:"flex",gap:NG,justifyContent:"center"}}>{row.map(n=>{const isSel=sel===n;return(<button key={n} onClick={()=>setSel(sel===n?null:n)} style={{width:NB,height:NB,borderRadius:NB/2,border:isSel?"3px solid var(--bg-secondary)":"2px solid #8899aa",background:isSel?"var(--bg-secondary)":"var(--bg-surface)",color:isSel?"var(--text-inverse)":"var(--text-primary)",fontSize:NFS,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.1s",boxShadow:isSel?"0 2px 8px rgba(20,54,90,0.3)":"none",padding:0}}>{n}</button>);})}</div>))}
 {/* Undo button: same width as pin buttons area, under 1,2 */}
 <div style={{display:"flex",justifyContent:"center"}}>
@@ -1919,12 +1919,12 @@ const ActiveCard=()=>{const t=teams[ti];const sc=scoreOf(history,ti);const f=fai
 const isBounce=animState.bounce===ti;const isWarn=animState.warn===ti;const isFlash=animState.flash===ti;const isReset=animState.reset===ti;const isShake=animState.shake===ti;
 const anim=isShake&&isFlash?"mk-shake 0.5s ease,mk-danger-flash 0.6s ease":isShake?"mk-shake 0.5s ease":isWarn?"mk-warn-pulse 0.5s ease 2":isFlash?"mk-danger-flash 0.6s ease":"none";
 const scAnim=isBounce?"mk-scale-bounce 0.4s ease":isReset?"mk-reset-blink 0.8s ease":"none";
-const bgAlpha=C[ti].bg+"77";const acFS=isTablet?32:17;
-return(<div style={{flexShrink:0,background:bgAlpha,borderBottom:"1px solid rgba(0,0,0,0.08)",animation:anim,display:"flex",alignItems:"center",gap:0}}>
-<div style={{width:isTablet?6:5,alignSelf:"stretch",background:C[ti].ac,flexShrink:0}}/>
+const acFS=isTablet?32:17;
+return(<div style={{flexShrink:0,background:"#14365a",borderBottom:"1px solid rgba(0,0,0,0.15)",animation:anim,display:"flex",alignItems:"center",gap:0}}>
+<div style={{width:isTablet?6:5,alignSelf:"stretch",background:"#ffc107",flexShrink:0}}/>
 <div style={{flex:1,padding:isTablet?"14px 18px":"7px 10px",display:"flex",alignItems:"center",gap:isTablet?16:8,flexWrap:"nowrap",minWidth:0}}>
 <span style={{fontSize:acFS,fontWeight:900,color:"#fff",whiteSpace:"nowrap",flexShrink:0,textDecoration:el?"line-through":"none"}}>{t.name}{el?" DQ":""}{(bestOf>0||numGames>1)?" "+gW[ti]+"勝":""}</span>
-{cp&&<span style={{fontSize:acFS,fontWeight:700,color:"#fff",whiteSpace:"nowrap",flexShrink:1,minWidth:0}}>{cp.name}</span>}
+{cp&&<span style={{fontSize:acFS,fontWeight:700,color:"#ffc107",whiteSpace:"nowrap",flexShrink:1,minWidth:0}}>{cp.name}</span>}
 <span style={{fontSize:isTablet?38:20,fontWeight:900,color:isReset?"#e74c3c":"#fff",fontVariantNumeric:"tabular-nums",lineHeight:1,flexShrink:0,animation:scAnim}}>{sc}<span style={{fontSize:isTablet?20:11,fontWeight:700}}>点</span></span>
 <MissDots f={f} size={isTablet?20:9}/>
 </div>
@@ -1932,18 +1932,18 @@ return(<div style={{flexShrink:0,background:bgAlpha,borderBottom:"1px solid rgba
 /* Inactive teams row */
 const InactiveRow=()=>{const others=teamOrder.filter(idx=>idx!==ti);if(others.length===0)return null;
 const oFS=isTablet?20:11;
-return(<div style={{flexShrink:0,display:"flex",gap:0,background:"rgba(0,0,0,0.5)",borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+return(<div style={{flexShrink:0,display:"flex",gap:0,background:"#1a2a3e",borderBottom:"1px solid rgba(255,255,255,0.1)"}}>
 {others.map((oIdx,oi)=>{const t=teams[oIdx];const sc=scoreOf(history,oIdx);const f=failsOf(history,oIdx);const el=eliminated[oIdx];
 const{ap:oAp,pi:oPi}=getPI(teams,history,oIdx,plOffsets);const ocp=oAp.length>0?oAp[oPi]:null;
 const oiOrder=teamOrder.indexOf(oIdx)+1;
 const isBounce2=animState.bounce===oIdx;const isReset2=animState.reset===oIdx;
 const scAnim2=isBounce2?"mk-scale-bounce 0.4s ease":isReset2?"mk-reset-blink 0.8s ease":"none";
-return(<React.Fragment key={oIdx}>{oi>0&&<div style={{width:1,alignSelf:"stretch",background:"rgba(255,255,255,0.1)"}}/>}
+return(<React.Fragment key={oIdx}>{oi>0&&<div style={{width:1,alignSelf:"stretch",background:"rgba(255,255,255,0.15)"}}/>}
 <div style={{flex:1,minWidth:0,padding:isTablet?"8px 12px":"3px 6px",opacity:el?0.35:1,display:"flex",alignItems:"center",gap:isTablet?8:4,flexWrap:"nowrap"}}>
-<span style={{fontSize:oFS,fontWeight:800,color:C[oIdx].nm,flexShrink:0}}>{oiOrder}</span>
-<span style={{fontSize:oFS,fontWeight:700,color:C[oIdx].nm,whiteSpace:"nowrap",flexShrink:0,textDecoration:el?"line-through":"none"}}>{t.name}</span>
-<span style={{fontSize:isTablet?24:13,fontWeight:900,color:isReset2?"#e74c3c":"rgba(255,255,255,0.95)",fontVariantNumeric:"tabular-nums",flexShrink:0,animation:scAnim2}}>{sc}</span>
-{ocp&&<span style={{fontSize:oFS,fontWeight:600,color:"rgba(255,255,255,0.95)",whiteSpace:"nowrap",flexShrink:1,minWidth:0}}>{ocp.name}</span>}
+<span style={{fontSize:oFS,fontWeight:800,color:"#fff",flexShrink:0}}>{oiOrder}</span>
+<span style={{fontSize:oFS,fontWeight:700,color:"#fff",whiteSpace:"nowrap",flexShrink:0,textDecoration:el?"line-through":"none"}}>{t.name}</span>
+<span style={{fontSize:isTablet?24:13,fontWeight:900,color:isReset2?"#e74c3c":"#fff",fontVariantNumeric:"tabular-nums",flexShrink:0,animation:scAnim2}}>{sc}</span>
+{ocp&&<span style={{fontSize:oFS,fontWeight:600,color:"rgba(255,255,255,0.7)",whiteSpace:"nowrap",flexShrink:1,minWidth:0}}>{ocp.name}</span>}
 <MissDots f={f} size={isTablet?12:6}/>
 </div></React.Fragment>);})}
 </div>);};
@@ -1955,7 +1955,7 @@ return(
 <button style={{...SS.tBtn,padding:isTablet?"7px 10px":"5px 8px"}} onClick={handleBack}><ChevronLeft size={isTablet?18:14}/></button>
 <button style={{...SS.tBtn,padding:isTablet?"7px 10px":undefined}} onClick={()=>setShowPl(true)}><Users size={isTablet?18:14}/></button>
 </div>
-<span style={{fontSize:isTablet?28:16,fontWeight:isTablet?900:700,color:"rgba(255,255,255,0.7)",textAlign:"center",flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{gameNumber}試合目 {currentTurn}ターン目{bestOf>0?" "+bestOf+"先取":""}</span>
+<span style={{fontSize:isTablet?28:16,fontWeight:isTablet?900:700,color:"#fff",textAlign:"center",flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{gameNumber}試合目 {currentTurn}ターン目{bestOf>0?" "+bestOf+"先取":""}</span>
 <div style={{display:"flex",gap:2,flexShrink:0}}>
 <div style={{display:"flex",background:"rgba(255,255,255,0.12)",borderRadius:7,padding:2,gap:2}}>{[["both","両方"],["sheet","表"],["input","入力"]].map(([k,l])=>(<button key={k} onClick={()=>setView(k)} style={{padding:isTablet?"6px 12px":"4px 9px",border:"none",borderRadius:5,background:view===k?"rgba(255,255,255,0.2)":"transparent",color:view===k?"#fff":"rgba(255,255,255,0.4)",fontSize:isTablet?16:12,fontWeight:600,cursor:"pointer"}}>{l}</button>))}</div>
 </div>
@@ -1965,7 +1965,7 @@ return(
 {/* Inactive teams row */}
 {(view==="both"||view==="input")&&<InactiveRow/>}
 <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}}>
-{(view==="both"||view==="sheet")&&(<div style={{flex:view==="both"?"0 1 auto":"1",minHeight:0,maxHeight:view==="both"?(isTablet?"45vh":"30vh"):"none",overflow:"hidden"}}><GameSheet teams={teams} history={history} currentTurn={currentTurn} teamOrder={teamOrder} activeCell={activeCell}/></div>)}
+{(view==="both"||view==="sheet")&&(<div style={{flex:view==="both"?1:"1",minHeight:0,overflow:"hidden"}}><GameSheet teams={teams} history={history} currentTurn={currentTurn} teamOrder={teamOrder} activeCell={activeCell}/></div>)}
 {(view==="both"||view==="input")&&(<ScoreInput dispatch={dispatch} canUndo={history.length>0} teamName={teams[ti].name} teamScore={score} teamColor={C[ti].ac} playerName={cp?.name} fails={fails} onConfirm={(t,s,m)=>setConf({t,s,msg:m})} minimized={inputMin} onToggleMin={()=>setInputMin(p=>!p)}/>)}
 </div>
 {showPl&&<PlModal teams={teams} dispatch={dispatch} onClose={()=>setShowPl(false)} isAdmin={isAdmin}/>}
