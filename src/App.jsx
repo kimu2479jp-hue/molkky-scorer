@@ -665,6 +665,8 @@ const T={p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur
 const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(Date.now());const frameRef=useRef(null);
 const[flash,setFlash]=useState(false);const dealIdxRef=useRef(-1);const revealTeamRef=useRef(-1);
 const[closing,setClosing]=useState(false);const closeTRef=useRef(null);
+const revealPos=useRef(names.map((_,i)=>i)).current;
+const lastPhaseRef=useRef({p:0,t:Date.now()});
 const vwSA=typeof window!=="undefined"?window.innerWidth:375;const isTabletSA=vwSA>=768;
 const cardW=isTabletSA?160:110,cardH=isTabletSA?100:60;
 const cx=typeof window!=="undefined"?window.innerWidth/2:200;
@@ -688,6 +690,9 @@ return()=>{if(frameRef.current)cancelAnimationFrame(frameRef.current);};
 },[]);
 useEffect(()=>{if(flash){const tid=setTimeout(()=>setFlash(false),100);return()=>clearTimeout(tid);}},[flash]);
 useEffect(()=>{if(closing){closeTRef.current=setTimeout(()=>onDone(),400);return()=>clearTimeout(closeTRef.current);}},[closing]);
+/* Safety valve: auto-close if phase stalls for 8 seconds */
+useEffect(()=>{lastPhaseRef.current={p:phase,t:Date.now()};},[phase]);
+useEffect(()=>{const safetyId=setInterval(()=>{if(Date.now()-lastPhaseRef.current.t>8000&&!closing){try{onDone();}catch(e){}}},2000);return()=>clearInterval(safetyId);},[closing]);
 /* Card team lookup */
 const getCardTeam=(idx)=>{let count=0;for(let ti=0;ti<nTeams;ti++){for(let pi=0;pi<teams[ti].players.length;pi++){if(count===idx)return{teamIdx:ti,inTeamIdx:pi};count++;}}return{teamIdx:0,inTeamIdx:0};};
 /* Compute card positions based on phase */
@@ -706,16 +711,16 @@ if(phase===2){/* Shuffling: cards fly left/right */
 const shufT=t-T.p2;const speed=8+idx*1.5;const ampBase=isTabletSA?140:90;const ampIdx=isTabletSA?22:15;const amp=ampBase+idx*ampIdx;const offX=Math.sin(shufT*speed)*amp;const offY=Math.cos(shufT*speed*0.7)*(isTabletSA?50:30);const rot=Math.sin(shufT*speed)*45;
 return{...base,left:cx-cardW/2+offX,top:cy-cardH/2+offY,transform:"rotate("+rot+"deg)",opacity:1};}
 if(phase===3){/* Dealing: move to team slot one by one */
-const cardDealTime=T.p3+idx;const dealt=t>=cardDealTime+0.5;const dealing=t>=cardDealTime&&!dealt;
+const cardDealTime=T.p3+revealPos[idx]*perCard;const dealt=t>=cardDealTime+0.5;const dealing=t>=cardDealTime&&!dealt;
 /* Find which team this card goes to */
 let teamIdx=-1,inTeamIdx=0,count=0;
 for(let ti=0;ti<nTeams;ti++){for(let pi=0;pi<teams[ti].players.length;pi++){if(count===idx){teamIdx=ti;inTeamIdx=pi;break;}count++;}if(teamIdx>=0)break;}
 if(teamIdx<0)teamIdx=0;
-const target=teamSlots[teamIdx];
+const target=teamSlots[teamIdx];const stackOff2=isTabletSA?14:8;
 if(!dealing&&!dealt){/* Still in stack */
 return{...base,left:cx-cardW/2,top:cy-cardH/2,transform:"scale(1)",opacity:1};}
 if(dealing){const prog=Math.min((t-cardDealTime)/0.5,1);const ease=1-Math.pow(1-prog,3);
-const stackOff2=isTabletSA?14:8;const tx=target.x-cardW/2;const ty=target.y-cardH/2+inTeamIdx*stackOff2;
+const tx=target.x-cardW/2;const ty=target.y-cardH/2+inTeamIdx*stackOff2;
 const bounce=prog>0.8?1+(1-prog)*0.75:1;
 return{...base,left:(cx-cardW/2)+(tx-(cx-cardW/2))*ease,top:(cy-cardH/2)+(ty-(cy-cardH/2))*ease,transform:"scale("+bounce+")",opacity:1,boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+(ease>0.8?", 0 0 20px "+C[teamIdx].ac+"88":"")};}
 /* dealt */
@@ -729,6 +734,8 @@ return{...base,left:cx-cardW/2,top:cy-cardH/2,opacity:0};
 const dealerScale=phase===0?1+Math.min(t/2,1)*0.8:1.8;
 const dealerOp=phase>=4?(1-Math.min((t-T.p4)/0.5,1)):Math.min(t*2,1);
 const overlayOp=closing?0:1;
+/* Error wrapper: if any rendering error, force close */
+try{
 return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*overlayOp)+")",zIndex:9000,pointerEvents:"auto",transition:closing?"opacity 0.4s ease":"none",opacity:closing?0:1}}>
 {/* Dealer CSS figure */}
 <div style={{position:"fixed",left:cx-(isTabletSA?60:40),top:cy-(isTabletSA?210:140),opacity:dealerOp*0.7,transform:"scale("+dealerScale+")",transformOrigin:"50% 80%",transition:"none",willChange:"transform",zIndex:9000}}>
@@ -793,6 +800,7 @@ return(<div key={idx} style={getCardStyle(idx)}>{showBack?(<>
 </div>
 </div>}
 </div>);
+}catch(e){console.error("ShuffleAnimation error:",e);try{onDone();}catch(e2){}return null;}
 }
 
 const VT={writingMode:"vertical-rl",WebkitWritingMode:"vertical-rl",textOrientation:"upright",WebkitTextOrientation:"upright",letterSpacing:"-1px",lineHeight:1,margin:"0 auto",whiteSpace:"nowrap",overflow:"hidden",display:"inline-block"};
@@ -815,7 +823,7 @@ return(<table style={{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"
 </tr><tr>
 <th style={{background:"#1e4a72",position:forCapture?"static":"sticky",top:H1,zIndex:7,padding:0,borderTop:"none",borderBottom:"2px solid #0d2a48"}}/>
 {ordered.map(o=><React.Fragment key={o.idx}>
-{o.ap.map((p,pi)=>(<th key={pi} style={{background:"linear-gradient(180deg,"+C[o.idx].bg+",#1e4a72)",color:C[o.idx].nm,fontWeight:800,fontSize:fs*0.78,textAlign:"center",verticalAlign:"top",borderLeft:pi===0?bl+C[o.idx].ac:"1px solid rgba(255,255,255,0.15)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,letterSpacing:fs<=11?0:1,textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>{p.name.slice(0,MAX_NAME)}</span></th>))}
+{o.ap.map((p,pi)=>(<th key={pi} style={{background:"linear-gradient(180deg,"+C[o.idx].bg+",#1e4a72)",color:"#fff",fontWeight:800,fontSize:fs*0.78,textAlign:"center",verticalAlign:"top",borderLeft:pi===0?bl+C[o.idx].ac:"1px solid rgba(255,255,255,0.15)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,letterSpacing:fs<=11?0:1,textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>{p.name.slice(0,MAX_NAME)}</span></th>))}
 <th style={{background:"#0d2a48",color:"#ffd700",fontWeight:900,textAlign:"center",verticalAlign:"top",borderLeft:"1px solid rgba(255,255,255,0.2)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>計</span></th>
 </React.Fragment>)}
 </tr></thead>
@@ -1102,11 +1110,11 @@ const doScore=()=>{if(sel==null)return;if(win){onConfirm("score",sel,teamName+"�
 const doMiss=()=>{if(fails>=MF-1){onConfirm("miss",0,teamName+"の"+MF+"回連続です。\n失格になります。確定しますか？");setSel(null);return;}dispatch({type:"MISS"});setSel(null);};
 const doFault=()=>{if(fails>=MF-1){onConfirm("fault",0,teamName+"の"+MF+"回連続です。\n失格になります。確定しますか？");setSel(null);return;}if(teamScore>=PEN){onConfirm("fault",0,teamName+"は"+teamScore+"点（37点以上）。\nフォルトで25点に戻ります。確定しますか？");setSel(null);return;}dispatch({type:"FAULT"});setSel(null);};
 const vw=typeof window!=="undefined"?window.innerWidth:375;
-const isNarrow=vw<420;const isTabletSI=vw>=768;const PAD=isTabletSI?12:8;const ACT_W=isNarrow?80:(isTabletSI?140:90);const GAP=isNarrow?6:(isTabletSI?14:10);const NG=isNarrow?4:(isTabletSI?10:6);
-const gridW=vw-PAD*2-ACT_W-GAP;const NB=isTabletSI?Math.min(Math.floor((gridW-NG*3)/4),95):Math.min(Math.floor((gridW-NG*3)/4),70);const NFS=Math.max(Math.floor(NB*0.42),16);
+const isNarrow=vw<420;const isTabletSI=vw>=768;const PAD=isTabletSI?12:8;const ACT_W=isNarrow?80:(isTabletSI?160:90);const GAP=isNarrow?6:(isTabletSI?14:10);const NG=isNarrow?4:(isTabletSI?10:6);
+const gridW=vw-PAD*2-ACT_W-GAP;const NB=isTabletSI?Math.min(Math.floor((gridW-NG*3)/4),110):Math.min(Math.floor((gridW-NG*3)/4),70);const NFS=Math.max(Math.floor(NB*0.42),16);
 /* Info font size: scale player name to fit without ellipsis */
-const pnLen=(playerName||"").length;const pnFS=isTabletSI?(pnLen<=4?44:pnLen<=7?38:32):(isNarrow?(pnLen<=4?16:pnLen<=7?14:12):(pnLen<=4?18:pnLen<=7?16:14));
-const scFS=isTabletSI?56:(isNarrow?20:24);
+const pnLen=(playerName||"").length;const pnFS=isTabletSI?(pnLen<=4?52:pnLen<=7?46:38):(isNarrow?(pnLen<=4?16:pnLen<=7?14:12):(pnLen<=4?18:pnLen<=7?16:14));
+const scFS=isTabletSI?64:(isNarrow?20:24);
 if(minimized){return(<div onClick={onToggleMin} style={{background:"var(--bg-secondary)",padding:"8px 16px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
 <span style={{fontSize:18,color:"var(--text-inverse)",fontWeight:800}}>▲ 入力</span></div>);}
 return(
@@ -1118,12 +1126,12 @@ return(
 <span style={{fontSize:pnFS,fontWeight:700,color:"var(--text-primary)",whiteSpace:"nowrap"}}>{playerName||""}</span>
 <span style={{fontSize:scFS,fontWeight:900,color:"var(--text-primary)",lineHeight:1,fontVariantNumeric:"tabular-nums"}}>{teamScore}<span style={{fontSize:Math.round(scFS*0.55),fontWeight:700}}>点</span></span>
 </div>
-<div style={{display:"flex",gap:isTabletSI?6:3,alignItems:"center",marginTop:isTabletSI?6:2}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:isTabletSI?26:(isNarrow?10:13),height:isTabletSI?26:(isNarrow?10:13),borderRadius:"50%",display:"inline-block",background:j<fails?"#e74c3c":"#ddd"}}/>))}</div>
+<div style={{display:"flex",gap:isTabletSI?6:3,alignItems:"center",marginTop:isTabletSI?6:2}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:isTabletSI?30:(isNarrow?10:13),height:isTabletSI?30:(isNarrow?10:13),borderRadius:"50%",display:"inline-block",background:j<fails?"#e74c3c":"#ddd"}}/>))}</div>
 </div>
 <button onClick={onToggleMin} style={{padding:isTabletSI?"6px 12px":"4px 8px",border:"1px solid var(--border-input)",borderRadius:8,background:"transparent",color:"var(--text-muted)",fontSize:isTabletSI?18:14,fontWeight:800,cursor:"pointer",flexShrink:0}}>▼</button>
 </div>
 {teamScore>=PEN&&<div style={{fontSize:isTabletSI?18:13,fontWeight:700,color:"var(--text-warning)",marginBottom:isTabletSI?4:2,display:"flex",alignItems:"center",gap:3}}><AlertTriangle size={isTabletSI?18:14}/> フォルト=25点</div>}
-<div style={{maxWidth:isTabletSI?850:undefined,margin:isTabletSI?"0 auto":undefined}}>
+<div style={{padding:isTabletSI?"0 40px":undefined}}>
 <div style={{display:"flex",gap:GAP,alignItems:"stretch"}}>
 {/* Pin layout buttons + undo */}
 <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:NG}}>
@@ -1911,14 +1919,14 @@ const ActiveCard=()=>{const t=teams[ti];const sc=scoreOf(history,ti);const f=fai
 const isBounce=animState.bounce===ti;const isWarn=animState.warn===ti;const isFlash=animState.flash===ti;const isReset=animState.reset===ti;const isShake=animState.shake===ti;
 const anim=isShake&&isFlash?"mk-shake 0.5s ease,mk-danger-flash 0.6s ease":isShake?"mk-shake 0.5s ease":isWarn?"mk-warn-pulse 0.5s ease 2":isFlash?"mk-danger-flash 0.6s ease":"none";
 const scAnim=isBounce?"mk-scale-bounce 0.4s ease":isReset?"mk-reset-blink 0.8s ease":"none";
-const bgAlpha=C[ti].bg+"55";const acFS=isTablet?32:17;
+const bgAlpha=C[ti].bg+"77";const acFS=isTablet?32:17;
 return(<div style={{flexShrink:0,background:bgAlpha,borderBottom:"1px solid rgba(0,0,0,0.08)",animation:anim,display:"flex",alignItems:"center",gap:0}}>
 <div style={{width:isTablet?6:5,alignSelf:"stretch",background:C[ti].ac,flexShrink:0}}/>
 <div style={{flex:1,padding:isTablet?"14px 18px":"7px 10px",display:"flex",alignItems:"center",gap:isTablet?16:8,flexWrap:"nowrap",minWidth:0}}>
 <span style={{fontSize:acFS,fontWeight:900,color:"#fff",whiteSpace:"nowrap",flexShrink:0,textDecoration:el?"line-through":"none"}}>{t.name}{el?" DQ":""}{(bestOf>0||numGames>1)?" "+gW[ti]+"勝":""}</span>
 {cp&&<span style={{fontSize:acFS,fontWeight:700,color:"#fff",whiteSpace:"nowrap",flexShrink:1,minWidth:0}}>{cp.name}</span>}
 <span style={{fontSize:isTablet?38:20,fontWeight:900,color:isReset?"#e74c3c":"#fff",fontVariantNumeric:"tabular-nums",lineHeight:1,flexShrink:0,animation:scAnim}}>{sc}<span style={{fontSize:isTablet?20:11,fontWeight:700}}>点</span></span>
-<MissDots f={f} size={isTablet?16:9}/>
+<MissDots f={f} size={isTablet?20:9}/>
 </div>
 </div>);};
 /* Inactive teams row */
@@ -1932,24 +1940,24 @@ const isBounce2=animState.bounce===oIdx;const isReset2=animState.reset===oIdx;
 const scAnim2=isBounce2?"mk-scale-bounce 0.4s ease":isReset2?"mk-reset-blink 0.8s ease":"none";
 return(<React.Fragment key={oIdx}>{oi>0&&<div style={{width:1,alignSelf:"stretch",background:"rgba(255,255,255,0.1)"}}/>}
 <div style={{flex:1,minWidth:0,padding:isTablet?"8px 12px":"3px 6px",opacity:el?0.35:1,display:"flex",alignItems:"center",gap:isTablet?8:4,flexWrap:"nowrap"}}>
-<span style={{fontSize:oFS,fontWeight:800,color:C[oIdx].ac,flexShrink:0}}>{oiOrder}</span>
-<span style={{fontSize:oFS,fontWeight:700,color:"rgba(255,255,255,0.9)",whiteSpace:"nowrap",flexShrink:0,textDecoration:el?"line-through":"none"}}>{t.name}</span>
+<span style={{fontSize:oFS,fontWeight:800,color:C[oIdx].nm,flexShrink:0}}>{oiOrder}</span>
+<span style={{fontSize:oFS,fontWeight:700,color:C[oIdx].nm,whiteSpace:"nowrap",flexShrink:0,textDecoration:el?"line-through":"none"}}>{t.name}</span>
 <span style={{fontSize:isTablet?24:13,fontWeight:900,color:isReset2?"#e74c3c":"rgba(255,255,255,0.95)",fontVariantNumeric:"tabular-nums",flexShrink:0,animation:scAnim2}}>{sc}</span>
-{ocp&&<span style={{fontSize:oFS,fontWeight:600,color:"rgba(255,255,255,0.8)",whiteSpace:"nowrap",flexShrink:1,minWidth:0}}>{ocp.name}</span>}
+{ocp&&<span style={{fontSize:oFS,fontWeight:600,color:"rgba(255,255,255,0.95)",whiteSpace:"nowrap",flexShrink:1,minWidth:0}}>{ocp.name}</span>}
 <MissDots f={f} size={isTablet?12:6}/>
 </div></React.Fragment>);})}
 </div>);};
 return(
 <div style={SS.gW} className="mk-slide-in-left">
 {/* Header: match info only */}
-<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(3px + env(safe-area-inset-top, 0px)) 10px 3px",background:"var(--bg-secondary)",flexShrink:0,gap:6}}>
+<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:isTablet?"calc(8px + env(safe-area-inset-top, 0px)) 14px 8px":"calc(3px + env(safe-area-inset-top, 0px)) 10px 3px",background:"var(--bg-secondary)",flexShrink:0,gap:6}}>
 <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
-<button style={{...SS.tBtn,padding:"5px 8px"}} onClick={handleBack}><ChevronLeft size={14}/></button>
-<button style={SS.tBtn} onClick={()=>setShowPl(true)}><Users size={14}/></button>
+<button style={{...SS.tBtn,padding:isTablet?"7px 10px":"5px 8px"}} onClick={handleBack}><ChevronLeft size={isTablet?18:14}/></button>
+<button style={{...SS.tBtn,padding:isTablet?"7px 10px":undefined}} onClick={()=>setShowPl(true)}><Users size={isTablet?18:14}/></button>
 </div>
-<span style={{fontSize:14,fontWeight:700,color:"rgba(255,255,255,0.7)",textAlign:"center",flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{gameNumber}試合目 {currentTurn}ターン目{bestOf>0?" "+bestOf+"先取":""}</span>
+<span style={{fontSize:isTablet?28:16,fontWeight:isTablet?900:700,color:"rgba(255,255,255,0.7)",textAlign:"center",flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{gameNumber}試合目 {currentTurn}ターン目{bestOf>0?" "+bestOf+"先取":""}</span>
 <div style={{display:"flex",gap:2,flexShrink:0}}>
-<div style={{display:"flex",background:"rgba(255,255,255,0.12)",borderRadius:7,padding:2,gap:2}}>{[["both","両方"],["sheet","表"],["input","入力"]].map(([k,l])=>(<button key={k} onClick={()=>setView(k)} style={{padding:"4px 9px",border:"none",borderRadius:5,background:view===k?"rgba(255,255,255,0.2)":"transparent",color:view===k?"#fff":"rgba(255,255,255,0.4)",fontSize:12,fontWeight:600,cursor:"pointer"}}>{l}</button>))}</div>
+<div style={{display:"flex",background:"rgba(255,255,255,0.12)",borderRadius:7,padding:2,gap:2}}>{[["both","両方"],["sheet","表"],["input","入力"]].map(([k,l])=>(<button key={k} onClick={()=>setView(k)} style={{padding:isTablet?"6px 12px":"4px 9px",border:"none",borderRadius:5,background:view===k?"rgba(255,255,255,0.2)":"transparent",color:view===k?"#fff":"rgba(255,255,255,0.4)",fontSize:isTablet?16:12,fontWeight:600,cursor:"pointer"}}>{l}</button>))}</div>
 </div>
 </div>
 {/* Active team card */}
@@ -1957,7 +1965,7 @@ return(
 {/* Inactive teams row */}
 {(view==="both"||view==="input")&&<InactiveRow/>}
 <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minHeight:0}}>
-{(view==="both"||view==="sheet")&&(<div style={{flex:view==="both"?"0 1 auto":"1",minHeight:0,maxHeight:view==="both"?(isTablet?"40vh":"30vh"):"none",overflow:"hidden"}}><GameSheet teams={teams} history={history} currentTurn={currentTurn} teamOrder={teamOrder} activeCell={activeCell}/></div>)}
+{(view==="both"||view==="sheet")&&(<div style={{flex:view==="both"?"0 1 auto":"1",minHeight:0,maxHeight:view==="both"?(isTablet?"45vh":"30vh"):"none",overflow:"hidden"}}><GameSheet teams={teams} history={history} currentTurn={currentTurn} teamOrder={teamOrder} activeCell={activeCell}/></div>)}
 {(view==="both"||view==="input")&&(<ScoreInput dispatch={dispatch} canUndo={history.length>0} teamName={teams[ti].name} teamScore={score} teamColor={C[ti].ac} playerName={cp?.name} fails={fails} onConfirm={(t,s,m)=>setConf({t,s,msg:m})} minimized={inputMin} onToggleMin={()=>setInputMin(p=>!p)}/>)}
 </div>
 {showPl&&<PlModal teams={teams} dispatch={dispatch} onClose={()=>setShowPl(false)} isAdmin={isAdmin}/>}
