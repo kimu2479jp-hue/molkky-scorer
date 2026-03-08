@@ -811,20 +811,27 @@ const maxT=history.length>0?Math.max(...history.map(h=>h.turn)):0;
 const ordered=teamOrder.map(i=>({team:teams[i],idx:i,ap:teams[i].players.filter(p=>p.active)}));
 /* For dqWin: find last turn for winner to override 計 to 50 */
 const dqWinLastTurn=dqWinnerIdx!=null?Math.max(0,...history.filter(h=>h.teamIndex===dqWinnerIdx).map(h=>h.turn)):null;
-const totalCols=1+ordered.reduce((s,o)=>s+o.ap.length+1,0);
+/* iPhone collapse: hide non-active player cols when total players >= 6 */
+const vwST=typeof window!=="undefined"?window.innerWidth:375;const isTabletST=vwST>=768;
+const totalPlST=ordered.reduce((s,o)=>s+o.ap.length,0);const useCollapse=!isTabletST&&!forCapture&&totalPlST>=6;
+const[expandedTeam,setExpandedTeam]=useState(null);
+const prevAcRef=useRef(activeCell&&activeCell.teamIndex);
+useEffect(()=>{const cur=activeCell&&activeCell.teamIndex;if(cur!==prevAcRef.current){setExpandedTeam(null);prevAcRef.current=cur;}},[activeCell]);
+const isCollapsed=(oIdx)=>useCollapse&&!(activeCell&&activeCell.teamIndex===oIdx)&&expandedTeam!==oIdx;
+const totalCols=1+ordered.reduce((s,o)=>s+(isCollapsed(o.idx)?1:o.ap.length+1),0);
 const showRows=activeCell&&activeCell.turn>maxT?activeCell.turn:maxT;
 useEffect(()=>{ensureBlink();},[]);
 const cp=fs<=11?"2px 1px":"5px 3px";const hp=fs<=11?"2px 1px":"5px 2px";const bl=fs<=11?"2px solid ":"3px solid ";
 return(<table style={{width:"100%",borderCollapse:"collapse",tableLayout:"fixed",borderSpacing:0}}>
-<colgroup><col style={{width:rw}}/>{ordered.map(o=><React.Fragment key={o.idx}>{o.ap.map((_,pi)=><col key={pi}/>)}<col style={{minWidth:28}}/></React.Fragment>)}</colgroup>
+<colgroup><col style={{width:rw}}/>{ordered.map(o=><React.Fragment key={o.idx}>{!isCollapsed(o.idx)&&o.ap.map((_,pi)=><col key={pi}/>)}<col style={{minWidth:28}}/></React.Fragment>)}</colgroup>
 <thead><tr style={{height:H1}}>
 <th style={{background:"var(--bg-secondary)",color:"var(--text-inverse)",fontWeight:700,fontSize:fs*0.8,textAlign:"center",position:forCapture?"static":"sticky",top:0,zIndex:7,padding:0,lineHeight:H1+"px",borderBottom:"none"}}>R</th>
-{ordered.map(o=>{const isAcTeam=activeCell&&activeCell.teamIndex===o.idx;return(<th key={o.idx} colSpan={o.ap.length+1} style={{background:isAcTeam?"#14365a":"#3d5a80",color:"#fff",fontWeight:700,fontSize:fs*0.75,textAlign:"center",borderLeft:bl+(isAcTeam?"#ffc107":"#4b5563"),position:forCapture?"static":"sticky",top:0,zIndex:7,padding:0,lineHeight:H1+"px",borderBottom:"none",whiteSpace:"nowrap",overflow:"hidden"}}>{o.team.name}</th>);})}
+{ordered.map(o=>{const isAcTeam=activeCell&&activeCell.teamIndex===o.idx;const col=isCollapsed(o.idx);return(<th key={o.idx} colSpan={col?1:o.ap.length+1} style={{background:isAcTeam?"#14365a":"#3d5a80",color:"#fff",fontWeight:700,fontSize:fs*0.75,textAlign:"center",borderLeft:bl+(isAcTeam?"#ffc107":"#4b5563"),position:forCapture?"static":"sticky",top:0,zIndex:7,padding:0,lineHeight:H1+"px",borderBottom:"none",whiteSpace:"nowrap",overflow:"hidden",cursor:col?"pointer":"default"}} onClick={col?()=>setExpandedTeam(expandedTeam===o.idx?null:o.idx):undefined}>{o.team.name}</th>);})}
 </tr><tr>
 <th style={{background:"#1e4a72",position:forCapture?"static":"sticky",top:H1,zIndex:7,padding:0,borderTop:"none",borderBottom:"2px solid #0d2a48"}}/>
-{ordered.map(o=>{const isAcTeam=activeCell&&activeCell.teamIndex===o.idx;return(<React.Fragment key={o.idx}>
-{o.ap.map((p,pi)=>(<th key={pi} style={{background:isAcTeam?"#14365a":"#3d5a80",color:"#fff",fontWeight:800,fontSize:fs*0.78,textAlign:"center",verticalAlign:"top",borderLeft:pi===0?bl+(isAcTeam?"#ffc107":"#4b5563"):"1px solid rgba(255,255,255,0.15)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,letterSpacing:fs<=11?0:1,textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>{p.name.slice(0,MAX_NAME)}</span></th>))}
-<th style={{background:"#0d2a48",color:"#ffd700",fontWeight:900,textAlign:"center",verticalAlign:"top",borderLeft:"1px solid rgba(255,255,255,0.2)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>計</span></th>
+{ordered.map(o=>{const isAcTeam=activeCell&&activeCell.teamIndex===o.idx;const col=isCollapsed(o.idx);return(<React.Fragment key={o.idx}>
+{!col&&o.ap.map((p,pi)=>(<th key={pi} style={{background:isAcTeam?"#14365a":"#3d5a80",color:"#fff",fontWeight:800,fontSize:fs*0.78,textAlign:"center",verticalAlign:"top",borderLeft:pi===0?bl+(isAcTeam?"#ffc107":"#4b5563"):"1px solid rgba(255,255,255,0.15)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,letterSpacing:fs<=11?0:1,textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>{p.name.slice(0,MAX_NAME)}</span></th>))}
+<th style={{background:col?"#3d5a80":"#0d2a48",color:col?"#fff":"#ffd700",fontWeight:900,textAlign:"center",verticalAlign:"top",borderLeft:col?bl+"#4b5563":"1px solid rgba(255,255,255,0.2)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,textShadow:"0 1px 3px rgba(0,0,0,0.4)",cursor:col?"pointer":"default"}} onClick={col?()=>setExpandedTeam(expandedTeam===o.idx?null:o.idx):undefined}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>{col?o.team.name.slice(0,3):"計"}</span></th>
 </React.Fragment>);})}
 </tr></thead>
 <tbody>{showRows===0?(<tr><td colSpan={totalCols} style={{color:"#bbb",padding:24,fontSize:fs*0.8,textAlign:"center",borderBottom:"1px solid var(--border-lighter)"}}>スコアを入力してください</td></tr>):(
@@ -832,15 +839,15 @@ Array.from({length:showRows},(_,i)=>i+1).map(turn=>{
 const isLast=highlightLast&&turn===maxT;
 return(<tr key={turn} style={isLast?{background:"#fffde6"}:{}}>
 <td style={{padding:cp,textAlign:"center",borderBottom:"1px solid var(--border-input)",fontWeight:800,color:"#666",fontSize:fs*0.85}}>{turn}</td>
-{ordered.map(o=>{const e=history.find(h=>h.turn===turn&&h.teamIndex===o.idx);const cf=e?getFA(history,o.idx,turn):0;
-return(<React.Fragment key={o.idx}>{o.ap.map((p,pi)=>{
+{ordered.map(o=>{const e=history.find(h=>h.turn===turn&&h.teamIndex===o.idx);const cf=e?getFA(history,o.idx,turn):0;const col=isCollapsed(o.idx);
+return(<React.Fragment key={o.idx}>{!col&&o.ap.map((p,pi)=>{
 const isP=e&&e.playerIndex===pi;const isAct=activeCell&&activeCell.turn===turn&&activeCell.teamIndex===o.idx&&activeCell.playerIndex===pi&&!e;
 let txt="",clr="#333",bg="transparent",fw=600;
 if(isP){if((e.type==="miss"||e.type==="fault")&&cf===1)bg="#fff9db";if((e.type==="miss"||e.type==="fault")&&cf>=2)bg="#ffe0e0";if(e.type==="miss"){txt="−";clr="var(--accent-orange)";fw=800;}else if(e.type==="fault"&&e.faultReset){txt="F↓";clr="var(--text-danger)";fw=800;}else if(e.type==="fault"){txt="F";clr="var(--text-danger)";fw=800;}else if(e.reset25){txt=e.score+"↓";clr="#d93a5e";fw=800;}else{txt=e.score;clr=C[o.idx].tx;fw=700;}if(e.consecutiveFails>=MF)txt+="✕";}
 const cs={padding:cp,textAlign:"center",borderBottom:"1px solid var(--border-input)",color:clr,fontWeight:fw,background:bg,borderLeft:pi===0?bl+C[o.idx].ac+"33":"1px solid var(--border-lighter)",fontSize:fs};
 if(isAct)cs.animation="mk-blink 1s ease-in-out infinite";
 return <td key={pi} style={cs}>{txt}</td>;
-})}<td style={{padding:cp,textAlign:"center",borderBottom:"1px solid var(--border-input)",fontWeight:900,color:C[o.idx].tx,background:e?"#f0f3f8":"transparent",borderLeft:"2px solid #d0d0d0",fontSize:fs}}>{e?(dqWinnerIdx!=null&&o.idx===dqWinnerIdx&&turn===dqWinLastTurn?WIN:e.runningTotal):""}</td></React.Fragment>);
+})}<td style={{padding:cp,textAlign:"center",borderBottom:"1px solid var(--border-input)",fontWeight:900,color:C[o.idx].tx,background:e?"#f0f3f8":"transparent",borderLeft:col?bl+"#4b5563":"2px solid #d0d0d0",fontSize:fs}}>{e?(dqWinnerIdx!=null&&o.idx===dqWinnerIdx&&turn===dqWinLastTurn?WIN:e.runningTotal):""}</td></React.Fragment>);
 })}
 </tr>);
 })
@@ -1082,9 +1089,9 @@ return(
 </>)}
 {mode==="shuffle"&&(<><div style={CARD} onTouchStart={lpStart} onTouchEnd={lpEnd} onTouchMove={lpMove}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}><div style={{fontWeight:700,fontSize:18,color:"var(--text-primary)"}}>参加メンバー（最大{MAX_SHUF}人）</div>
 {editMode&&<button onClick={()=>{setEditMode(false);setExpandedDel(null);}} style={{padding:"4px 14px",border:"none",borderRadius:8,background:"var(--accent-blue)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>Done</button>}</div>
-<div style={{display:"grid",gridTemplateColumns:editMode?"1fr":"1fr 1fr",gap:7}}>{mems.map((m,i)=>{const delKey="s"+i;const isExp=expandedDel===delKey;return(<div key={i} style={{display:"flex",alignItems:"center",gap:4,overflow:"hidden"}}>
+<div style={{display:"grid",gridTemplateColumns:editMode?"1fr":"1fr 1fr",gap:7}}>{mems.map((m,i)=>{const delKey="s"+i;const isExp=expandedDel===delKey;return(<div key={i} style={{display:"flex",alignItems:"center",gap:4}}>
 {editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:24,height:24,borderRadius:12,border:"none",background:"#e74c3c",color:"#fff",fontSize:16,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"\u2212"}</button>}
-<span style={{width:20,fontSize:14,color:"var(--text-muted)",fontWeight:700,textAlign:"right"}}>{i+1}</span><input value={m} onChange={e=>uM(i,e.target.value)} maxLength={MAX_NAME} style={{...PIN,padding:"10px 12px",fontSize:18,flex:isExp?"0 1 auto":"1"}} placeholder="メンバー"/>
+<span style={{width:20,fontSize:14,color:"var(--text-muted)",fontWeight:700,textAlign:"right",flexShrink:0}}>{i+1}</span><input value={m} onChange={e=>uM(i,e.target.value)} maxLength={MAX_NAME} style={{...PIN,padding:"10px 12px",fontSize:18,flex:isExp?"0 1 auto":"1",minWidth:0}} placeholder="メンバー"/>
 {!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uM(i,name)} usedNames={used} isAdmin={isAdmin}/>}
 {editMode&&isExp&&mems.length>2&&<button onClick={()=>{rM(i);setExpandedDel(null);}} style={{padding:"4px 14px",border:"none",borderRadius:8,background:"#e74c3c",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
 </div>);})}</div>
@@ -1115,8 +1122,8 @@ const gridW=vw-PAD*2-ACT_W-GAP;const NB=isTabletSI?Math.min(Math.floor((gridW-NG
 /* Info font size: scale player name to fit without ellipsis */
 const pnLen=(playerName||"").length;const pnFS=isTabletSI?(pnLen<=4?52:pnLen<=7?46:38):(isNarrow?(pnLen<=4?16:pnLen<=7?14:12):(pnLen<=4?18:pnLen<=7?16:14));
 const scFS=isTabletSI?64:(isNarrow?20:24);
-if(minimized){return(<div onClick={onToggleMin} style={{background:"var(--bg-secondary)",padding:isTabletSI?"12px 20px":"8px 16px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
-<span style={{fontSize:isTabletSI?24:18,color:"var(--text-inverse)",fontWeight:800}}>▲ 入力</span></div>);}
+if(minimized){return(<div onClick={onToggleMin} style={{background:"var(--bg-secondary)",padding:isTabletSI?"24px 40px":"8px 16px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+<span style={{fontSize:isTabletSI?48:18,color:"var(--text-inverse)",fontWeight:800}}>▲ 入力</span></div>);}
 return(
 <div style={{background:"var(--bg-surface)",borderTop:"2px solid #dde1e6",padding:(isTabletSI?"10px ":"6px ")+PAD+"px",paddingBottom:"calc("+(isTabletSI?"12":"8")+"px + env(safe-area-inset-bottom, 0px))",flexShrink:0}}>
 {/* Top info: player name + score left, minimize button right */}
@@ -1128,7 +1135,7 @@ return(
 </div>
 <div style={{display:"flex",gap:isTabletSI?6:3,alignItems:"center",marginTop:isTabletSI?6:2}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:isTabletSI?30:(isNarrow?10:13),height:isTabletSI?30:(isNarrow?10:13),borderRadius:"50%",display:"inline-block",background:j<fails?"#e74c3c":"#ddd"}}/>))}</div>
 </div>
-<button onClick={onToggleMin} style={{padding:isTabletSI?"10px 18px":"4px 8px",border:"1px solid var(--border-input)",borderRadius:isTabletSI?10:8,background:"transparent",color:"var(--text-muted)",fontSize:isTabletSI?22:14,fontWeight:800,cursor:"pointer",flexShrink:0}}>▼</button>
+<button onClick={onToggleMin} style={{padding:isTabletSI?"20px 36px":"4px 8px",border:"1px solid var(--border-input)",borderRadius:isTabletSI?14:8,background:"transparent",color:"var(--text-muted)",fontSize:isTabletSI?44:14,fontWeight:800,cursor:"pointer",flexShrink:0}}>▼</button>
 </div>
 {teamScore>=PEN&&<div style={{fontSize:isTabletSI?18:13,fontWeight:700,color:"var(--text-warning)",marginBottom:isTabletSI?4:2,display:"flex",alignItems:"center",gap:3}}><AlertTriangle size={isTabletSI?18:14}/> フォルト=25点</div>}
 <div style={{display:"flex",justifyContent:"center"}}>
