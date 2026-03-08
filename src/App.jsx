@@ -1047,8 +1047,8 @@ const vw=typeof window!=="undefined"?window.innerWidth:375;
 const isNarrow=vw<420;const isTabletSI=vw>=768;const PAD=isTabletSI?12:8;const ACT_W=isNarrow?80:(isTabletSI?140:90);const GAP=isNarrow?6:(isTabletSI?14:10);const NG=isNarrow?4:(isTabletSI?10:6);
 const gridW=vw-PAD*2-ACT_W-GAP;const NB=isTabletSI?Math.min(Math.floor((gridW-NG*3)/4),95):Math.min(Math.floor((gridW-NG*3)/4),70);const NFS=Math.max(Math.floor(NB*0.42),16);
 /* Info font size: scale player name to fit without ellipsis */
-const pnLen=(playerName||"").length;const pnFS=isTabletSI?(pnLen<=4?72:pnLen<=7?66:56):(isNarrow?(pnLen<=4?16:pnLen<=7?14:12):(pnLen<=4?18:pnLen<=7?16:14));
-const scFS=isTabletSI?72:(isNarrow?20:24);
+const pnLen=(playerName||"").length;const pnFS=isTabletSI?(pnLen<=4?44:pnLen<=7?38:32):(isNarrow?(pnLen<=4?16:pnLen<=7?14:12):(pnLen<=4?18:pnLen<=7?16:14));
+const scFS=isTabletSI?56:(isNarrow?20:24);
 if(minimized){return(<div onClick={onToggleMin} style={{background:"var(--bg-secondary)",padding:"8px 16px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
 <span style={{fontSize:18,color:"var(--text-inverse)",fontWeight:800}}>▲ 入力</span></div>);}
 return(
@@ -1060,12 +1060,12 @@ return(
 <span style={{fontSize:pnFS,fontWeight:700,color:"var(--text-primary)",whiteSpace:"nowrap"}}>{playerName||""}</span>
 <span style={{fontSize:scFS,fontWeight:900,color:"var(--text-primary)",lineHeight:1,fontVariantNumeric:"tabular-nums"}}>{teamScore}<span style={{fontSize:Math.round(scFS*0.55),fontWeight:700}}>点</span></span>
 </div>
-<div style={{display:"flex",gap:isTabletSI?8:3,alignItems:"center",marginTop:isTabletSI?6:2}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:isTabletSI?40:(isNarrow?10:13),height:isTabletSI?40:(isNarrow?10:13),borderRadius:"50%",display:"inline-block",background:j<fails?"#e74c3c":"#ddd"}}/>))}</div>
+<div style={{display:"flex",gap:isTabletSI?6:3,alignItems:"center",marginTop:isTabletSI?6:2}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:isTabletSI?26:(isNarrow?10:13),height:isTabletSI?26:(isNarrow?10:13),borderRadius:"50%",display:"inline-block",background:j<fails?"#e74c3c":"#ddd"}}/>))}</div>
 </div>
 <button onClick={onToggleMin} style={{padding:isTabletSI?"6px 12px":"4px 8px",border:"1px solid var(--border-input)",borderRadius:8,background:"transparent",color:"var(--text-muted)",fontSize:isTabletSI?18:14,fontWeight:800,cursor:"pointer",flexShrink:0}}>▼</button>
 </div>
 {teamScore>=PEN&&<div style={{fontSize:isTabletSI?18:13,fontWeight:700,color:"var(--text-warning)",marginBottom:isTabletSI?4:2,display:"flex",alignItems:"center",gap:3}}><AlertTriangle size={isTabletSI?18:14}/> フォルト=25点</div>}
-<div style={{maxWidth:isTabletSI?680:undefined,margin:isTabletSI?"0 auto":undefined}}>
+<div style={{maxWidth:isTabletSI?700:undefined,margin:isTabletSI?"0 auto":undefined}}>
 <div style={{display:"flex",gap:GAP,alignItems:"stretch"}}>
 {/* Pin layout buttons + undo */}
 <div style={{flex:1,minWidth:0,display:"flex",flexDirection:"column",gap:NG}}>
