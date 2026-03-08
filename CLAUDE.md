@@ -26,6 +26,7 @@ public/          - Static assets, manifest, icons
 - **ASCII only**: No smart quotes or special characters (curly quotes, em-dashes, etc.)
 - **Single file**: App.jsx must remain a single file - do not split into components
 - **iPhone Safari PWA**: Must work correctly as an installed PWA on iOS Safari
+- **Team-specific colors (C array .bg/.ac/.nm) are NOT used in GameScreen during active match display**. They remain in use for SetupScreen, GameResult, ShuffleAnimation, and canvas image export.
 
 ## Available Libraries
 - lucide-react (icons)
@@ -37,29 +38,111 @@ public/          - Static assets, manifest, icons
 npx vite build
 ```
 
+## Design Philosophy
+
+### What This Scorer Solves
+Molkky is a time-limited competition. The scorer operator and surrounding players must read and judge multiple pieces of information simultaneously within a few seconds per turn:
+- Read opponent scores from the score table
+- Know remaining points to reach 50
+- Identify opponent finishing opportunities
+- Read score trends to gauge opponent form
+- Judge miss frequency
+
+Decisions happen within tens of seconds per turn. "Readable" is not enough -- the information design must enable instant, accurate situational awareness at a glance. Visibility (instant correct comprehension) is the most important quality standard.
+
+### Core Design Nucleus
+The UI must enable instant, error-free recognition of "the current situation":
+1. Current game number and turn number
+2. Which team is currently active
+3. Who is the current player
+4. Current score
+5. Miss count and status
+
+### Screen-by-Screen Priorities
+- **GameScreen** (in-match) = Most important. Visibility (rapid, accurate situation reading) is the absolute priority. Function over aesthetics.
+- **Stats screens** = Aesthetics and polish. Viewed at leisure after matches.
+- **SetupScreen** = Ease of operation. Quick, intuitive pre-match configuration.
+
+## Target Environment
+
+### Tablet (iPad) = Primary Reference
+- **Conditions:** Direct sunlight, iPad portrait, tripod at 1.5m height, up to 3m viewing distance, 8-10 people viewing simultaneously
+- **Final standard:** Multiple people up to 3m away must instantly grasp the current situation even in direct sunlight
+- **Priority when in doubt:** Group visibility > Instant readability > Error resistance > Contrast in sunlight > Elegance
+
+### Smartphone (iPhone)
+- **Conditions:** Single user, close-range operation
+- **Final standard:** Comfortable, intuitive operation with immediate information access
+
+### Adoption Checklist for Tablet Improvements
+1. Can primary information be read when contrast drops in direct sunlight?
+2. Can the active team be identified at a glance from up to 3m away?
+3. Are team name, current player name, score, and miss count visible as a coherent information block?
+4. Does the layout hold up with 3 or 4 teams?
+5. Has visibility been sacrificed for the sake of aesthetics?
+
+All 5 must be satisfied for an improvement to be adopted.
+
+## UI Design Principles
+
+### Active/Inactive Color System
+Team-specific colors are removed from GameScreen match display. Teams are distinguished by active/inactive state only.
+
+**Active team:**
+- Header band: dark navy (#14365a) with white text
+- Left accent bar: yellow (#ffc107)
+- Player name: yellow (#ffc107) for emphasis
+- Score table header: dark navy
+
+**Inactive team(s):**
+- Header band/row: low-saturation dark background (#1a2a3e) with white text
+- Score table header: gray (#6b7280)
+
+**Common:**
+- Color palette limited to 5 families: dark navy, yellow/amber, gray, white, black
+- No mid-tones, light gradients, or semi-transparent colors
+- Input area maintains current style (bright background base, already good)
+
+### Information Block Concept
+Team name + player name + score + misses are displayed as a meaningful unit (information block), not as scattered individual values. Information blocks take priority over isolated large numbers.
+
+### Visual Hierarchy Through Layout
+The primary tool for eye guidance is layout, position, and size. Color contrast serves as a supporting reinforcement, not the primary mechanism.
+
+### Elegance Through Structure
+Elegance is expressed through whitespace, alignment, information hierarchy, and color count control. Mid-tones, light gradients, semi-transparent effects, and weak borders are removed as means of expressing elegance.
+
+### Background Direction
+- Full dark background is retired
+- Content and input areas shift to bright backgrounds
+- Dark navy is reserved for headers and active emphasis only
+- Goal: "high visibility with structural elegance", not "pale and refined"
+
+### Player Name Display
+- Full names shown without truncation as a rule
+- Never sacrifice font size or weight for full display if it hurts outdoor visibility
+- Absorb long names through layout adjustments first
+- Active player name is one of the most important pieces of information
+
+### Input Area Constraints
+- Button sizes must not exceed the current isTablet logic upper limits
+
 ## Current Branch Goal
-This branch is dedicated to redesigning the shuffle animation into a high-polish dealer animation sequence.
 
-Branch name:
-feature/dealer-animation
+### UI Visibility Redesign
+This branch focuses on improving GameScreen visibility during active matches.
 
-Primary goal:
-Replace the current simple shuffle animation with a more premium visual sequence in which an original casino dealer style character naturally shuffles and deals cards to each team.
+Primary goals:
+- Replace team-specific color system with active/inactive color distinction
+- Improve contrast for outdoor/sunlight readability
+- Apply design principles from the UI improvement guideline v2
+- Fix the shuffle animation bug (skipConfirm state missing)
 
-## Design Direction for Dealer Animation
-The desired direction is not "fastest implementation" but "highest visual quality that can still be maintained safely in the existing app".
-
-Target experience:
-- A casino dealer style original character appears during the shuffle/deal sequence
-- The character performs a natural looking shuffle motion
-- The character then deals cards to teams in a clean and elegant motion
-- Cards should look closer to real playing cards, not plain rectangles with names only
-- Card frames should feel like trump or casino cards, while still keeping team and player names readable
-- The animation should feel stylish, polished, and premium
-- Motion should avoid looking robotic, abrupt, or cheap
+### Dealer Animation (retained from previous branch)
+The dealer animation redesign for ShuffleAnimation is a separate presentation layer upgrade. The shuffle animation's visual direction (casino dealer character, premium card design, polished motion) remains a future goal. The immediate priority is fixing the animation bug and improving GameScreen visibility.
 
 ## Critical Scope Rules
-The dealer animation work must stay isolated from core game logic.
+All UI changes must stay isolated from core game logic.
 
 Do not change:
 - reducer
@@ -71,137 +154,17 @@ Do not change:
 - existing match result logic
 - existing persistence behavior unless absolutely necessary
 
-The animation redesign must be treated as a presentation layer upgrade, not a game logic rewrite.
-
-## Implementation Strategy
-Use a staged approach.
-
-Preferred order:
-1. Define art direction
-2. Define animation behavior and timing
-3. Define card visual rules
-4. Build a static visual mock inside the app
-5. Build a temporary animated prototype
-6. Replace temporary motion with polished production animation
-7. Test layout and behavior on existing target devices
-
-Do not jump straight into complex animation without first establishing visual structure.
-
-## Character Direction
-The dealer must be an original character, not a copy of any existing copyrighted character.
-
-Character direction:
-- casino dealer inspired outfit
-- elegant and readable silhouette
-- suitable for web animation
-- visually clear at mobile and tablet sizes
-- hands and arms must be designed with animation in mind
-- expression should feel confident, calm, and professional
-- avoid overly noisy costume details that become unreadable on smaller screens
-
-The character design must prioritize animation usability, not just still-image beauty.
-
-## Animation Direction
-Animation quality is very important.
-
-Required motion qualities:
-- natural anticipation before movement
-- smooth hand and arm motion
-- believable dealing rhythm
-- clean card travel paths
-- visually readable pauses between shuffle and deal phases
-- no sudden snapping unless intentionally stylized
-- no motion that blocks important UI text
-- no motion that makes team assignment unclear
-
-The sequence should feel deliberate and elegant.
-
-Suggested animation states:
-- idle
-- intro
-- shuffle_start
-- shuffle_loop
-- draw_card
-- deal_team_1
-- deal_team_2
-- deal_team_3
-- deal_team_4
-- finish
-
-State names may change if needed, but the sequence must remain understandable.
-
-## Card Design Direction
-Cards must be visually upgraded.
-
-Required card design goals:
-- playing card inspired outer frame
-- premium card look rather than plain name tag
-- team and player names must remain easy to read
-- card face must work well in motion
-- border and corner treatment should feel intentional
-- avoid overly detailed decoration that reduces readability
-
-The card design should balance theme and usability.
-
-## Layout and Responsiveness
-The animation must work within the existing app without harming usability.
-
-Requirements:
-- preserve readability on iPhone Safari PWA
-- preserve usability on tablet sized screens
-- do not cover critical score controls for too long
-- do not create layout jumps that feel broken
-- keep animation visually centered and intentional
-- maintain graceful behavior across different team counts if the dealing pattern depends on active teams
-
-## Code Architecture Guidance
-Keep the existing project stable.
-
-Preferred engineering approach:
-- isolate dealer animation related code as much as possible
-- keep changes easy to review
-- keep fallback behavior possible
-- avoid large unrelated refactors
-- avoid changing stable code unless required by the animation feature
-
-If a risky approach and a safer approach both exist, prefer the safer one unless visual quality would clearly suffer.
-
-## Asset Pipeline Guidance
-Before final implementation, define the asset pipeline clearly.
-
-Expected asset categories:
-- dealer character art
-- card face design
-- card back design if needed
-- motion mock assets
-- effect assets such as shadows or subtle flourishes
-
-All assets should use clear names and consistent organization.
-
-## Review Standard
-Every major visual step should be reviewed against these questions:
-- Does it look more premium than the current shuffle?
-- Does the motion read clearly at a glance?
-- Does the dealing sequence feel natural?
-- Are names still readable on cards?
-- Is the experience compatible with the current app layout?
-- Did we preserve all existing game logic constraints?
-
-If the answer to any of these is no, revise before moving forward.
-
 ## Collaboration Instructions for Claude Code
 When working on this branch:
-- explain changes in small reviewable steps
-- prefer safe incremental edits
-- describe which files were changed and why
-- do not rewrite unrelated parts of the app
-- preserve existing constraints from this CLAUDE.md file
-- when making animation related proposals, separate visual ideas from actual implemented code
-- when uncertain, favor maintainability plus polish over complexity for its own sake
+- Make small changes one at a time
+- Verify build passes after each change
+- Request real-device confirmation from the user before proceeding to next change
+- Do not rewrite unrelated parts of the app
+- Preserve existing constraints from this CLAUDE.md file
+- When uncertain, favor maintainability plus polish over complexity for its own sake
 
-## Branch Specific Deliverable Goal
-The final deliverable for this branch should be a polished dealer themed shuffle and dealing experience that:
-- looks clearly better than the current version
-- preserves the existing game system
-- is suitable for the current Molkky Scorer app
-- can be reviewed and merged without risking unrelated regressions
+### Lessons from Previous Failures
+1. Claude AI artifact previews cannot verify correct display (styles.css CSS variables are not loaded). Always confirm on real device after Vercel deploy.
+2. Do not make "lightening" an end in itself. Bright gray backgrounds + gray text caused contrast failures before. The goal is high contrast readability, not brightness.
+3. Do not break what already works well. Dark background + white text for inactive rows was rated positively -- maintain that direction.
+4. Confirm visual direction with mockups before writing code.
