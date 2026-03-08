@@ -677,7 +677,7 @@ const T={p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur
 const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(Date.now());const frameRef=useRef(null);
 const[flash,setFlash]=useState(false);const dealIdxRef=useRef(-1);const revealTeamRef=useRef(-1);
 const[closing,setClosing]=useState(false);const closeTRef=useRef(null);const[skipConfirm,setSkipConfirm]=useState(false);
-const revealPos=useRef(names.map((_,i)=>i)).current;
+const revealPos=useRef(shuf(names.map((_,i)=>i))).current;
 const lastActivityRef=useRef(Date.now());
 /* Team slot positions: columns for dealt cards */
 const teamSlots=teams.map((_,i)=>({x:margin+colW2*i+colW2/2,yStart:cardAreaTop+24}));
@@ -702,33 +702,44 @@ useEffect(()=>{lastActivityRef.current=Date.now();},[phase]);
 useEffect(()=>{const totalDuration=(T.p4+5)*1000;const safetyId=setInterval(()=>{if(Date.now()-lastActivityRef.current>Math.max(totalDuration,15000)&&!closing){try{onDone();}catch(e){}}},3000);return()=>clearInterval(safetyId);},[closing]);
 /* Card team lookup */
 const getCardTeam=(idx)=>{let count=0;for(let ti=0;ti<nTeams;ti++){for(let pi=0;pi<teams[ti].players.length;pi++){if(count===idx)return{teamIdx:ti,inTeamIdx:pi};count++;}}return{teamIdx:0,inTeamIdx:0};};
-/* Compute card positions based on phase */
-const getCardStyle=(idx)=>{
-const br=isTabletSA?16:12;
-const base={position:"fixed",width:cardW,height:cardH,borderRadius:br,background:"#fff",boxShadow:"0 4px 20px rgba(0,0,0,0.3)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9001+idx,willChange:"transform",transition:"none",backfaceVisibility:"hidden",overflow:"hidden"};
-if(phase===0){const prog=Math.min((t-T.p0)/2,1);const ease=1-Math.pow(1-prog,3);
-const ix=initPos[idx].x;const iy=initPos[idx].y;const tx=cx-cardW/2;const ty=cy-cardH/2;
-return{...base,left:ix+(tx-ix)*ease,top:iy+(ty-iy)*ease,transform:"scale("+(0.6+0.4*ease)+")",opacity:Math.min(prog*3,1)};}
-if(phase===1){const prog=Math.min((t-T.p1)/0.5,1);const ease=1-Math.pow(1-prog,2);const stackOff=idx*2;
-return{...base,left:cx-cardW/2+stackOff*(1-ease),top:cy-cardH/2-stackOff*(1-ease),transform:"scale(1)",opacity:1};}
-if(phase===2){const shufT=t-T.p2;const speed=8+idx*1.5;const ampBase=isTabletSA?200:90;const ampIdx2=isTabletSA?30:15;const amp=ampBase+idx*ampIdx2;const offX=Math.sin(shufT*speed)*amp;const offY=Math.cos(shufT*speed*0.7)*(isTabletSA?70:30);const rot=Math.sin(shufT*speed)*45;
-return{...base,left:cx-cardW/2+offX,top:cy-cardH/2+offY,transform:"rotate("+rot+"deg)",opacity:1};}
-if(phase===3){const cardDealTime=T.p3+revealPos[idx]*perCard;
-const flipStart=cardDealTime;const flipEnd=flipStart+0.5;const holdEnd=flipEnd+1.0;const moveEnd=holdEnd+0.5;
+/* Compute card outer position/scale/opacity (not flip) */
+const getCardOuter=(idx)=>{
 const ct=getCardTeam(idx);const ti2=ct.teamIdx;const inT=ct.inTeamIdx;
 const target=teamSlots[ti2];const targetX=target.x-cardW/2;const targetY=target.yStart+inT*(cardH+cardGap);
-if(t<flipStart){return{...base,left:cx-cardW/2,top:cy-cardH/2,transform:"scale(1)",opacity:1};}
-if(t<flipEnd){const prog=Math.min((t-flipStart)/0.5,1);
-return{...base,left:cx-cardW/2,top:cy-cardH/2,transform:"scale(1) rotateY("+Math.round(prog*180)+"deg)",opacity:1};}
-if(t<holdEnd){const hp2=(t-flipEnd)/1.0;const sc=1+0.08*Math.sin(hp2*Math.PI);
-return{...base,left:cx-cardW/2,top:cy-cardH/2,transform:"scale("+sc+")",opacity:1,boxShadow:"0 4px 20px rgba(0,0,0,0.3), 0 0 30px "+C[ti2].ac+"66"};}
-if(t<moveEnd){const prog=Math.min((t-holdEnd)/0.5,1);const ease=1-Math.pow(1-prog,3);
-return{...base,left:(cx-cardW/2)+(targetX-(cx-cardW/2))*ease,top:(cy-cardH/2)+(targetY-(cy-cardH/2))*ease,transform:"scale("+(1-0.1*ease)+")",opacity:1};}
-return{...base,left:targetX,top:targetY,transform:"scale(0.9)",opacity:1,borderLeft:"4px solid "+C[ti2].ac};}
-if(phase===4){const ct=getCardTeam(idx);const ti2=ct.teamIdx;const inT=ct.inTeamIdx;
-const target=teamSlots[ti2];const targetX=target.x-cardW/2;const targetY=target.yStart+inT*(cardH+cardGap);
-return{...base,left:targetX,top:targetY,transform:"scale(0.9)",opacity:1,borderLeft:"4px solid "+C[ti2].ac};}
-return{...base,left:cx-cardW/2,top:cy-cardH/2,opacity:0};
+const deckPos=revealPos[idx];const currentDealOrd=phase===3?Math.floor((t-T.p3)/perCard):-1;
+if(phase===0){const prog=Math.min((t-T.p0)/2,1);const ease=1-Math.pow(1-prog,3);
+const ix=initPos[idx].x;const iy=initPos[idx].y;const tx=cx-cardW/2;const ty=cy-cardH/2;
+return{left:ix+(tx-ix)*ease,top:iy+(ty-iy)*ease,scale:0.6+0.4*ease,opacity:Math.min(prog*3,1),zIndex:9001+idx,rotate:0};}
+if(phase===1){const prog=Math.min((t-T.p1)/0.5,1);const ease=1-Math.pow(1-prog,2);const stackOff=idx*2;
+return{left:cx-cardW/2+stackOff*(1-ease),top:cy-cardH/2-stackOff*(1-ease),scale:1,opacity:1,zIndex:9001+idx,rotate:0};}
+if(phase===2){const shufT=t-T.p2;const speed=8+idx*1.5;const ampBase=isTabletSA?200:90;const ampIdx2=isTabletSA?30:15;const amp=ampBase+idx*ampIdx2;
+const offX=Math.sin(shufT*speed)*amp;const offY=Math.cos(shufT*speed*0.7)*(isTabletSA?70:30);const rot=Math.sin(shufT*speed)*45;
+return{left:cx-cardW/2+offX,top:cy-cardH/2+offY,scale:1,opacity:1,zIndex:9001+idx,rotate:rot};}
+if(phase===3){const cardDealTime=T.p3+deckPos*perCard;const tLocal=t-cardDealTime;
+const liftD=0.3,flipD=0.5,holdD=1.0,moveD=0.5,landD=0.5;
+if(t<cardDealTime){const stackIdx=deckPos-Math.max(0,currentDealOrd+1);const sOff=Math.min(Math.max(0,stackIdx),10);
+return{left:cx-cardW/2+sOff,top:cy-cardH/2+sOff,scale:1,opacity:1,zIndex:9010+nCards-deckPos,rotate:0};}
+if(tLocal<liftD){const prog=tLocal/liftD;
+return{left:cx-cardW/2,top:cy-cardH/2-prog*30,scale:1,opacity:1,zIndex:9100,rotate:0};}
+if(tLocal<liftD+flipD){return{left:cx-cardW/2,top:cy-cardH/2-30,scale:1,opacity:1,zIndex:9100,rotate:0};}
+if(tLocal<liftD+flipD+holdD){const hp=(tLocal-liftD-flipD)/holdD;const sc=1+0.12*Math.sin(hp*Math.PI);
+return{left:cx-cardW/2,top:cy-cardH/2-30,scale:sc,opacity:1,zIndex:9100,rotate:0};}
+if(tLocal<liftD+flipD+holdD+moveD){const prog=(tLocal-liftD-flipD-holdD)/moveD;const ease=1-Math.pow(1-prog,3);
+const fromX=cx-cardW/2,fromY=cy-cardH/2-30;const sc=1-0.7*ease;
+return{left:fromX+(targetX-fromX)*ease,top:fromY+(targetY-fromY)*ease,scale:sc,opacity:1,zIndex:9100-Math.floor(prog*50),rotate:0};}
+if(tLocal<perCard){const prog=(tLocal-liftD-flipD-holdD-moveD)/landD;
+const sc=prog<0.6?0.3+0.75*(prog/0.6):1.05-0.05*((prog-0.6)/0.4);
+return{left:targetX,top:targetY,scale:sc,opacity:1,zIndex:9001+idx,rotate:0};}
+return{left:targetX,top:targetY,scale:1,opacity:1,zIndex:9001+idx,rotate:0};}
+if(phase===4){return{left:targetX,top:targetY,scale:1,opacity:0,zIndex:9001+idx,rotate:0};}
+return{left:cx-cardW/2,top:cy-cardH/2,scale:1,opacity:0,zIndex:9001,rotate:0};
+};
+/* Compute flip degree for CSS 3D card rotation */
+const getFlipDeg=(idx)=>{
+if(phase<=2)return 0;if(phase>=4)return 180;
+const cardDealTime=T.p3+revealPos[idx]*perCard;const tLocal=t-cardDealTime;
+const liftD=0.3,flipD=0.5;
+if(tLocal<liftD)return 0;if(tLocal<liftD+flipD){return((tLocal-liftD)/flipD)*180;}return 180;
 };
 /* Dealer position and size */
 const dealerY=phase>=3?viewH*0.08:viewH*0.15;
@@ -754,17 +765,30 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*over
 {phase>=3&&teamSlots.map((sl,ti)=>(<div key={ti} style={{position:"fixed",left:sl.x-(colW2/2),top:sl.yStart-24,width:colW2,textAlign:"center",zIndex:9001,opacity:0.9,pointerEvents:"none"}}>
 <div style={{fontSize:isTabletSA?24:14,fontWeight:900,color:C[ti].ac,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{teams[ti].name}</div>
 </div>))}
-{/* Cards (all phases) */}
+{/* Cards (all phases) - CSS 3D flip */}
 {names.map((name,idx)=>{const ct=getCardTeam(idx);const ac=C[ct.teamIdx]?C[ct.teamIdx].ac:"#888";const suit=SUITS[ct.teamIdx]||SUITS[0];const orderNum=ct.inTeamIdx+1;
-const cardDealTime=T.p3+revealPos[idx]*perCard;const flipEnd2=cardDealTime+0.5;
-const showBack=phase<=2||(phase===3&&t<flipEnd2);
+const outer=getCardOuter(idx);const flipDeg=getFlipDeg(idx);const br=isTabletSA?16:12;
 const vName=name.length>7?name.slice(0,7):name;
 const vFs=isTabletSA?(name.length<=2?32:name.length<=4?28:name.length<=7?24:20):(name.length<=2?22:name.length<=4?18:name.length<=7?15:13);
 const vLs=isTabletSA?(name.length<=2?"6px":name.length<=4?"4px":"2px"):(name.length<=2?"4px":name.length<=4?"2px":"0px");
-return(<div key={idx} style={getCardStyle(idx)}>{showBack?(<>
-<img src="/card_back.JPG" alt="" style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",borderRadius:isTabletSA?16:12,pointerEvents:"none"}}/>
-</>):(<>
-<div style={{position:"absolute",top:0,left:0,right:0,height:3,borderRadius:(isTabletSA?16:12)+" "+(isTabletSA?16:12)+" 0 0",background:ac}}/>
+const cardDealTime2=T.p3+revealPos[idx]*perCard;const holdStart2=cardDealTime2+0.8;const holdEnd2=holdStart2+1.0;
+const isHolding=phase===3&&t>=holdStart2&&t<holdEnd2;const holdProg2=isHolding?(t-holdStart2)/1.0:0;
+const glowSh=isHolding?", 0 0 30px "+ac+"66":"";
+return(<div key={idx} style={{position:"fixed",left:outer.left,top:outer.top,width:cardW,height:cardH,
+perspective:"800px",WebkitPerspective:"800px",zIndex:outer.zIndex,opacity:outer.opacity,
+transform:"scale("+outer.scale+")"+(outer.rotate?" rotate("+outer.rotate+"deg)":""),transition:"none",willChange:"transform"}}>
+<div style={{width:"100%",height:"100%",transformStyle:"preserve-3d",WebkitTransformStyle:"preserve-3d",
+transform:"rotateY("+Math.round(flipDeg)+"deg)",transition:"none",position:"relative"}}>
+{/* Back face */}
+<div style={{position:"absolute",inset:0,backfaceVisibility:"hidden",WebkitBackfaceVisibility:"hidden",
+borderRadius:br,overflow:"hidden",boxShadow:"0 4px 20px rgba(0,0,0,0.3)"}}>
+<img src="/card_back.JPG" alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:br,pointerEvents:"none"}}/>
+</div>
+{/* Front face */}
+<div style={{position:"absolute",inset:0,backfaceVisibility:"hidden",WebkitBackfaceVisibility:"hidden",
+transform:"rotateY(180deg)",borderRadius:br,background:"#fff",overflow:"hidden",
+boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+glowSh,display:"flex",alignItems:"center",justifyContent:"center"}}>
+<div style={{position:"absolute",top:0,left:0,right:0,height:3,borderRadius:br+" "+br+" 0 0",background:ac}}/>
 <div style={{position:"absolute",inset:"6px 6px 6px 6px",border:"1px solid "+ac+"4d",borderRadius:6}}/>
 <div style={{position:"absolute",top:4,left:5,textAlign:"center",lineHeight:1}}>
 <div style={{fontSize:cornerNum,fontWeight:900,color:ac}}>{orderNum}</div>
@@ -777,18 +801,20 @@ return(<div key={idx} style={getCardStyle(idx)}>{showBack?(<>
 <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",display:"flex",alignItems:"center",justifyContent:"center",height:"calc(100% - "+(cornerNum*3+16)+"px)"}}>
 <div style={{writingMode:"vertical-rl",WebkitWritingMode:"vertical-rl",textOrientation:"upright",WebkitTextOrientation:"upright",fontSize:vFs,fontWeight:800,color:"#1a1a2e",letterSpacing:vLs,lineHeight:1,whiteSpace:"nowrap"}}>{vName}</div>
 </div>
-{phase===3&&t>=flipEnd2&&t<flipEnd2+1.0&&(()=>{const hp3=(t-flipEnd2)/1.0;return(<div style={{position:"absolute",top:0,bottom:0,width:40,background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent)",borderRadius:10,left:-40+(hp3*(cardW+80)),pointerEvents:"none"}}/>);})()}
-</>)}</div>);})}
+{isHolding&&<div style={{position:"absolute",top:0,bottom:0,width:40,background:"linear-gradient(90deg,transparent,rgba(255,255,255,0.18),transparent)",borderRadius:10,left:-40+(holdProg2*(cardW+80)),pointerEvents:"none"}}/>}
+</div>
+</div>
+</div>);})}
 {/* Phase 4: team reveal panel overlay */}
 {phase===4&&(<div style={{position:"fixed",inset:0,zIndex:9050,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:isTabletSA?24:16,opacity:Math.min(1,(t-T.p4)/0.3)}}>
 <div style={{display:isTabletSA&&nTeams>=3?"grid":"flex",gridTemplateColumns:isTabletSA&&nTeams>=3?"1fr 1fr":undefined,gap:isTabletSA?20:12,justifyContent:"center",flexWrap:"wrap",maxWidth:"100%",width:isTabletSA?"90%":undefined}}>
-{teams.map((tm,ti)=>{const suit=SUITS[ti]||SUITS[0];return(<div key={ti} style={{background:"rgba(0,0,0,0.6)",border:(isTabletSA?4:3)+"px solid "+C[ti].ac,borderRadius:isTabletSA?20:16,padding:isTabletSA?"20px 28px":"16px 20px",minWidth:isTabletSA?undefined:140,maxWidth:isTabletSA?undefined:200,minHeight:isTabletSA?280:undefined,flex:isTabletSA&&nTeams>=3?undefined:"1 1 0",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",transform:"scale("+(Math.min(1,(t-T.p4-ti*0.15)/0.3))+")",transition:"none"}}>
-<div style={{fontSize:isTabletSA?26:13,fontWeight:700,color:"rgba(255,255,255,0.7)",textAlign:"center",marginBottom:isTabletSA?4:2}}>{suit} {ti+1}番目</div>
+{teams.map((tm,ti)=>(<div key={ti} style={{background:"rgba(0,0,0,0.6)",border:(isTabletSA?4:3)+"px solid "+C[ti].ac,borderRadius:isTabletSA?20:16,padding:isTabletSA?"20px 28px":"16px 20px",minWidth:isTabletSA?undefined:140,maxWidth:isTabletSA?undefined:200,minHeight:isTabletSA?280:undefined,flex:isTabletSA&&nTeams>=3?undefined:"1 1 0",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)",transform:"scale("+(Math.min(1,(t-T.p4-ti*0.15)/0.3))+")",transition:"none"}}>
+<div style={{fontSize:isTabletSA?26:13,fontWeight:700,color:"rgba(255,255,255,0.7)",textAlign:"center",marginBottom:isTabletSA?4:2}}>{ti+1}番目</div>
 <div style={{fontSize:isTabletSA?38:22,fontWeight:900,color:C[ti].ac,textAlign:"center",marginBottom:isTabletSA?14:8,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{tm.name}</div>
 <div style={{borderTop:(isTabletSA?3:2)+"px solid "+C[ti].ac+"66",paddingTop:isTabletSA?12:8}}>
-{tm.players.map((p,pi)=>(<div key={pi} style={{fontSize:isTabletSA?30:18,fontWeight:700,color:"#fff",textAlign:"center",padding:isTabletSA?"6px 0":"4px 0",textShadow:"0 1px 2px rgba(0,0,0,0.4)"}}>{suit}{pi+1} {p}</div>))}
+{tm.players.map((p,pi)=>(<div key={pi} style={{fontSize:isTabletSA?30:18,fontWeight:700,color:"#fff",textAlign:"center",padding:isTabletSA?"6px 0":"4px 0",textShadow:"0 1px 2px rgba(0,0,0,0.4)"}}>{p}</div>))}
 </div>
-</div>);})}
+</div>))}
 </div>
 <button onClick={()=>setClosing(true)} style={{marginTop:isTabletSA?28:20,padding:isTabletSA?"16px 40px":"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?28:18,fontWeight:800,cursor:"pointer",opacity:Math.min(1,Math.max(0,(t-T.p4-0.5)/0.3)),transition:"opacity 0.2s"}}>閉じる</button>
 </div>)}
