@@ -1151,12 +1151,12 @@ const uM=(i,v)=>{setMems(p=>p.map((m,j)=>j===i?v.slice(0,MAX_NAME):m));setSp(nul
 const totalTeamsMulti=[1,2,3].filter(c=>c<=courtCount).reduce((s,c)=>s+courtTeamCounts[c],0);const maxShufForCourt=courtCount===1?tc*MAX_PL:totalTeamsMulti*MAX_PL;
 const aM=()=>{if(mems.length<maxShufForCourt){setMems(p=>[...p,""]);setSp(null);setAllCourtData(null);}};
 const rM=i=>{if(mems.length>2){setMems(p=>p.filter((_,j)=>j!==i));setSp(null);setAllCourtData(null);}};
-const doMultiCourtShuf=()=>{const totalTeams=Object.entries(courtTeamCounts).filter(([k])=>Number(k)<=courtCount).reduce((s,[,v])=>s+v,0);const allNames=[...mems.filter(m=>m.trim())];if(allNames.length<totalTeams)return null;
+const doMultiCourtShuf=()=>{const totalTeams=Object.entries(courtTeamCounts).filter(([k])=>Number(k)<=courtCount).reduce((s,[,v])=>s+v,0);const allNames=[...mems.filter(m=>m.trim())];const minReq=Math.max(totalTeams,courtCount*2);if(allNames.length<minReq)return null;
 const syncCode=getSyncCode();const currentFavs=loadFavs();
 const isKimuraEnabled=syncCode==="MolkkyFuji223"&&currentFavs.includes("\u30AD\u30E0\u30E9");
 let kimuraName=null;if(isKimuraEnabled){const ki=allNames.findIndex(n=>n==="\u30AD\u30E0\u30E9");if(ki>=0)kimuraName=allNames.splice(ki,1)[0];}
-const total=allNames.length;const base=Math.floor(total/courtCount);const rem=total%courtCount;
-const courtSizes={};for(let c=1;c<=courtCount;c++){const extraOrder=c===1?courtCount:c-1;courtSizes[c]=base+(extraOrder<=rem?1:0);}
+const total=allNames.length;const remaining=total-courtCount*2;const base2=remaining>=0?Math.floor(remaining/courtCount):0;const rem2=remaining>=0?remaining%courtCount:0;
+const courtSizes={};for(let c=1;c<=courtCount;c++){const extraOrder=c===1?courtCount:c-1;courtSizes[c]=2+base2+(extraOrder<=rem2?1:0);}
 const shuffled=shuf(allNames);const courtPlayers={};let idx=0;
 for(let c=1;c<=courtCount;c++){courtPlayers[c]=shuffled.slice(idx,idx+courtSizes[c]);idx+=courtSizes[c];}
 if(kimuraName)courtPlayers[1].push(kimuraName);
@@ -1178,7 +1178,9 @@ else{setSp(result);}}else{const courtResults=doMultiCourtShuf();if(!courtResults
 if(shufAnim){const courtOrder=[];for(let c=2;c<=courtCount;c++)courtOrder.push(c);courtOrder.push(1);
 setMultiCourtShufData({courtData:courtResults,courtOrder:courtOrder});}
 else{setSp(courtResults[1]);setAllCourtData(courtResults);}}};
-const okM=teams.slice(0,tc).every(t=>t.name.trim()&&t.players.some(p=>p.trim()));const totalTeamsForAllCourts=courtCount===1?tc:Object.entries(courtTeamCounts).filter(([k])=>Number(k)<=courtCount).reduce((s,[,v])=>s+v,0);const okS=mems.filter(m=>m.trim()).length>=totalTeamsForAllCourts;
+const okM=teams.slice(0,tc).every(t=>t.name.trim()&&t.players.some(p=>p.trim()));const totalTeamsForAllCourts=courtCount===1?tc:Object.entries(courtTeamCounts).filter(([k])=>Number(k)<=courtCount).reduce((s,[,v])=>s+v,0);
+const filledCount=mems.filter(m=>m.trim()).length;const hasEmpty=mems.some(m=>!m.trim());const minRequired=Math.max(totalTeamsForAllCourts,courtCount*2);const okS=!hasEmpty&&filledCount>=minRequired;
+const okSReason=hasEmpty?"未入力の欄があります":filledCount<minRequired?("最低"+minRequired+"人必要です"):"";
 const isSpValid=()=>{if(!sp||!Array.isArray(sp)||sp.length===0)return false;if(!sp.every(t=>t.players&&t.players.length>0&&t.players.some(p=>p.trim())))return false;if(!sp.every(t=>t.name&&t.name.trim()))return false;const totalP=sp.reduce((s,t)=>s+t.players.filter(p=>p.trim()).length,0);if(totalP<2)return false;const curNames=new Set(mems.filter(m=>m.trim()));return sp.flatMap(t=>t.players).every(n=>curNames.has(n));};
 const go=()=>{if(courtCount>=2){window.alert("複数コート機能は準備中です");return;}let ft;if(mode==="manual"){ft=teams.slice(0,tc).map(t=>({...t,players:t.players.filter(p=>p.trim())}));if(!ft.every(t=>t.players.length>0))return;}else{if(!sp||!isSpValid())return;ft=sp;}const ord=Array.from({length:ft.length},(_,i)=>i);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats);};
 const usedManual=courtCount>=2?[1,2,3].filter(c=>c<=courtCount).flatMap(c=>courtTeams[c].slice(0,courtTeamCounts[c]).flatMap(t=>t.players)).filter(p=>p.trim()).map(p=>p.trim()):teams.slice(0,tc).flatMap(t=>t.players).filter(p=>p.trim()).map(p=>p.trim());
@@ -1250,6 +1252,7 @@ return(
 {!editMode&&mems.length<maxShufForCourt&&<button style={{width:"100%",padding:10,border:"2px dashed var(--border-input)",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:6}} onClick={aM}>＋</button>}
 {!editMode&&<button onClick={()=>setShowSmartFav(true)} style={{width:"100%",padding:10,border:"2px solid var(--accent-blue)",borderRadius:8,background:"rgba(43,125,233,0.08)",color:"var(--accent-blue)",fontSize:16,fontWeight:700,cursor:"pointer",marginTop:4}}>{"\u2606"} お気に入りから選択追加</button>}
 {!editMode&&mems.length>2&&<button style={{width:"100%",padding:10,border:"2px dashed #f0b0b0",borderRadius:8,background:"transparent",color:"var(--text-danger)",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:4}} onClick={()=>rM(mems.length-1)}>− 最後を削除</button>}</div>
+{!okS&&okSReason&&<div style={{fontSize:13,fontWeight:700,color:"#e74c3c",textAlign:"center",marginBottom:4}}>{okSReason}</div>}
 <button style={{width:"100%",padding:16,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"var(--text-inverse)",fontSize:20,fontWeight:800,cursor:"pointer",opacity:okS?1:0.3}} onClick={okS?doShuf:undefined}>🎲 シャッフル</button>
 {courtCount>=2&&sp&&<div style={{padding:"8px 14px",borderRadius:8,marginBottom:8,marginTop:8,background:"rgba(43,125,233,0.1)",border:"1px solid rgba(43,125,233,0.2)",fontSize:13,color:"rgba(255,255,255,0.6)"}}>{"\uD83D\uDCF1"} 1コート（端末）の結果を表示中。他のコートはシャッフル演出で確認できます。</div>}
 {sp&&(<div style={{marginTop:courtCount>=2&&sp?0:8}}>{sp.map((t,ti)=>(<div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac,padding:"10px 16px",marginBottom:6}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:26,height:26,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-inverse)",fontWeight:900,fontSize:14,background:C[ti].ac}}>{ti+1}</div><input value={t.name} onChange={e=>setSp(p=>p.map((x,i)=>i===ti?{...x,name:e.target.value}:x))} style={{...TIN,fontSize:18}}/></div><div style={{paddingLeft:34,fontSize:16,color:"#555"}}>{t.players.join("、")}</div></div>))}
