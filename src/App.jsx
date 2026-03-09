@@ -655,7 +655,7 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 function CSSConfetti(){const colors=["#2b7de9","#d93a5e","#22b566","#d9a83a","#9b59b6","#e67e22","#1abc9c","#e74c3c","#ffd700","#ff69b4"];const pieces=Array.from({length:50},(_,i)=>({id:i,left:Math.random()*100,delay:Math.random()*2,color:colors[i%colors.length],size:6+Math.random()*8,shape:Math.random()>0.5?"50%":"0"}));return(<div className="mk-confetti-container">{pieces.map(p=>(<div key={p.id} className="mk-confetti-piece" style={{left:p.left+"%",width:p.size,height:p.size,background:p.color,borderRadius:p.shape,animationDelay:p.delay+"s"}}/>))}</div>);}
 
 /* ═══ Shuffle Card Animation ═══ */
-function ShuffleAnimation({names,teams,onDone}){
+function ShuffleAnimation({names,teams,onDone,skipIntro,remainingDeck,isLastCourt,courtLabel,isMultiCourt,onSkipThisCourt,onSkipAll}){
 const nCards=names.length;const nTeams=teams.length;
 const shufDur=nCards<=4?2:nCards<=6?3:nCards<=8?3.5:4;
 const perCard=2.8;const dealDur=nCards*perCard;
@@ -673,7 +673,7 @@ const cardW=isTabletSA?Math.max(60,Math.min(200,Math.floor(rawW))):90;
 const cardH=isTabletSA?Math.round(cardW*1.375):124;
 const cx=vwSA/2;const cy=viewH*(isTabletSA?0.18:0.30);
 /* Timing */
-const T={p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur};
+const T=skipIntro?{p0:0,p1:0,p1e:0,p2:0,p2e:0,p3:0,p3e:dealDur,p4:dealDur}:{p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur};
 const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(Date.now());const frameRef=useRef(null);
 const[flash,setFlash]=useState(false);const dealIdxRef=useRef(-1);const revealTeamRef=useRef(-1);
 const[closing,setClosing]=useState(false);const closeTRef=useRef(null);const[skipConfirm,setSkipConfirm]=useState(false);
@@ -690,7 +690,7 @@ if(el<T.p1)setPhase(0);
 else if(el<T.p1e)setPhase(1);
 else if(el<T.p2e){setPhase(2);const shufT=el-T.p2;if(shufT>0.3&&shufT<shufDur-0.3&&Math.random()<0.04)setFlash(true);}
 else if(el<T.p3e){setPhase(3);const dT=el-T.p3;const di=Math.floor(dT/perCard);if(di!==dealIdxRef.current&&di<nCards){dealIdxRef.current=di;lastActivityRef.current=Date.now();}}
-else{setPhase(4);const rT=el-T.p4;const ri=Math.floor(rT/(0.8/nTeams));if(ri!==revealTeamRef.current&&ri<nTeams){revealTeamRef.current=ri;lastActivityRef.current=Date.now();}}
+else if(isLastCourt){setPhase(5);if(el>=T.p3e+1.0&&!closing){setClosing(true);}}else{setPhase(4);const rT=el-T.p4;const ri=Math.floor(rT/(0.8/nTeams));if(ri!==revealTeamRef.current&&ri<nTeams){revealTeamRef.current=ri;lastActivityRef.current=Date.now();}}
 frameRef.current=requestAnimationFrame(animate);};
 frameRef.current=requestAnimationFrame(animate);
 return()=>{if(frameRef.current)cancelAnimationFrame(frameRef.current);};
@@ -805,6 +805,8 @@ boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+glowSh,display:"flex",alignItems:"center"
 </div>
 </div>
 </div>);})}
+{/* Remaining deck cards for multi-court */}
+{remainingDeck>0&&phase>=3&&Array.from({length:Math.min(remainingDeck,8)},(_,i)=>(<div key={"rem"+i} style={{position:"fixed",left:cx-cardW/2+i*1,top:cy-cardH/2-i*1,width:cardW,height:cardH,borderRadius:isTabletSA?16:12,overflow:"hidden",boxShadow:"0 4px 20px rgba(0,0,0,0.3)",zIndex:9000+i,opacity:dealIdxRef.current>=nCards-1?0.7:1}}><img src="/card_back.JPG" alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:isTabletSA?16:12,pointerEvents:"none"}}/></div>))}
 {/* Phase 4: team reveal panel overlay */}
 {phase===4&&(<div style={{position:"fixed",inset:0,zIndex:9050,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:isTabletSA?24:16,opacity:Math.min(1,(t-T.p4)/0.3)}}>
 <div style={{display:isTabletSA&&nTeams>=3?"grid":"flex",gridTemplateColumns:isTabletSA&&nTeams>=3?"1fr 1fr":undefined,gap:isTabletSA?20:12,justifyContent:"center",flexWrap:"wrap",maxWidth:"100%",width:isTabletSA?"90%":undefined}}>
@@ -816,22 +818,59 @@ boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+glowSh,display:"flex",alignItems:"center"
 </div>
 </div>))}
 </div>
-<button onClick={()=>setClosing(true)} style={{marginTop:isTabletSA?28:20,padding:isTabletSA?"16px 40px":"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?28:18,fontWeight:800,cursor:"pointer",opacity:Math.min(1,Math.max(0,(t-T.p4-0.5)/0.3)),transition:"opacity 0.2s"}}>閉じる</button>
+<button onClick={()=>setClosing(true)} style={{marginTop:isTabletSA?28:20,padding:isTabletSA?"16px 40px":"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?28:18,fontWeight:800,cursor:"pointer",opacity:Math.min(1,Math.max(0,(t-T.p4-0.5)/0.3)),transition:"opacity 0.2s"}}>{isMultiCourt&&!isLastCourt?"次のコートへ \u25B6":"閉じる"}</button>
 </div>)}
+{/* Court label for multi-court */}
+{courtLabel&&<div style={{position:"fixed",top:"calc(12px + env(safe-area-inset-top, 0px))",left:0,right:0,textAlign:"center",zIndex:9200,pointerEvents:"none"}}><span style={{fontSize:isTabletSA?22:16,fontWeight:900,color:"rgba(255,255,255,0.8)",background:"rgba(0,0,0,0.4)",padding:"6px 20px",borderRadius:20,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>{courtLabel}</span></div>}
 {/* Skip button during animation */}
 {phase<4&&!closing&&!skipConfirm&&<button onClick={()=>setSkipConfirm(true)} style={{position:"fixed",bottom:"calc(24px + env(safe-area-inset-bottom, 0px))",right:20,padding:"8px 16px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:20,background:"rgba(0,0,0,0.4)",color:"rgba(255,255,255,0.7)",fontSize:13,fontWeight:600,cursor:"pointer",zIndex:9200,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>スキップ ⏭</button>}
 {/* Skip confirm dialog */}
 {skipConfirm&&<div style={{position:"fixed",inset:0,zIndex:9300,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>
-<div style={{background:"#1a1a2e",border:"1px solid rgba(255,255,255,0.2)",borderRadius:16,padding:"24px 28px",textAlign:"center",maxWidth:280}}>
+<div style={{background:"#1a1a2e",border:"1px solid rgba(255,255,255,0.2)",borderRadius:16,padding:"24px 28px",textAlign:"center",maxWidth:isMultiCourt?320:280}}>
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>スキップしますか？</div>
-<div style={{display:"flex",gap:10,justifyContent:"center"}}>
+{isMultiCourt?(<div style={{display:"flex",flexDirection:"column",gap:8}}>
+<button onClick={()=>{setSkipConfirm(false);if(onSkipThisCourt)onSkipThisCourt();}} style={{padding:"12px 0",border:"none",borderRadius:10,background:"var(--accent-blue,#2b7de9)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>このコートはスキップ</button>
+<button onClick={()=>{setSkipConfirm(false);if(onSkipAll)onSkipAll();}} style={{padding:"12px 0",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>全てスキップ</button>
+<button onClick={()=>setSkipConfirm(false)} style={{padding:"12px 0",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"rgba(255,255,255,0.5)",fontSize:14,fontWeight:600,cursor:"pointer"}}>いいえ</button>
+</div>):(<div style={{display:"flex",gap:10,justifyContent:"center"}}>
 <button onClick={()=>{setSkipConfirm(false);onDone();}} style={{flex:1,padding:"10px 0",border:"none",borderRadius:10,background:"var(--accent-blue,#2b7de9)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>はい</button>
 <button onClick={()=>setSkipConfirm(false)} style={{flex:1,padding:"10px 0",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>いいえ</button>
-</div>
+</div>)}
 </div>
 </div>}
 </div>);
 }catch(e){console.error("ShuffleAnimation error:",e);try{onDone();}catch(e2){}return null;}
+}
+
+function CourtRevealPanel({teams,courtLabel,isLast,onNext}){
+const vwSA=typeof window!=="undefined"?window.innerWidth:375;const isTabletSA=vwSA>=768;const nTeams=teams.length;
+return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:9000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:isTabletSA?24:16}}>
+{courtLabel&&<div style={{position:"fixed",top:"calc(12px + env(safe-area-inset-top, 0px))",left:0,right:0,textAlign:"center",zIndex:9200}}><span style={{fontSize:isTabletSA?22:16,fontWeight:900,color:"rgba(255,255,255,0.8)",background:"rgba(0,0,0,0.4)",padding:"6px 20px",borderRadius:20}}>{courtLabel}</span></div>}
+<div style={{display:isTabletSA&&nTeams>=3?"grid":"flex",gridTemplateColumns:isTabletSA&&nTeams>=3?"1fr 1fr":undefined,gap:isTabletSA?20:12,justifyContent:"center",flexWrap:"wrap",maxWidth:"100%",width:isTabletSA?"90%":undefined}}>
+{teams.map((tm,ti)=>(<div key={ti} style={{background:"rgba(0,0,0,0.6)",border:(isTabletSA?4:3)+"px solid "+C[ti].ac,borderRadius:isTabletSA?20:16,padding:isTabletSA?"20px 28px":"16px 20px",minWidth:isTabletSA?undefined:140,maxWidth:isTabletSA?undefined:200,minHeight:isTabletSA?280:undefined,flex:isTabletSA&&nTeams>=3?undefined:"1 1 0",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+<div style={{fontSize:isTabletSA?26:13,fontWeight:700,color:"rgba(255,255,255,0.7)",textAlign:"center",marginBottom:isTabletSA?4:2}}>{ti+1}番目</div>
+<div style={{fontSize:isTabletSA?38:22,fontWeight:900,color:C[ti].ac,textAlign:"center",marginBottom:isTabletSA?14:8,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{tm.name}</div>
+<div style={{borderTop:(isTabletSA?3:2)+"px solid "+C[ti].ac+"66",paddingTop:isTabletSA?12:8}}>
+{tm.players.map((p,pi)=>(<div key={pi} style={{fontSize:isTabletSA?30:18,fontWeight:700,color:"#fff",textAlign:"center",padding:isTabletSA?"6px 0":"4px 0",textShadow:"0 1px 2px rgba(0,0,0,0.4)"}}>{p}</div>))}
+</div></div>))}
+</div>
+<button onClick={onNext} style={{marginTop:isTabletSA?28:20,padding:isTabletSA?"16px 40px":"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?28:18,fontWeight:800,cursor:"pointer"}}>{isLast?"閉じる":"次のコートへ \u25B6"}</button>
+</div>);
+}
+
+function MultiCourtShuffleManager({courtData,courtCount,courtOrder,onAllDone,onSkipAll}){
+const[currentCourtIdx,setCurrentCourtIdx]=useState(0);
+const[skipToReveal,setSkipToReveal]=useState(false);
+const currentCourtNum=courtOrder[currentCourtIdx];
+const isFirst=currentCourtIdx===0;
+const isLast=currentCourtIdx===courtOrder.length-1;
+const currentTeams=courtData[currentCourtNum];
+const currentNames=currentTeams.flatMap(t=>t.players);
+const remainingCards=courtOrder.slice(currentCourtIdx+1).reduce((sum,cn)=>sum+courtData[cn].flatMap(t=>t.players).length,0);
+const courtLabel=currentCourtNum===1?"\uD83D\uDCF1 1コート（端末）":"\uD83D\uDCCB "+currentCourtNum+"コート（紙）";
+const handleCourtDone=()=>{if(isLast){onAllDone(courtData);}else{setCurrentCourtIdx(p=>p+1);setSkipToReveal(false);}};
+const handleSkipThisCourt=()=>{setSkipToReveal(true);};
+return(<>{skipToReveal?(<CourtRevealPanel teams={currentTeams} courtLabel={courtLabel} isLast={isLast} onNext={handleCourtDone}/>):(<ShuffleAnimation names={currentNames} teams={currentTeams} onDone={handleCourtDone} skipIntro={!isFirst} remainingDeck={remainingCards} isLastCourt={isLast} courtLabel={courtLabel} isMultiCourt={true} onSkipThisCourt={handleSkipThisCourt} onSkipAll={()=>onSkipAll(courtData)}/>)}</>);
 }
 
 const VT={writingMode:"vertical-rl",WebkitWritingMode:"vertical-rl",textOrientation:"upright",WebkitTextOrientation:"upright",letterSpacing:"-1px",lineHeight:1,margin:"0 auto",whiteSpace:"nowrap",overflow:"hidden",display:"inline-block"};
@@ -1052,6 +1091,7 @@ const[saveToStats,setSaveToStats]=useState(true);
 const[teams,setTeams]=useState(()=>{if(savedTeams){const base=savedTeams.map(t=>({name:t.name,players:t.players.length>0?t.players:[""]}));while(base.length<MAX_TEAMS)base.push({name:"チーム"+(base.length+1),players:[""]});return base.slice(0,MAX_TEAMS);}return Array.from({length:MAX_TEAMS},(_,i)=>({name:"チーム"+(i+1),players:[""]}));});
 const[mems,setMems]=useState(Array(4).fill(""));const[sp,setSp]=useState(null);const[showSetupStats,setShowSetupStats]=useState(false);
 const[showSettings,setShowSettings]=useState(false);const[shufAnimData,setShufAnimData]=useState(null);
+const[multiCourtShufData,setMultiCourtShufData]=useState(null);const[allCourtData,setAllCourtData]=useState(null);
 const[editMode,setEditMode]=useState(false);const[expandedDel,setExpandedDel]=useState(null);const lpRef=useRef(null);
 const lpStart=(e)=>{if(e.target.tagName==="INPUT"||e.target.tagName==="BUTTON"||e.target.tagName==="SELECT")return;lpRef.current=setTimeout(()=>{setEditMode(true);setExpandedDel(null);},600);};
 const lpEnd=()=>{if(lpRef.current){clearTimeout(lpRef.current);lpRef.current=null;}};
@@ -1070,6 +1110,19 @@ const ctRp=(c,ti,pi)=>setCourtTeams(p=>({...p,[c]:p[c].map((t,j)=>j===ti&&t.play
 const uM=(i,v)=>setMems(p=>p.map((m,j)=>j===i?v.slice(0,MAX_NAME):m));
 const aM=()=>{if(mems.length<MAX_SHUF)setMems(p=>[...p,""]);};
 const rM=i=>{if(mems.length>2)setMems(p=>p.filter((_,j)=>j!==i));};
+const doMultiCourtShuf=()=>{const allNames=[...mems.filter(m=>m.trim())];if(allNames.length<courtCount*2)return null;
+const syncCode=getSyncCode();const currentFavs=loadFavs();
+const isKimuraEnabled=syncCode==="MolkkyFuji223"&&currentFavs.includes("\u30AD\u30E0\u30E9");
+let kimuraName=null;if(isKimuraEnabled){const ki=allNames.findIndex(n=>n==="\u30AD\u30E0\u30E9");if(ki>=0)kimuraName=allNames.splice(ki,1)[0];}
+const total=allNames.length;const base=Math.floor(total/courtCount);const rem=total%courtCount;
+const courtSizes={};for(let c=1;c<=courtCount;c++){const extraOrder=c===1?courtCount:c-1;courtSizes[c]=base+(extraOrder<=rem?1:0);}
+const shuffled=shuf(allNames);const courtPlayers={};let idx=0;
+for(let c=1;c<=courtCount;c++){courtPlayers[c]=shuffled.slice(idx,idx+courtSizes[c]);idx+=courtSizes[c];}
+if(kimuraName)courtPlayers[1].push(kimuraName);
+const courtResults={};for(let c=1;c<=courtCount;c++){const players=shuf(courtPlayers[c]);const nT=courtTeamCounts[c];
+const tSizes=[];const b2=Math.floor(players.length/nT);const r2=players.length%nT;for(let i=0;i<nT;i++)tSizes.push(b2+(i<r2?1:0));
+const tms=[];let pi=0;for(let i=0;i<nT;i++){tms.push({name:"\u30C1\u30FC\u30E0"+(i+1),players:players.slice(pi,pi+tSizes[i])});pi+=tSizes[i];}
+courtResults[c]=tms;}return courtResults;};
 const doShufCore=()=>{const names=mems.filter(m=>m.trim());if(names.length<tc)return null;
 const prevSets=sp?sp.map(t=>new Set(t.players)):null;
 const teamSizes=[];{const base=Math.floor(names.length/tc);const rem=names.length%tc;for(let i=0;i<tc;i++)teamSizes.push(base+(i<rem?1:0));}
@@ -1078,10 +1131,13 @@ let result=tryOnce();
 if(prevSets&&names.length>tc){for(let att=0;att<10;att++){const same=result.some(t=>{const ts=new Set(t.players);return prevSets.some(ps=>ps.size===ts.size&&[...ts].every(n=>ps.has(n)));});if(!same)break;result=tryOnce();}}
 const ord=shuf(Array.from({length:tc},(_,i)=>i));
 return ord.map(i=>result[i]);};
-const doShuf=()=>{const result=doShufCore();if(!result)return;
+const doShuf=()=>{if(courtCount===1){const result=doShufCore();if(!result)return;
 if(shufAnim){const allNames=result.flatMap(t=>t.players);setShufAnimData({names:allNames,teams:result});}
-else{setSp(result);}};
-const okM=teams.slice(0,tc).every(t=>t.name.trim()&&t.players.some(p=>p.trim()));const okS=mems.filter(m=>m.trim()).length>=tc;
+else{setSp(result);}}else{const courtResults=doMultiCourtShuf();if(!courtResults)return;
+if(shufAnim){const courtOrder=[];for(let c=2;c<=courtCount;c++)courtOrder.push(c);courtOrder.push(1);
+setMultiCourtShufData({courtData:courtResults,courtOrder:courtOrder});}
+else{setSp(courtResults[1]);setAllCourtData(courtResults);}}};
+const okM=teams.slice(0,tc).every(t=>t.name.trim()&&t.players.some(p=>p.trim()));const okS=courtCount>=2?mems.filter(m=>m.trim()).length>=courtCount*2:mems.filter(m=>m.trim()).length>=tc;
 const go=()=>{if(courtCount>=2){window.alert("複数コート機能は準備中です");return;}let ft;if(mode==="manual")ft=teams.slice(0,tc).map(t=>({...t,players:t.players.filter(p=>p.trim())}));else{if(!sp)return;ft=sp;}const ord=Array.from({length:ft.length},(_,i)=>i);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats);};
 const usedManual=courtCount>=2?[1,2,3].filter(c=>c<=courtCount).flatMap(c=>courtTeams[c].slice(0,courtTeamCounts[c]).flatMap(t=>t.players)).filter(p=>p.trim()).map(p=>p.trim()):teams.slice(0,tc).flatMap(t=>t.players).filter(p=>p.trim()).map(p=>p.trim());
 const usedShuffle=mems.filter(m=>m.trim()).map(m=>m.trim());const used=mode==="manual"?usedManual:usedShuffle;
@@ -1160,6 +1216,7 @@ return(
 {showSetupStats&&<StatsModal onClose={()=>setShowSetupStats(false)} source="setup" isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
 {showSettings&&<SettingsPage onClose={()=>setShowSettings(false)} isAdmin={isAdmin} onAdminToggle={onAdminToggle} aiEnabled={aiEnabled} onAIToggle={onAIToggle} shufAnim={shufAnim} onShufAnimToggle={onShufAnimToggle}/>}
 {shufAnimData&&<ShuffleAnimation names={shufAnimData.names} teams={shufAnimData.teams} onDone={()=>{if(shufAnimData.goData){const{ft,ord}=shufAnimData.goData;setShufAnimData(null);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats);}else{setSp(shufAnimData.teams);setShufAnimData(null);}}}/>}
+{multiCourtShufData&&<MultiCourtShuffleManager courtData={multiCourtShufData.courtData} courtCount={courtCount} courtOrder={multiCourtShufData.courtOrder} onAllDone={(data)=>{setMultiCourtShufData(null);setAllCourtData(data);setSp(data[1]);console.log("全コートシャッフル完了:",data);}} onSkipAll={(data)=>{setMultiCourtShufData(null);setAllCourtData(data);setSp(data[1]);console.log("全コートスキップ完了:",data);}}/>}
 </div>);
 }
 
