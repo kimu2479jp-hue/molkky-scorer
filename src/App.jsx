@@ -850,7 +850,7 @@ const showDevMaster=(()=>{try{return localStorage.getItem("mk-dev-master")==="1"
 const classify=(name)=>{if(showDevMaster&&DEV_MASTER_LIST.includes(name))return"master";if(!showDevMaster&&DEV_MASTER_LIST.includes(name))return"regular";const gs=stats[name]||[];const gc=gs.length;if(gc===0)return"never";const lastDate=gs.reduce((lat,g)=>{const d=new Date(g.d);return d>lat?d:lat;},new Date(0));const days=Math.floor((new Date()-lastDate)/(1000*60*60*24));if(days<=14&&gc>=5)return"regular";if(days<=30&&gc>=2)return"semi";return"occasional";};
 const grouped={};favs.forEach(name=>{const g=classify(name);if(!grouped[g])grouped[g]=[];const gs=stats[name]||[];grouped[g].push({name,gameCount:gs.length});});
 Object.values(grouped).forEach(arr=>arr.sort((a,b)=>b.gameCount-a.gameCount));
-const GC=[{key:"master",label:"\u25E4 \u958B\u767A\u8005\u300A\uD835\uDD2E\uD835\uDD1E\uD835\uDD30\uD835\uDD31\uD835\uDD22\uD835\uDD2F\u300B\u25E2",color:"#ffd700",show:showDevMaster},{key:"regular",label:"\u5E38\u9023",color:"#22b566"},{key:"semi",label:"\u6E96\u30EC\u30AE\u30E5\u30E9\u30FC",color:"#2b7de9"},{key:"occasional",label:"\u305F\u307E\u306B\u53C2\u52A0",color:"#f0a030"},{key:"never",label:"\u672A\u53C2\u52A0",color:"#999"}];
+const GC=[{key:"master",label:"master",color:"#1a1a2e",accent:"#ffd700",show:showDevMaster},{key:"regular",label:"\u5E38\u9023",color:"#22b566"},{key:"semi",label:"\u6E96\u30EC\u30AE\u30E5\u30E9\u30FC",color:"#2b7de9"},{key:"occasional",label:"\u305F\u307E\u306B\u53C2\u52A0",color:"#f0a030"},{key:"never",label:"\u672A\u53C2\u52A0",color:"#999"}];
 const toggle=(name)=>{if(usedSet.has(name))return;setSelected(p=>{const n=new Set(p);if(n.has(name))n.delete(name);else n.add(name);return n;});};
 const toggleGroup=(members)=>{const selectable=members.filter(f=>!usedSet.has(f.name)).map(f=>f.name);const allSel=selectable.length>0&&selectable.every(n=>selected.has(n));setSelected(p=>{const n=new Set(p);if(allSel)selectable.forEach(nm=>n.delete(nm));else selectable.forEach(nm=>n.add(nm));return n;});};
 return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
@@ -862,12 +862,12 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
 {GC.filter(g=>g.show!==false).map(gc=>{const members=grouped[gc.key]||[];if(members.length===0)return null;
 const selectable=members.filter(f=>!usedSet.has(f.name)).map(f=>f.name);const allSel=selectable.length>0&&selectable.every(n=>selected.has(n));
 return(<div key={gc.key} style={{marginBottom:10}}>
-<div onClick={()=>toggleGroup(members)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",borderRadius:8,background:gc.color+"11",border:"1px solid "+gc.color+"33",cursor:"pointer",marginBottom:4}}>
+<div onClick={()=>toggleGroup(members)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",borderRadius:8,background:(gc.accent||gc.color)+"11",border:"1px solid "+(gc.accent||gc.color)+"33",cursor:"pointer",marginBottom:4}}>
 <div style={{display:"flex",alignItems:"center",gap:8}}>
-<div style={{width:18,height:18,borderRadius:4,border:allSel?"none":"2px solid "+gc.color+"66",background:allSel?gc.color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11,fontWeight:900}}>{allSel&&"\u2713"}</div>
-<span style={{fontSize:14,fontWeight:800,color:gc.color}}>{gc.label}</span>
+<div style={{width:18,height:18,borderRadius:4,border:allSel?"none":"2px solid "+(gc.accent||gc.color)+"66",background:allSel?(gc.accent||gc.color):"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11,fontWeight:900}}>{allSel&&"\u2713"}</div>
+{gc.key==="master"?<span style={{fontSize:14,fontWeight:800,color:gc.color}}>{"\u25E4"} 開発者{"\u300A"}<span style={{fontStyle:"italic",fontWeight:900}}>Master</span>{"\u300B\u25E2"}</span>:<span style={{fontSize:14,fontWeight:800,color:gc.color}}>{gc.label}</span>}
 </div>
-<span style={{fontSize:12,color:gc.color+"99"}}>{members.length}人</span>
+<span style={{fontSize:12,color:(gc.accent||gc.color)+"99"}}>{members.length}人</span>
 </div>
 <div style={{display:"flex",flexWrap:"wrap",gap:5,paddingLeft:4}}>
 {members.map(fav=>{const isAdded=usedSet.has(fav.name);const isSel=selected.has(fav.name);return(
