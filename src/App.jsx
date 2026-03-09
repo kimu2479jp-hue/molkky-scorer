@@ -898,15 +898,19 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zInde
 function MultiCourtShuffleManager({courtData,courtCount,courtOrder,onAllDone,onSkipAll}){
 const[currentCourtIdx,setCurrentCourtIdx]=useState(0);
 const[skipToReveal,setSkipToReveal]=useState(false);
-const currentCourtNum=courtOrder[currentCourtIdx];
-const isFirst=currentCourtIdx===0;
-const isLast=currentCourtIdx===courtOrder.length-1;
+const lastIdxRef=useRef(0);
+if(currentCourtIdx>=0)lastIdxRef.current=currentCourtIdx;
+const safeIdx=currentCourtIdx>=0?currentCourtIdx:lastIdxRef.current;
+const currentCourtNum=courtOrder[safeIdx];
+const isFirst=safeIdx===0;
+const isLast=safeIdx===courtOrder.length-1;
 const currentTeams=courtData[currentCourtNum];
 const currentNames=currentTeams.flatMap(t=>t.players);
-const remainingCards=courtOrder.slice(currentCourtIdx+1).reduce((sum,cn)=>sum+courtData[cn].flatMap(t=>t.players).length,0);
+const remainingCards=courtOrder.slice(safeIdx+1).reduce((sum,cn)=>sum+courtData[cn].flatMap(t=>t.players).length,0);
 const courtLabel=currentCourtNum===1?"\uD83D\uDCF1 1コート（端末）":"\uD83D\uDCCB "+currentCourtNum+"コート（紙）";
-const handleCourtDone=()=>{if(isLast){onAllDone(courtData);}else{setCurrentCourtIdx(p=>p+1);setSkipToReveal(false);}};
+const handleCourtDone=()=>{setCurrentCourtIdx(-1);setSkipToReveal(false);setTimeout(()=>{if(isLast){onAllDone(courtData);}else{setCurrentCourtIdx(safeIdx+1);}},50);};
 const handleSkipThisCourt=()=>{setSkipToReveal(true);};
+if(currentCourtIdx<0)return null;
 return(<>{skipToReveal?(<CourtRevealPanel teams={currentTeams} courtLabel={courtLabel} isLast={isLast} onNext={handleCourtDone}/>):(<ShuffleAnimation names={currentNames} teams={currentTeams} onDone={handleCourtDone} skipIntro={!isFirst} remainingDeck={remainingCards} isLastCourt={isLast} courtLabel={courtLabel} isMultiCourt={true} onSkipThisCourt={handleSkipThisCourt} onSkipAll={()=>onSkipAll(courtData)}/>)}</>);
 }
 
