@@ -655,7 +655,7 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 function CSSConfetti(){const colors=["#2b7de9","#d93a5e","#22b566","#d9a83a","#9b59b6","#e67e22","#1abc9c","#e74c3c","#ffd700","#ff69b4"];const pieces=Array.from({length:50},(_,i)=>({id:i,left:Math.random()*100,delay:Math.random()*2,color:colors[i%colors.length],size:6+Math.random()*8,shape:Math.random()>0.5?"50%":"0"}));return(<div className="mk-confetti-container">{pieces.map(p=>(<div key={p.id} className="mk-confetti-piece" style={{left:p.left+"%",width:p.size,height:p.size,background:p.color,borderRadius:p.shape,animationDelay:p.delay+"s"}}/>))}</div>);}
 
 /* ═══ Shuffle Card Animation ═══ */
-function ShuffleAnimation({names,teams,onDone}){
+function ShuffleAnimation({names,teams,onDone,skipIntro,remainingDeck,isLastCourt,courtLabel,isMultiCourt,onSkipThisCourt,onSkipAll}){
 const nCards=names.length;const nTeams=teams.length;
 const shufDur=nCards<=4?2:nCards<=6?3:nCards<=8?3.5:4;
 const perCard=2.8;const dealDur=nCards*perCard;
@@ -673,7 +673,7 @@ const cardW=isTabletSA?Math.max(60,Math.min(200,Math.floor(rawW))):90;
 const cardH=isTabletSA?Math.round(cardW*1.375):124;
 const cx=vwSA/2;const cy=viewH*(isTabletSA?0.18:0.30);
 /* Timing */
-const T={p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur};
+const T=skipIntro?{p0:0,p1:0,p1e:0,p2:0,p2e:0,p3:0,p3e:dealDur,p4:dealDur}:{p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur};
 const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(Date.now());const frameRef=useRef(null);
 const[flash,setFlash]=useState(false);const dealIdxRef=useRef(-1);const revealTeamRef=useRef(-1);
 const[closing,setClosing]=useState(false);const closeTRef=useRef(null);const[skipConfirm,setSkipConfirm]=useState(false);
@@ -690,7 +690,7 @@ if(el<T.p1)setPhase(0);
 else if(el<T.p1e)setPhase(1);
 else if(el<T.p2e){setPhase(2);const shufT=el-T.p2;if(shufT>0.3&&shufT<shufDur-0.3&&Math.random()<0.04)setFlash(true);}
 else if(el<T.p3e){setPhase(3);const dT=el-T.p3;const di=Math.floor(dT/perCard);if(di!==dealIdxRef.current&&di<nCards){dealIdxRef.current=di;lastActivityRef.current=Date.now();}}
-else{setPhase(4);const rT=el-T.p4;const ri=Math.floor(rT/(0.8/nTeams));if(ri!==revealTeamRef.current&&ri<nTeams){revealTeamRef.current=ri;lastActivityRef.current=Date.now();}}
+else if(isLastCourt){setPhase(5);if(el>=T.p3e+1.0&&!closing){setClosing(true);}}else{setPhase(4);const rT=el-T.p4;const ri=Math.floor(rT/(0.8/nTeams));if(ri!==revealTeamRef.current&&ri<nTeams){revealTeamRef.current=ri;lastActivityRef.current=Date.now();}}
 frameRef.current=requestAnimationFrame(animate);};
 frameRef.current=requestAnimationFrame(animate);
 return()=>{if(frameRef.current)cancelAnimationFrame(frameRef.current);};
@@ -805,6 +805,8 @@ boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+glowSh,display:"flex",alignItems:"center"
 </div>
 </div>
 </div>);})}
+{/* Remaining deck cards for multi-court */}
+{remainingDeck>0&&phase>=3&&Array.from({length:Math.min(remainingDeck,8)},(_,i)=>(<div key={"rem"+i} style={{position:"fixed",left:cx-cardW/2+i*1,top:cy-cardH/2-i*1,width:cardW,height:cardH,borderRadius:isTabletSA?16:12,overflow:"hidden",boxShadow:"0 4px 20px rgba(0,0,0,0.3)",zIndex:9000+i,opacity:dealIdxRef.current>=nCards-1?0.7:1}}><img src="/card_back.JPG" alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:isTabletSA?16:12,pointerEvents:"none"}}/></div>))}
 {/* Phase 4: team reveal panel overlay */}
 {phase===4&&(<div style={{position:"fixed",inset:0,zIndex:9050,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:isTabletSA?24:16,opacity:Math.min(1,(t-T.p4)/0.3)}}>
 <div style={{display:isTabletSA&&nTeams>=3?"grid":"flex",gridTemplateColumns:isTabletSA&&nTeams>=3?"1fr 1fr":undefined,gap:isTabletSA?20:12,justifyContent:"center",flexWrap:"wrap",maxWidth:"100%",width:isTabletSA?"90%":undefined}}>
@@ -816,22 +818,100 @@ boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+glowSh,display:"flex",alignItems:"center"
 </div>
 </div>))}
 </div>
-<button onClick={()=>setClosing(true)} style={{marginTop:isTabletSA?28:20,padding:isTabletSA?"16px 40px":"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?28:18,fontWeight:800,cursor:"pointer",opacity:Math.min(1,Math.max(0,(t-T.p4-0.5)/0.3)),transition:"opacity 0.2s"}}>閉じる</button>
+<button onClick={()=>setClosing(true)} style={{marginTop:isTabletSA?28:20,padding:isTabletSA?"16px 40px":"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?28:18,fontWeight:800,cursor:"pointer",opacity:Math.min(1,Math.max(0,(t-T.p4-0.5)/0.3)),transition:"opacity 0.2s"}}>{isMultiCourt&&!isLastCourt?"次のコートへ \u25B6":"閉じる"}</button>
 </div>)}
+{/* Court label for multi-court */}
+{courtLabel&&<div style={{position:"fixed",top:"calc(16px + env(safe-area-inset-top, 0px))",left:isTabletSA?32:16,zIndex:9200,pointerEvents:"none"}}><span style={{fontSize:isTabletSA?22:16,fontWeight:900,color:"rgba(255,255,255,0.9)",background:"rgba(0,0,0,0.5)",padding:isTabletSA?"8px 24px":"6px 16px",borderRadius:12,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>{courtLabel}</span></div>}
 {/* Skip button during animation */}
 {phase<4&&!closing&&!skipConfirm&&<button onClick={()=>setSkipConfirm(true)} style={{position:"fixed",bottom:"calc(24px + env(safe-area-inset-bottom, 0px))",right:20,padding:"8px 16px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:20,background:"rgba(0,0,0,0.4)",color:"rgba(255,255,255,0.7)",fontSize:13,fontWeight:600,cursor:"pointer",zIndex:9200,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>スキップ ⏭</button>}
 {/* Skip confirm dialog */}
 {skipConfirm&&<div style={{position:"fixed",inset:0,zIndex:9300,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>
-<div style={{background:"#1a1a2e",border:"1px solid rgba(255,255,255,0.2)",borderRadius:16,padding:"24px 28px",textAlign:"center",maxWidth:280}}>
+<div style={{background:"#1a1a2e",border:"1px solid rgba(255,255,255,0.2)",borderRadius:16,padding:"24px 28px",textAlign:"center",maxWidth:isMultiCourt?320:280}}>
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>スキップしますか？</div>
-<div style={{display:"flex",gap:10,justifyContent:"center"}}>
+{isMultiCourt?(<div style={{display:"flex",flexDirection:"column",gap:8}}>
+<button onClick={()=>{setSkipConfirm(false);if(onSkipThisCourt)onSkipThisCourt();}} style={{padding:"12px 0",border:"none",borderRadius:10,background:"var(--accent-blue,#2b7de9)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>このコートはスキップ</button>
+<button onClick={()=>{setSkipConfirm(false);if(onSkipAll)onSkipAll();}} style={{padding:"12px 0",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>全てスキップ</button>
+<button onClick={()=>setSkipConfirm(false)} style={{padding:"12px 0",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"rgba(255,255,255,0.5)",fontSize:14,fontWeight:600,cursor:"pointer"}}>いいえ</button>
+</div>):(<div style={{display:"flex",gap:10,justifyContent:"center"}}>
 <button onClick={()=>{setSkipConfirm(false);onDone();}} style={{flex:1,padding:"10px 0",border:"none",borderRadius:10,background:"var(--accent-blue,#2b7de9)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>はい</button>
 <button onClick={()=>setSkipConfirm(false)} style={{flex:1,padding:"10px 0",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>いいえ</button>
-</div>
+</div>)}
 </div>
 </div>}
 </div>);
 }catch(e){console.error("ShuffleAnimation error:",e);try{onDone();}catch(e2){}return null;}
+}
+
+const DEV_MASTER_LIST=["キムラ"];
+function SmartFavPicker({favs,stats,usedNames,onAdd,onClose}){
+const usedSet=new Set(Array.isArray(usedNames)?usedNames:[]);
+const[selected,setSelected]=useState(()=>{const s=new Set();const showDev=(()=>{try{return localStorage.getItem("mk-dev-master")==="1";}catch(e){return false;}})();if(showDev){DEV_MASTER_LIST.forEach(n=>{if(favs.includes(n)&&!usedSet.has(n))s.add(n);});}return s;});
+const showDevMaster=(()=>{try{return localStorage.getItem("mk-dev-master")==="1";}catch(e){return false;}})();
+const classify=(name)=>{if(showDevMaster&&DEV_MASTER_LIST.includes(name))return"master";if(!showDevMaster&&DEV_MASTER_LIST.includes(name))return"regular";const gs=stats[name]||[];const gc=gs.length;if(gc===0)return"never";const lastDate=gs.reduce((lat,g)=>{const d=new Date(g.d);return d>lat?d:lat;},new Date(0));const days=Math.floor((new Date()-lastDate)/(1000*60*60*24));if(days<=14&&gc>=5)return"regular";if(days<=30&&gc>=2)return"semi";return"occasional";};
+const grouped={};favs.forEach(name=>{const g=classify(name);if(!grouped[g])grouped[g]=[];const gs=stats[name]||[];grouped[g].push({name,gameCount:gs.length});});
+Object.values(grouped).forEach(arr=>arr.sort((a,b)=>b.gameCount-a.gameCount));
+const GC=[{key:"master",label:"master",color:"#1a1a2e",accent:"#ffd700",show:showDevMaster},{key:"regular",label:"\u5E38\u9023",color:"#22b566"},{key:"semi",label:"\u6E96\u30EC\u30AE\u30E5\u30E9\u30FC",color:"#2b7de9"},{key:"occasional",label:"\u305F\u307E\u306B\u53C2\u52A0",color:"#f0a030"},{key:"never",label:"\u672A\u53C2\u52A0",color:"#999"}];
+const toggle=(name)=>{if(usedSet.has(name))return;setSelected(p=>{const n=new Set(p);if(n.has(name))n.delete(name);else n.add(name);return n;});};
+const toggleGroup=(members)=>{const selectable=members.filter(f=>!usedSet.has(f.name)).map(f=>f.name);const allSel=selectable.length>0&&selectable.every(n=>selected.has(n));setSelected(p=>{const n=new Set(p);if(allSel)selectable.forEach(nm=>n.delete(nm));else selectable.forEach(nm=>n.add(nm));return n;});};
+return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+<div style={{background:"#fff",borderRadius:16,padding:16,maxWidth:500,width:"100%",maxHeight:"85vh",overflow:"auto"}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+<div style={{fontSize:18,fontWeight:800,color:"#14365a"}}>{"\u2606"} お気に入りから選択</div>
+<button onClick={onClose} style={{padding:"4px 12px",border:"1px solid #ddd",borderRadius:8,background:"transparent",color:"#666",fontSize:18,fontWeight:700,cursor:"pointer"}}>{"\u2715"}</button>
+</div>
+{GC.filter(g=>g.show!==false).map(gc=>{const members=grouped[gc.key]||[];if(members.length===0)return null;
+const selectable=members.filter(f=>!usedSet.has(f.name)).map(f=>f.name);const allSel=selectable.length>0&&selectable.every(n=>selected.has(n));
+return(<div key={gc.key} style={{marginBottom:10}}>
+<div onClick={()=>toggleGroup(members)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",borderRadius:8,background:(gc.accent||gc.color)+"11",border:"1px solid "+(gc.accent||gc.color)+"33",cursor:"pointer",marginBottom:4}}>
+<div style={{display:"flex",alignItems:"center",gap:8}}>
+<div style={{width:18,height:18,borderRadius:4,border:allSel?"none":"2px solid "+(gc.accent||gc.color)+"66",background:allSel?(gc.accent||gc.color):"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11,fontWeight:900}}>{allSel&&"\u2713"}</div>
+{gc.key==="master"?<span style={{fontSize:14,fontWeight:800,color:gc.color}}>{"\u25E4"} 開発者{"\u300A"}<span style={{fontStyle:"italic",fontWeight:900}}>Master</span>{"\u300B\u25E2"}</span>:<span style={{fontSize:14,fontWeight:800,color:gc.color}}>{gc.label}</span>}
+</div>
+<span style={{fontSize:12,color:(gc.accent||gc.color)+"99"}}>{members.length}人</span>
+</div>
+<div style={{display:"flex",flexWrap:"wrap",gap:5,paddingLeft:4}}>
+{members.map(fav=>{const isAdded=usedSet.has(fav.name);const isSel=selected.has(fav.name);return(
+<button key={fav.name} onClick={()=>toggle(fav.name)} style={{padding:"6px 14px",borderRadius:20,border:isSel?"2px solid "+gc.color:"1px solid #ddd",background:isAdded?"#eee":isSel?gc.color+"15":"#fff",color:isAdded?"#aaa":isSel?gc.color:"#1a1a2e",fontSize:14,fontWeight:isSel?800:600,cursor:isAdded?"default":"pointer",opacity:isAdded?0.4:1}}>{fav.name}<span style={{fontSize:10,marginLeft:4,color:isAdded?"#ccc":"#aaa"}}>{fav.gameCount}</span></button>);})}
+</div></div>);})}
+<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderTop:"1px solid #eee",paddingTop:12,marginTop:10}}>
+<div style={{fontSize:14,fontWeight:700,color:"#1a1a2e"}}>選択中: <span style={{color:"#2b7de9"}}>{selected.size}人</span></div>
+<button onClick={()=>{onAdd([...selected]);onClose();}} style={{padding:"10px 24px",border:"none",borderRadius:10,background:selected.size>0?"#2b7de9":"#ccc",color:"#fff",fontSize:15,fontWeight:800,cursor:selected.size>0?"pointer":"default"}}>追加する</button>
+</div></div></div>);
+}
+
+function CourtRevealPanel({teams,courtLabel,isLast,onNext}){
+const vwSA=typeof window!=="undefined"?window.innerWidth:375;const isTabletSA=vwSA>=768;const nTeams=teams.length;
+return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zIndex:9000,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:isTabletSA?24:16}}>
+{courtLabel&&<div style={{position:"fixed",top:"calc(16px + env(safe-area-inset-top, 0px))",left:isTabletSA?32:16,zIndex:9200}}><span style={{fontSize:isTabletSA?22:16,fontWeight:900,color:"rgba(255,255,255,0.9)",background:"rgba(0,0,0,0.5)",padding:isTabletSA?"8px 24px":"6px 16px",borderRadius:12}}>{courtLabel}</span></div>}
+<div style={{display:isTabletSA&&nTeams>=3?"grid":"flex",gridTemplateColumns:isTabletSA&&nTeams>=3?"1fr 1fr":undefined,gap:isTabletSA?20:12,justifyContent:"center",flexWrap:"wrap",maxWidth:"100%",width:isTabletSA?"90%":undefined}}>
+{teams.map((tm,ti)=>(<div key={ti} style={{background:"rgba(0,0,0,0.6)",border:(isTabletSA?4:3)+"px solid "+C[ti].ac,borderRadius:isTabletSA?20:16,padding:isTabletSA?"20px 28px":"16px 20px",minWidth:isTabletSA?undefined:140,maxWidth:isTabletSA?undefined:200,minHeight:isTabletSA?280:undefined,flex:isTabletSA&&nTeams>=3?undefined:"1 1 0",backdropFilter:"blur(8px)",WebkitBackdropFilter:"blur(8px)"}}>
+<div style={{fontSize:isTabletSA?26:13,fontWeight:700,color:"rgba(255,255,255,0.7)",textAlign:"center",marginBottom:isTabletSA?4:2}}>{ti+1}番目</div>
+<div style={{fontSize:isTabletSA?38:22,fontWeight:900,color:C[ti].ac,textAlign:"center",marginBottom:isTabletSA?14:8,textShadow:"0 1px 4px rgba(0,0,0,0.5)"}}>{tm.name}</div>
+<div style={{borderTop:(isTabletSA?3:2)+"px solid "+C[ti].ac+"66",paddingTop:isTabletSA?12:8}}>
+{tm.players.map((p,pi)=>(<div key={pi} style={{fontSize:isTabletSA?30:18,fontWeight:700,color:"#fff",textAlign:"center",padding:isTabletSA?"6px 0":"4px 0",textShadow:"0 1px 2px rgba(0,0,0,0.4)"}}>{p}</div>))}
+</div></div>))}
+</div>
+<button onClick={onNext} style={{marginTop:isTabletSA?28:20,padding:isTabletSA?"16px 40px":"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?28:18,fontWeight:800,cursor:"pointer"}}>{isLast?"閉じる":"次のコートへ \u25B6"}</button>
+</div>);
+}
+
+function MultiCourtShuffleManager({courtData,courtCount,courtOrder,onAllDone,onSkipAll}){
+const[currentCourtIdx,setCurrentCourtIdx]=useState(0);
+const[skipToReveal,setSkipToReveal]=useState(false);
+const lastIdxRef=useRef(0);
+if(currentCourtIdx>=0)lastIdxRef.current=currentCourtIdx;
+const safeIdx=currentCourtIdx>=0?currentCourtIdx:lastIdxRef.current;
+const currentCourtNum=courtOrder[safeIdx];
+const isFirst=safeIdx===0;
+const isLast=safeIdx===courtOrder.length-1;
+const currentTeams=courtData[currentCourtNum];
+const currentNames=currentTeams.flatMap(t=>t.players);
+const remainingCards=courtOrder.slice(safeIdx+1).reduce((sum,cn)=>sum+courtData[cn].flatMap(t=>t.players).length,0);
+const courtLabel=currentCourtNum===1?"\uD83D\uDCF1 1コート（端末）":"\uD83D\uDCCB "+currentCourtNum+"コート（紙）";
+const handleCourtDone=()=>{setCurrentCourtIdx(-1);setSkipToReveal(false);setTimeout(()=>{if(isLast){onAllDone(courtData);}else{setCurrentCourtIdx(safeIdx+1);}},50);};
+const handleSkipThisCourt=()=>{setSkipToReveal(true);};
+if(currentCourtIdx<0)return null;
+return(<>{skipToReveal?(<CourtRevealPanel teams={currentTeams} courtLabel={courtLabel} isLast={isLast} onNext={handleCourtDone}/>):(<ShuffleAnimation names={currentNames} teams={currentTeams} onDone={handleCourtDone} skipIntro={!isFirst} remainingDeck={remainingCards} isLastCourt={isLast} courtLabel={courtLabel} isMultiCourt={true} onSkipThisCourt={handleSkipThisCourt} onSkipAll={()=>onSkipAll(courtData)}/>)}</>);
 }
 
 const VT={writingMode:"vertical-rl",WebkitWritingMode:"vertical-rl",textOrientation:"upright",WebkitTextOrientation:"upright",letterSpacing:"-1px",lineHeight:1,margin:"0 auto",whiteSpace:"nowrap",overflow:"hidden",display:"inline-block"};
@@ -1044,7 +1124,7 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 
 function SetupScreen({onStart,savedTeams,isAdmin,onAdminToggle,aiEnabled,onAIToggle,shufAnim,onShufAnimToggle}){
 const{favs,addF,rmF}=useFavs();
-const[mode,setMode]=useState("manual");const[tc,setTc]=useState(savedTeams?savedTeams.length:2);
+const[mode,setMode]=useState("shuffle");const[tc,setTc]=useState(savedTeams?savedTeams.length:2);
 const[courtCount,setCourtCount]=useState(1);const[courtTeamCounts,setCourtTeamCounts]=useState({1:2,2:2,3:2});const[activeCourt,setActiveCourt]=useState(1);
 const[courtTeams,setCourtTeams]=useState(()=>{const init={};for(let c=1;c<=3;c++){init[c]=Array.from({length:4},(_,i)=>({name:"チーム"+(i+1),players:[""]}));}return init;});
 const[numGames,setNumGames]=useState(1);const[bestOf,setBestOf]=useState(0);const[dqEnd,setDqEnd]=useState(true);
@@ -1052,13 +1132,20 @@ const[saveToStats,setSaveToStats]=useState(true);
 const[teams,setTeams]=useState(()=>{if(savedTeams){const base=savedTeams.map(t=>({name:t.name,players:t.players.length>0?t.players:[""]}));while(base.length<MAX_TEAMS)base.push({name:"チーム"+(base.length+1),players:[""]});return base.slice(0,MAX_TEAMS);}return Array.from({length:MAX_TEAMS},(_,i)=>({name:"チーム"+(i+1),players:[""]}));});
 const[mems,setMems]=useState(Array(4).fill(""));const[sp,setSp]=useState(null);const[showSetupStats,setShowSetupStats]=useState(false);
 const[showSettings,setShowSettings]=useState(false);const[shufAnimData,setShufAnimData]=useState(null);
+const[multiCourtShufData,setMultiCourtShufData]=useState(null);const[allCourtData,setAllCourtData]=useState(null);const[showSmartFav,setShowSmartFav]=useState(false);
 const[editMode,setEditMode]=useState(false);const[expandedDel,setExpandedDel]=useState(null);const lpRef=useRef(null);
+const[trimConfirm,setTrimConfirm]=useState(null);/* {filled,newMax,step,onConfirm} */
+const showTrimConfirm=(filled,newMax,onConfirm)=>{if(filled<=newMax||filled===0){onConfirm();return;}setTrimConfirm({filled,newMax,step:1,onConfirm});};
+const trimDialogExec=()=>{if(!trimConfirm)return;const{newMax,onConfirm}=trimConfirm;onConfirm();setMems(prev=>prev.slice(0,Math.max(newMax,2)));setSp(null);setAllCourtData(null);setTrimConfirm(null);};
 const lpStart=(e)=>{if(e.target.tagName==="INPUT"||e.target.tagName==="BUTTON"||e.target.tagName==="SELECT")return;lpRef.current=setTimeout(()=>{setEditMode(true);setExpandedDel(null);},600);};
 const lpEnd=()=>{if(lpRef.current){clearTimeout(lpRef.current);lpRef.current=null;}};
 const lpMove=()=>{if(lpRef.current){clearTimeout(lpRef.current);lpRef.current=null;}};
 /* Auto-adjust team count when player count exceeds per-team max */
 const pCountSetup=mode==="shuffle"?mems.filter(m=>m.trim()).length:teams.slice(0,tc).reduce((s,t)=>s+t.players.filter(p=>p.trim()).length,0);
-useEffect(()=>{const minT=pCountSetup>=13?4:pCountSetup>=9?3:2;if(tc<minT){setTc(minT);setSp(null);}},[pCountSetup]);
+useEffect(()=>{if(courtCount>=2)return;const minT=pCountSetup>=13?4:pCountSetup>=9?3:2;if(tc<minT){setTc(minT);setSp(null);}},[pCountSetup,courtCount]);
+/* Trim mems when maxShufForCourt decreases (e.g. team count reduced) */
+const maxShufRef=courtCount===1?tc*MAX_PL:[1,2,3].filter(c=>c<=courtCount).reduce((s,c)=>s+courtTeamCounts[c],0)*MAX_PL;
+useEffect(()=>{if(mode!=="shuffle")return;setMems(prev=>{if(prev.length<=maxShufRef)return prev;const trimmed=prev.slice(0,maxShufRef);return trimmed.length>=2?trimmed:["",""];});setSp(null);setAllCourtData(null);},[maxShufRef]);
 const uN=(i,v)=>setTeams(p=>p.map((t,j)=>j===i?{...t,name:v}:t));
 const uP=(ti,pi,v)=>setTeams(p=>p.map((t,i)=>i===ti?{...t,players:t.players.map((pl,j)=>j===pi?v.slice(0,MAX_NAME):pl)}:t));
 const aP=ti=>setTeams(p=>p.map((t,i)=>i===ti&&t.players.length<MAX_PL?{...t,players:[...t.players,""]}:t));
@@ -1067,9 +1154,23 @@ const ctUn=(c,ti,v)=>setCourtTeams(p=>({...p,[c]:p[c].map((t,j)=>j===ti?{...t,na
 const ctUp=(c,ti,pi,v)=>setCourtTeams(p=>({...p,[c]:p[c].map((t,j)=>j===ti?{...t,players:t.players.map((pl,k)=>k===pi?v.slice(0,MAX_NAME):pl)}:t)}));
 const ctAp=(c,ti)=>{const totalP=[1,2,3].filter(x=>x<=courtCount).reduce((s,x)=>s+courtTeams[x].slice(0,courtTeamCounts[x]).reduce((a,t)=>a+t.players.filter(p=>p.trim()).length,0),0);if(totalP>=18){window.alert("19人以上の場合はランダムモードにしてください");return;}setCourtTeams(p=>({...p,[c]:p[c].map((t,j)=>j===ti&&t.players.length<MAX_PL?{...t,players:[...t.players,""]}:t)}));};
 const ctRp=(c,ti,pi)=>setCourtTeams(p=>({...p,[c]:p[c].map((t,j)=>j===ti&&t.players.length>1?{...t,players:t.players.filter((_,k)=>k!==pi)}:t)}));
-const uM=(i,v)=>setMems(p=>p.map((m,j)=>j===i?v.slice(0,MAX_NAME):m));
-const aM=()=>{if(mems.length<MAX_SHUF)setMems(p=>[...p,""]);};
-const rM=i=>{if(mems.length>2)setMems(p=>p.filter((_,j)=>j!==i));};
+const uM=(i,v)=>{setMems(p=>p.map((m,j)=>j===i?v.slice(0,MAX_NAME):m));setSp(null);setAllCourtData(null);};
+const totalTeamsMulti=[1,2,3].filter(c=>c<=courtCount).reduce((s,c)=>s+courtTeamCounts[c],0);const maxShufForCourt=courtCount===1?tc*MAX_PL:totalTeamsMulti*MAX_PL;
+const aM=()=>{if(mems.length<maxShufForCourt){setMems(p=>[...p,""]);setSp(null);setAllCourtData(null);}};
+const rM=i=>{if(mems.length>2){setMems(p=>p.filter((_,j)=>j!==i));setSp(null);setAllCourtData(null);}};
+const doMultiCourtShuf=()=>{const totalTeams=Object.entries(courtTeamCounts).filter(([k])=>Number(k)<=courtCount).reduce((s,[,v])=>s+v,0);const allNames=[...mems.filter(m=>m.trim())];const minReq=Math.max(totalTeams,courtCount*2);if(allNames.length<minReq)return null;
+const syncCode=getSyncCode();const currentFavs=loadFavs();
+const isKimuraEnabled=syncCode==="MolkkyFuji223"&&currentFavs.includes("\u30AD\u30E0\u30E9");
+let kimuraName=null;if(isKimuraEnabled){const ki=allNames.findIndex(n=>n==="\u30AD\u30E0\u30E9");if(ki>=0)kimuraName=allNames.splice(ki,1)[0];}
+const total=allNames.length;const remaining=total-courtCount*2;const base2=remaining>=0?Math.floor(remaining/courtCount):0;const rem2=remaining>=0?remaining%courtCount:0;
+const courtSizes={};for(let c=1;c<=courtCount;c++){const extraOrder=c===1?courtCount:c-1;courtSizes[c]=2+base2+(extraOrder<=rem2?1:0);}
+const shuffled=shuf(allNames);const courtPlayers={};let idx=0;
+for(let c=1;c<=courtCount;c++){courtPlayers[c]=shuffled.slice(idx,idx+courtSizes[c]);idx+=courtSizes[c];}
+if(kimuraName)courtPlayers[1].push(kimuraName);
+const courtResults={};for(let c=1;c<=courtCount;c++){const players=shuf(courtPlayers[c]);const nT=courtTeamCounts[c];
+const tSizes=[];const b2=Math.floor(players.length/nT);const r2=players.length%nT;for(let i=0;i<nT;i++)tSizes.push(b2+(i<r2?1:0));
+const tms=[];let pi=0;for(let i=0;i<nT;i++){tms.push({name:"\u30C1\u30FC\u30E0"+(i+1),players:players.slice(pi,pi+tSizes[i])});pi+=tSizes[i];}
+courtResults[c]=tms;}return courtResults;};
 const doShufCore=()=>{const names=mems.filter(m=>m.trim());if(names.length<tc)return null;
 const prevSets=sp?sp.map(t=>new Set(t.players)):null;
 const teamSizes=[];{const base=Math.floor(names.length/tc);const rem=names.length%tc;for(let i=0;i<tc;i++)teamSizes.push(base+(i<rem?1:0));}
@@ -1078,11 +1179,17 @@ let result=tryOnce();
 if(prevSets&&names.length>tc){for(let att=0;att<10;att++){const same=result.some(t=>{const ts=new Set(t.players);return prevSets.some(ps=>ps.size===ts.size&&[...ts].every(n=>ps.has(n)));});if(!same)break;result=tryOnce();}}
 const ord=shuf(Array.from({length:tc},(_,i)=>i));
 return ord.map(i=>result[i]);};
-const doShuf=()=>{const result=doShufCore();if(!result)return;
+const doShuf=()=>{if(courtCount===1){const result=doShufCore();if(!result)return;
 if(shufAnim){const allNames=result.flatMap(t=>t.players);setShufAnimData({names:allNames,teams:result});}
-else{setSp(result);}};
-const okM=teams.slice(0,tc).every(t=>t.name.trim()&&t.players.some(p=>p.trim()));const okS=mems.filter(m=>m.trim()).length>=tc;
-const go=()=>{if(courtCount>=2){window.alert("複数コート機能は準備中です");return;}let ft;if(mode==="manual")ft=teams.slice(0,tc).map(t=>({...t,players:t.players.filter(p=>p.trim())}));else{if(!sp)return;ft=sp;}const ord=Array.from({length:ft.length},(_,i)=>i);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats);};
+else{setSp(result);}}else{const courtResults=doMultiCourtShuf();if(!courtResults)return;
+if(shufAnim){const courtOrder=[];for(let c=2;c<=courtCount;c++)courtOrder.push(c);courtOrder.push(1);
+setMultiCourtShufData({courtData:courtResults,courtOrder:courtOrder});}
+else{setSp(courtResults[1]);setAllCourtData(courtResults);}}};
+const okM=teams.slice(0,tc).every(t=>t.name.trim()&&t.players.some(p=>p.trim()));const totalTeamsForAllCourts=courtCount===1?tc:Object.entries(courtTeamCounts).filter(([k])=>Number(k)<=courtCount).reduce((s,[,v])=>s+v,0);
+const filledCount=mems.filter(m=>m.trim()).length;const hasEmpty=mems.some(m=>!m.trim());const minRequired=Math.max(totalTeamsForAllCourts,courtCount*2);const okS=!hasEmpty&&filledCount>=minRequired;
+const okSReason=hasEmpty?"未入力の欄があります":filledCount<minRequired?("最低"+minRequired+"人必要です"):"";
+const isSpValid=()=>{if(!sp||!Array.isArray(sp)||sp.length===0)return false;if(!sp.every(t=>t.players&&t.players.length>0&&t.players.some(p=>p.trim())))return false;if(!sp.every(t=>t.name&&t.name.trim()))return false;const totalP=sp.reduce((s,t)=>s+t.players.filter(p=>p.trim()).length,0);if(totalP<2)return false;const curNames=new Set(mems.filter(m=>m.trim()));return sp.flatMap(t=>t.players).every(n=>curNames.has(n));};
+const go=()=>{if(courtCount>=2){window.alert("複数コート機能は準備中です");return;}let ft;if(mode==="manual"){ft=teams.slice(0,tc).map(t=>({...t,players:t.players.filter(p=>p.trim())}));if(!ft.every(t=>t.players.length>0))return;}else{if(!sp||!isSpValid())return;ft=sp;}const ord=Array.from({length:ft.length},(_,i)=>i);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats);};
 const usedManual=courtCount>=2?[1,2,3].filter(c=>c<=courtCount).flatMap(c=>courtTeams[c].slice(0,courtTeamCounts[c]).flatMap(t=>t.players)).filter(p=>p.trim()).map(p=>p.trim()):teams.slice(0,tc).flatMap(t=>t.players).filter(p=>p.trim()).map(p=>p.trim());
 const usedShuffle=mems.filter(m=>m.trim()).map(m=>m.trim());const used=mode==="manual"?usedManual:usedShuffle;
 const SL={display:"block",fontSize:14,fontWeight:700,color:"rgba(255,255,255,0.5)",letterSpacing:3,marginBottom:8};
@@ -1096,9 +1203,9 @@ return(
 <div style={{height:"100dvh",display:"flex",flexDirection:"column",overflow:"auto",background:"linear-gradient(170deg,var(--bg-tertiary),var(--bg-secondary))",WebkitOverflowScrolling:"touch",overscrollBehavior:"none"}}>
 <div style={{padding:"36px 20px 8px",textAlign:"center",position:"relative"}}><button onClick={()=>setShowSettings(true)} style={{position:"absolute",top:40,right:20,padding:"8px 14px",border:"1px solid rgba(255,255,255,0.25)",borderRadius:10,background:"rgba(255,255,255,0.08)",color:"var(--text-inverse)",fontSize:18,cursor:"pointer",zIndex:10}}><Settings size={18}/></button><img src={MASCOT_S} alt="モルック" style={{width:200,height:200,objectFit:"contain",display:"block",margin:"0 auto -6px"}}/><h1 style={{fontSize:38,fontWeight:900,color:"var(--text-inverse)",letterSpacing:4}}>モルック スコアラー</h1><div style={{fontSize:13,color:"rgba(255,255,255,0.3)",fontWeight:600,letterSpacing:5}}>MÖLKKY SCORER</div></div>
 <div style={{flex:1,padding:"0 20px",paddingBottom:"calc(36px + env(safe-area-inset-bottom, 0px))",maxWidth:720,margin:"0 auto",width:"100%"}}>
-<div style={{marginBottom:14}}><label style={SL}>入力モード</label><div style={{display:"flex",gap:8}}>{[["manual","✏️ 手動"],["shuffle","🎲 ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>{if(k===mode)return;if(k==="shuffle"){const ns=teams.slice(0,tc).flatMap(t=>t.players).filter(p=>p.trim());if(ns.length>0)setMems(ns.length<2?[...ns,""]:ns);}else if(k==="manual"){const ns=mems.filter(m=>m.trim());if(ns.length>0){setTeams(p=>{const nt=p.map((t,i)=>i<tc?{...t,players:[]}:t);ns.forEach((n,j)=>{const ti=j%tc;nt[ti]={...nt[ti],players:[...nt[ti].players,n]};});for(let i=0;i<tc;i++){if(nt[i].players.length===0)nt[i]={...nt[i],players:[""]};} return nt;});}}setMode(k);setSp(null);setEditMode(false);setExpandedDel(null);}} style={{...CH,...(mode===k?CHA:{})}}>{l}</button>))}</div></div>
-<div style={{display:"flex",gap:14,marginBottom:14}}>{courtCount===1&&<div style={{flex:1}}><label style={SL}>チーム数</label><div style={{display:"flex",gap:8}}>{[2,3,4].map(n=>{const pCount=mode==="shuffle"?mems.filter(m=>m.trim()).length:teams.slice(0,tc).reduce((s,t)=>s+t.players.filter(p=>p.trim()).length,0);const minTeams=pCount>=13?4:pCount>=9?3:2;const dis=n<minTeams;return(<button key={n} onClick={()=>{if(dis)return;setTc(n);setSp(null);}} style={{...CH,...(tc===n?CHA:{}),padding:"16px 0",opacity:dis?0.3:1,cursor:dis?"not-allowed":"pointer"}}>{n}</button>);})}</div></div>}<div style={{flex:1}}><label style={SL}>コート数</label><div style={{display:"flex",gap:8}}>{[1,2,3].map(n=>{const isTab=typeof window!=="undefined"&&window.innerWidth>=768;const dis=n>=2&&!isTab;return(<button key={n} onClick={()=>{if(dis)return;setCourtCount(n);if(n===1){setActiveCourt(1);}}} style={{...CH,...(courtCount===n?CHA:{}),padding:"16px 0",opacity:dis?0.3:1,cursor:dis?"not-allowed":"pointer"}}>{n}コート</button>);})}</div></div></div>
-{courtCount>=2&&(<div style={{marginBottom:14}}>{[1,2,3].filter(c=>c<=courtCount).map(c=>(<div key={c} style={{background:"rgba(255,255,255,0.06)",borderRadius:10,padding:"12px 14px",marginBottom:8,border:c===1?"2px solid rgba(43,125,233,0.3)":"1px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:15,fontWeight:800,color:"var(--text-inverse)"}}>{c===1?"\uD83D\uDCF1":"\uD83D\uDCCB"} {c}コート（{c===1?"端末":"紙"}）</span><div style={{display:"flex",gap:6}}>{[2,3,4].map(n=>(<button key={n} onClick={()=>setCourtTeamCounts(p=>({...p,[c]:n}))} style={{width:44,height:36,borderRadius:8,border:"1px solid rgba(255,255,255,0.15)",background:courtTeamCounts[c]===n?"var(--accent-blue)":"transparent",color:courtTeamCounts[c]===n?"#fff":"rgba(255,255,255,0.5)",fontSize:16,fontWeight:800,cursor:"pointer"}}>{n}</button>))}</div></div>))}<div style={{fontSize:20,fontWeight:900,color:"var(--text-inverse)",textAlign:"right",marginTop:8}}>合計 {[1,2,3].filter(c=>c<=courtCount).reduce((s,c)=>s+courtTeamCounts[c],0)} チーム</div></div>)}
+<div style={{marginBottom:14}}><label style={SL}>入力モード</label><div style={{display:"flex",gap:8}}>{[["manual","✏\uFE0F 手動"],["shuffle","\uD83C\uDFB2 ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>{if(k===mode)return;const doSwitch=()=>{if(k==="shuffle"){let ns;if(courtCount>=2){ns=[];for(let c=1;c<=courtCount;c++){const ct=courtTeams[c]||[];ct.slice(0,courtTeamCounts[c]).forEach(t=>{t.players.filter(p=>p.trim()).forEach(p=>ns.push(p));});}if(ns.length===0)ns=["",""];}else{ns=teams.slice(0,tc).flatMap(t=>t.players).filter(p=>p.trim());if(ns.length>0)ns=ns.length<2?[...ns,""]:ns;}setMems(ns.length>0?ns:["","","",""]);}else if(k==="manual"){const ns=mems.filter(m=>m.trim());if(ns.length>0){setTeams(p=>{const nt=p.map((t,i)=>i<tc?{...t,players:[]}:t);ns.forEach((n,j)=>{const ti=j%tc;nt[ti]={...nt[ti],players:[...nt[ti].players,n]};});for(let i=0;i<tc;i++){if(nt[i].players.length===0)nt[i]={...nt[i],players:[""]};} return nt;});}}setMode(k);setSp(null);setAllCourtData(null);setEditMode(false);setExpandedDel(null);};if(mode==="shuffle"&&k==="manual"){const fc=mems.filter(m=>m.trim()).length;const manualMax=courtCount===1?tc*MAX_PL:18;if(fc>manualMax&&fc>0){showTrimConfirm(fc,manualMax,doSwitch);return;}}doSwitch();}} style={{...CH,...(mode===k?CHA:{})}}>{l}</button>))}</div></div>
+<div style={{display:"flex",gap:14,marginBottom:14}}>{courtCount===1&&<div style={{flex:1}}><label style={SL}>チーム数</label><div style={{display:"flex",gap:8}}>{[2,3,4].map(n=>{const pCount=mode==="shuffle"?mems.filter(m=>m.trim()).length:teams.slice(0,tc).reduce((s,t)=>s+t.players.filter(p=>p.trim()).length,0);const minTeams=pCount>=13?4:pCount>=9?3:2;const dis=n<minTeams;return(<button key={n} onClick={()=>{if(dis)return;if(mode==="shuffle"&&n<tc){const fc=mems.filter(m=>m.trim()).length;const nm=n*MAX_PL;if(fc>nm&&fc>0){showTrimConfirm(fc,nm,()=>{setTc(n);setSp(null);});return;}}setTc(n);setSp(null);}} style={{...CH,...(tc===n?CHA:{}),padding:"16px 0",opacity:dis?0.3:1,cursor:dis?"not-allowed":"pointer"}}>{n}</button>);})}</div></div>}<div style={{flex:1}}><label style={SL}>コート数</label><div style={{display:"flex",gap:8}}>{[1,2,3].map(n=>{const isTab=typeof window!=="undefined"&&window.innerWidth>=768;const dis=n>=2&&!isTab;return(<button key={n} onClick={()=>{if(dis)return;if(mode==="shuffle"&&n<courtCount){const fc=mems.filter(m=>m.trim()).length;const newTotalT=n===1?tc:[1,2,3].filter(c=>c<=n).reduce((s,c)=>s+courtTeamCounts[c],0);const nm=n===1?tc*MAX_PL:newTotalT*MAX_PL;if(fc>nm&&fc>0){showTrimConfirm(fc,nm,()=>{setCourtCount(n);if(n===1)setActiveCourt(1);setSp(null);});return;}}setCourtCount(n);if(n===1){setActiveCourt(1);}}} style={{...CH,...(courtCount===n?CHA:{}),padding:"16px 0",opacity:dis?0.3:1,cursor:dis?"not-allowed":"pointer"}}>{n}コート</button>);})}</div></div></div>
+{courtCount>=2&&(<div style={{marginBottom:14}}>{[1,2,3].filter(c=>c<=courtCount).map(c=>(<div key={c} style={{background:"rgba(255,255,255,0.06)",borderRadius:10,padding:"12px 14px",marginBottom:8,border:c===1?"2px solid rgba(43,125,233,0.3)":"1px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:15,fontWeight:800,color:"var(--text-inverse)"}}>{c===1?"\uD83D\uDCF1":"\uD83D\uDCCB"} {c}コート（{c===1?"端末":"紙"}）</span><div style={{display:"flex",gap:6}}>{[2,3,4].map(n=>(<button key={n} onClick={()=>{if(mode==="shuffle"&&n<courtTeamCounts[c]){const fc=mems.filter(m=>m.trim()).length;const newCTC={...courtTeamCounts,[c]:n};const newTotalT=[1,2,3].filter(x=>x<=courtCount).reduce((s,x)=>s+newCTC[x],0);const nm=newTotalT*MAX_PL;if(fc>nm&&fc>0){showTrimConfirm(fc,nm,()=>{setCourtTeamCounts(p=>({...p,[c]:n}));setSp(null);});return;}}setCourtTeamCounts(p=>({...p,[c]:n}));}} style={{width:44,height:36,borderRadius:8,border:"1px solid rgba(255,255,255,0.15)",background:courtTeamCounts[c]===n?"var(--accent-blue)":"transparent",color:courtTeamCounts[c]===n?"#fff":"rgba(255,255,255,0.5)",fontSize:16,fontWeight:800,cursor:"pointer"}}>{n}</button>))}</div></div>))}<div style={{fontSize:20,fontWeight:900,color:"var(--text-inverse)",textAlign:"right",marginTop:8}}>合計 {[1,2,3].filter(c=>c<=courtCount).reduce((s,c)=>s+courtTeamCounts[c],0)} チーム</div></div>)}
 <div style={{display:"flex",gap:8,marginBottom:14}}><div style={{flex:"1 1 0"}}><label style={SL}>ゲーム数</label><select value={numGames} onChange={e=>setNumGames(+e.target.value)} style={SEL}>{Array.from({length:10},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}ゲーム</option>)}</select></div><div style={{flex:"1 1 0"}}><label style={SL}>先取機能</label><select value={bestOf} onChange={e=>setBestOf(+e.target.value)} style={SEL}><option value={0}>なし</option>{Array.from({length:11},(_,i)=>i+2).map(n=><option key={n} value={n}>{n}先取</option>)}</select></div><div style={{flex:"1 1 0"}}><label style={SL}>失格時</label><select value={dqEnd?"end":"cont"} onChange={e=>setDqEnd(e.target.value==="end")} style={SEL}><option value="end">即終了</option><option value="cont">継続</option></select></div></div>
 {/* Stats toggle (UISwitch) + Stats button */}
 <div style={{display:"flex",gap:8,marginBottom:14}}>
@@ -1141,7 +1248,7 @@ return(
 </div></div>))}
 <button style={{width:"100%",padding:20,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"var(--text-inverse)",fontSize:32,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:6,boxShadow:"0 3px 16px rgba(43,125,233,0.3)"}} onClick={go}><Target size={28} style={{display:"inline",verticalAlign:"middle",marginRight:6}}/> ゲーム開始</button>
 </>)}
-{mode==="shuffle"&&(<><div style={CARD} onTouchStart={lpStart} onTouchEnd={lpEnd} onTouchMove={lpMove}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}><div style={{fontWeight:700,fontSize:18,color:"var(--text-primary)"}}>参加メンバー（最大{MAX_SHUF}人）</div>
+{mode==="shuffle"&&(<><div style={CARD} onTouchStart={lpStart} onTouchEnd={lpEnd} onTouchMove={lpMove}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}><div style={{fontWeight:700,fontSize:18,color:"var(--text-primary)"}}>参加メンバー（最大{maxShufForCourt}人）</div>
 {editMode&&<button onClick={()=>{setEditMode(false);setExpandedDel(null);}} style={{padding:"4px 14px",border:"none",borderRadius:8,background:"var(--accent-blue)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>Done</button>}</div>
 <div style={{display:"grid",gridTemplateColumns:editMode?"1fr":"1fr 1fr",gap:7}}>{mems.map((m,i)=>{const delKey="s"+i;const isExp=expandedDel===delKey;return(<div key={i} style={{display:"flex",alignItems:"center",gap:4}}>
 {editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:24,height:24,borderRadius:12,border:"none",background:"#e74c3c",color:"#fff",fontSize:16,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"\u2212"}</button>}
@@ -1149,17 +1256,40 @@ return(
 {!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uM(i,name)} usedNames={used} isAdmin={isAdmin}/>}
 {editMode&&isExp&&mems.length>2&&<button onClick={()=>{rM(i);setExpandedDel(null);}} style={{padding:"4px 14px",border:"none",borderRadius:8,background:"#e74c3c",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
 </div>);})}</div>
-{!editMode&&mems.length<MAX_SHUF&&<button style={{width:"100%",padding:10,border:"2px dashed var(--border-input)",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:6}} onClick={aM}>＋</button>}
+{!editMode&&mems.length<maxShufForCourt&&<button style={{width:"100%",padding:10,border:"2px dashed var(--border-input)",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:6}} onClick={aM}>＋</button>}
+{!editMode&&<button onClick={()=>setShowSmartFav(true)} style={{width:"100%",padding:10,border:"2px solid var(--accent-blue)",borderRadius:8,background:"rgba(43,125,233,0.08)",color:"var(--accent-blue)",fontSize:16,fontWeight:700,cursor:"pointer",marginTop:4}}>{"\u2606"} お気に入りから選択追加</button>}
 {!editMode&&mems.length>2&&<button style={{width:"100%",padding:10,border:"2px dashed #f0b0b0",borderRadius:8,background:"transparent",color:"var(--text-danger)",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:4}} onClick={()=>rM(mems.length-1)}>− 最後を削除</button>}</div>
+{!okS&&okSReason&&<div style={{fontSize:13,fontWeight:700,color:"#e74c3c",textAlign:"center",marginBottom:4}}>{okSReason}</div>}
 <button style={{width:"100%",padding:16,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"var(--text-inverse)",fontSize:20,fontWeight:800,cursor:"pointer",opacity:okS?1:0.3}} onClick={okS?doShuf:undefined}>🎲 シャッフル</button>
-{sp&&(<div style={{marginTop:8}}>{sp.map((t,ti)=>(<div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac,padding:"10px 16px",marginBottom:6}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:26,height:26,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-inverse)",fontWeight:900,fontSize:14,background:C[ti].ac}}>{ti+1}</div><input value={t.name} onChange={e=>setSp(p=>p.map((x,i)=>i===ti?{...x,name:e.target.value}:x))} style={{...TIN,fontSize:18}}/></div><div style={{paddingLeft:34,fontSize:16,color:"#555"}}>{t.players.join("、")}</div></div>))}
-<button style={{width:"100%",padding:20,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"var(--text-inverse)",fontSize:32,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:4}} onClick={go}><Target size={28} style={{display:"inline",verticalAlign:"middle",marginRight:6}}/> 開始</button>
-<button style={{width:"100%",padding:14,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"var(--text-inverse)",fontSize:18,fontWeight:800,cursor:"pointer",marginTop:6}} onClick={()=>{if(window.confirm("\u30b7\u30e3\u30c3\u30d5\u30eb\u3057\u76f4\u3057\u307e\u3059\u304b\uff1f"))doShuf();}}><RefreshCw size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 再シャッフル</button></div>)}
+{courtCount>=2&&sp&&<div style={{padding:"8px 14px",borderRadius:8,marginBottom:8,marginTop:8,background:"rgba(43,125,233,0.1)",border:"1px solid rgba(43,125,233,0.2)",fontSize:13,color:"rgba(255,255,255,0.6)"}}>{"\uD83D\uDCF1"} 1コート（端末）の結果を表示中。他のコートはシャッフル演出で確認できます。</div>}
+{sp&&(<div style={{marginTop:courtCount>=2&&sp?0:8}}>{sp.map((t,ti)=>(<div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac,padding:"10px 16px",marginBottom:6}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:26,height:26,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-inverse)",fontWeight:900,fontSize:14,background:C[ti].ac}}>{ti+1}</div><input value={t.name} onChange={e=>setSp(p=>p.map((x,i)=>i===ti?{...x,name:e.target.value}:x))} style={{...TIN,fontSize:18}}/></div><div style={{paddingLeft:34,fontSize:16,color:"#555"}}>{t.players.join("、")}</div></div>))}
+<button style={{width:"100%",padding:20,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"var(--text-inverse)",fontSize:32,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:4,opacity:isSpValid()?1:0.3}} onClick={isSpValid()?go:undefined}><Target size={28} style={{display:"inline",verticalAlign:"middle",marginRight:6}}/> 開始</button>
+<button style={{width:"100%",padding:14,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"var(--text-inverse)",fontSize:18,fontWeight:800,cursor:"pointer",marginTop:6,opacity:okS?1:0.3}} onClick={okS?()=>{if(window.confirm("\u30b7\u30e3\u30c3\u30d5\u30eb\u3057\u76f4\u3057\u307e\u3059\u304b\uff1f"))doShuf();}:undefined}><RefreshCw size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 再シャッフル</button></div>)}
 </>)}
 </div>
 {showSetupStats&&<StatsModal onClose={()=>setShowSetupStats(false)} source="setup" isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
+{showSmartFav&&<SmartFavPicker favs={favs} stats={_cache.stats} usedNames={used} onAdd={(names)=>{setMems(prev=>{const filled=[...prev];let ai=0;for(let i=0;i<filled.length&&ai<names.length;i++){if(!filled[i].trim()){filled[i]=names[ai++];}}while(ai<names.length&&filled.length<maxShufForCourt){filled.push(names[ai++]);}return filled;});setSp(null);setAllCourtData(null);}} onClose={()=>setShowSmartFav(false)}/>}
 {showSettings&&<SettingsPage onClose={()=>setShowSettings(false)} isAdmin={isAdmin} onAdminToggle={onAdminToggle} aiEnabled={aiEnabled} onAIToggle={onAIToggle} shufAnim={shufAnim} onShufAnimToggle={onShufAnimToggle}/>}
 {shufAnimData&&<ShuffleAnimation names={shufAnimData.names} teams={shufAnimData.teams} onDone={()=>{if(shufAnimData.goData){const{ft,ord}=shufAnimData.goData;setShufAnimData(null);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats);}else{setSp(shufAnimData.teams);setShufAnimData(null);}}}/>}
+{multiCourtShufData&&<MultiCourtShuffleManager courtData={multiCourtShufData.courtData} courtCount={courtCount} courtOrder={multiCourtShufData.courtOrder} onAllDone={(data)=>{setMultiCourtShufData(null);setAllCourtData(data);setSp(data[1]);console.log("全コートシャッフル完了:",data);}} onSkipAll={(data)=>{setMultiCourtShufData(null);setAllCourtData(data);setSp(data[1]);console.log("全コートスキップ完了:",data);}}/>}
+{trimConfirm&&(<div style={{position:"fixed",inset:0,zIndex:9300,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+<div style={{background:"#1a1a2e",borderRadius:16,padding:"24px 28px",maxWidth:400,width:"100%"}}>
+{trimConfirm.step===1?(<>
+<div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:10}}>{"\u26A0"} メンバー数が超過します</div>
+<div style={{fontSize:14,color:"rgba(255,255,255,0.7)",marginBottom:16,lineHeight:1.6}}>現在<span style={{color:"#e74c3c",fontWeight:800}}>{trimConfirm.filled}人</span>入力済みですが、変更後の上限は<span style={{color:"#e74c3c",fontWeight:800}}>{trimConfirm.newMax}人</span>です。超過分の<span style={{color:"#e74c3c",fontWeight:800}}>{trimConfirm.filled-trimConfirm.newMax}人</span>が末尾から削除されます。続けますか？</div>
+<div style={{display:"flex",gap:10}}>
+<button onClick={()=>setTrimConfirm(p=>({...p,step:2}))} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"#e74c3c",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
+<button onClick={()=>setTrimConfirm(null)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>いいえ</button>
+</div>
+</>):(<>
+<div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:10}}>本当に変更しますか？</div>
+<div style={{fontSize:14,color:"rgba(255,255,255,0.7)",marginBottom:16,lineHeight:1.6}}>この操作は取り消せません。<span style={{color:"#e74c3c",fontWeight:800}}>{trimConfirm.filled-trimConfirm.newMax}人</span>のメンバーが削除されます。</div>
+<div style={{display:"flex",gap:10}}>
+<button onClick={trimDialogExec} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"#e74c3c",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>変更する</button>
+<button onClick={()=>setTrimConfirm(null)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>キャンセル</button>
+</div>
+</>)}
+</div></div>)}
 </div>);
 }
 
