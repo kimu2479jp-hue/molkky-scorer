@@ -1136,6 +1136,9 @@ const lpMove=()=>{if(lpRef.current){clearTimeout(lpRef.current);lpRef.current=nu
 /* Auto-adjust team count when player count exceeds per-team max */
 const pCountSetup=mode==="shuffle"?mems.filter(m=>m.trim()).length:teams.slice(0,tc).reduce((s,t)=>s+t.players.filter(p=>p.trim()).length,0);
 useEffect(()=>{if(courtCount>=2)return;const minT=pCountSetup>=13?4:pCountSetup>=9?3:2;if(tc<minT){setTc(minT);setSp(null);}},[pCountSetup,courtCount]);
+/* Trim mems when maxShufForCourt decreases (e.g. team count reduced) */
+const maxShufRef=courtCount===1?tc*MAX_PL:[1,2,3].filter(c=>c<=courtCount).reduce((s,c)=>s+courtTeamCounts[c],0)*MAX_PL;
+useEffect(()=>{if(mode!=="shuffle")return;setMems(prev=>{if(prev.length<=maxShufRef)return prev;const trimmed=prev.slice(0,maxShufRef);return trimmed.length>=2?trimmed:["",""];});setSp(null);setAllCourtData(null);},[maxShufRef]);
 const uN=(i,v)=>setTeams(p=>p.map((t,j)=>j===i?{...t,name:v}:t));
 const uP=(ti,pi,v)=>setTeams(p=>p.map((t,i)=>i===ti?{...t,players:t.players.map((pl,j)=>j===pi?v.slice(0,MAX_NAME):pl)}:t));
 const aP=ti=>setTeams(p=>p.map((t,i)=>i===ti&&t.players.length<MAX_PL?{...t,players:[...t.players,""]}:t));
@@ -1145,7 +1148,7 @@ const ctUp=(c,ti,pi,v)=>setCourtTeams(p=>({...p,[c]:p[c].map((t,j)=>j===ti?{...t
 const ctAp=(c,ti)=>{const totalP=[1,2,3].filter(x=>x<=courtCount).reduce((s,x)=>s+courtTeams[x].slice(0,courtTeamCounts[x]).reduce((a,t)=>a+t.players.filter(p=>p.trim()).length,0),0);if(totalP>=18){window.alert("19人以上の場合はランダムモードにしてください");return;}setCourtTeams(p=>({...p,[c]:p[c].map((t,j)=>j===ti&&t.players.length<MAX_PL?{...t,players:[...t.players,""]}:t)}));};
 const ctRp=(c,ti,pi)=>setCourtTeams(p=>({...p,[c]:p[c].map((t,j)=>j===ti&&t.players.length>1?{...t,players:t.players.filter((_,k)=>k!==pi)}:t)}));
 const uM=(i,v)=>{setMems(p=>p.map((m,j)=>j===i?v.slice(0,MAX_NAME):m));setSp(null);setAllCourtData(null);};
-const totalTeamsMulti=[1,2,3].filter(c=>c<=courtCount).reduce((s,c)=>s+courtTeamCounts[c],0);const maxShufForCourt=courtCount===1?MAX_TEAMS*MAX_PL:totalTeamsMulti*MAX_PL;
+const totalTeamsMulti=[1,2,3].filter(c=>c<=courtCount).reduce((s,c)=>s+courtTeamCounts[c],0);const maxShufForCourt=courtCount===1?tc*MAX_PL:totalTeamsMulti*MAX_PL;
 const aM=()=>{if(mems.length<maxShufForCourt){setMems(p=>[...p,""]);setSp(null);setAllCourtData(null);}};
 const rM=i=>{if(mems.length>2){setMems(p=>p.filter((_,j)=>j!==i));setSp(null);setAllCourtData(null);}};
 const doMultiCourtShuf=()=>{const totalTeams=Object.entries(courtTeamCounts).filter(([k])=>Number(k)<=courtCount).reduce((s,[,v])=>s+v,0);const allNames=[...mems.filter(m=>m.trim())];if(allNames.length<totalTeams)return null;
