@@ -168,3 +168,30 @@ When working on this branch:
 2. Do not make "lightening" an end in itself. Bright gray backgrounds + gray text caused contrast failures before. The goal is high contrast readability, not brightness.
 3. Do not break what already works well. Dark background + white text for inactive rows was rated positively -- maintain that direction.
 4. Confirm visual direction with mockups before writing code.
+5. iPhone Safari copy-paste corrupts code (smart quotes, unicode ellipsis, en-dashes). Never edit files via GitHub Web UI on iPhone. Always use Claude Code for git operations.
+6. ShuffleAnimation bugs can cause full-screen black lockout. Always include safety valve (auto-close on stall) and try-catch wrapper around the entire return.
+
+### Human Perspective Verification Principles
+Technical correctness of code alone is not sufficient. After implementation, always self-verify from the following perspectives.
+
+**About the developer (Taichi-san):**
+- Not a professional programmer or designer, but a company employee who loves Molkky
+- Has deep knowledge of Molkky competition rules and operational know-how, but limited technical knowledge of programming and design
+- Judges by "how it looks on screen", not "how the function works"
+- Follows a workflow of checking via Vercel preview on a real device to determine quality
+- When technical explanation is needed, avoid jargon and explain in plain language
+
+**Final Verification Checklist (applies to all changes):**
+1. **How would a human see this screen?** Not the rationality of the code, but imagine how it actually appears to human eyes when displayed on a device screen. Can the text be read? Can buttons be found? Is it instantly clear what to do next?
+2. **Imagine viewing on an outdoor iPad from 3m away.** The primary usage environment of this app is outdoors, tripod-mounted, with multiple people viewing from a distance. "Visible" on an indoor monitor and "readable" outdoors are completely different things.
+3. **Choose the optimal solution for humans over the technically optimal solution.** Example: Even if dynamic font size calculation achieves "uniform fill rate across all character counts", if the result is text too small to read, fixed sizes per character count are the correct answer. The experience of the person looking at the screen takes priority over algorithmic elegance.
+4. **Apply different judgment criteria based on screen purpose.**
+   - **In-match screen (GameScreen):** What is most understandable for humans viewing it is the absolute top priority. Design beauty is only pursued to the extent it serves visibility.
+   - **Stats screen, Settings screen, Others:** Balance design sense with visibility. The goal is "high quality comparable to a professional designer, without AI-like feel". Allow stylishness while ensuring users never get lost in operation.
+5. **When in doubt, ask Taichi-san for judgment.** Present mock images or options and have them verified via preview. Do not make decisions based on technical convenience alone.
+
+### Design Quality Standards
+The design goal of this project is "high quality comparable to a professional designer, without AI-like feel".
+- Avoid characteristics of generic AI-generated UI (uniform grays, Inter/Roboto-family fonts, characterless card layouts)
+- Make intentional design decisions tailored to each screen's personality
+- A design quality polishing phase is planned after completion of large-scale feature implementation
