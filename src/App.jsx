@@ -731,12 +731,13 @@ if(tLocal<perCard){const prog=(tLocal-liftD-flipD-holdD-moveD)/landD;
 const sc=prog<0.6?0.3+0.75*(prog/0.6):1.05-0.05*((prog-0.6)/0.4);
 return{left:targetX,top:targetY,scale:sc,opacity:1,zIndex:9001+idx,rotate:0};}
 return{left:targetX,top:targetY,scale:1,opacity:1,zIndex:9001+idx,rotate:0};}
+if(phase===5){return{left:targetX,top:targetY,scale:1,opacity:1,zIndex:9001+idx,rotate:0};}
 if(phase===4){return{left:targetX,top:targetY,scale:1,opacity:0,zIndex:9001+idx,rotate:0};}
 return{left:cx-cardW/2,top:cy-cardH/2,scale:1,opacity:0,zIndex:9001,rotate:0};
 };
 /* Compute flip degree for CSS 3D card rotation */
 const getFlipDeg=(idx)=>{
-if(phase<=2)return 0;if(phase>=4)return 180;
+if(phase<=2)return 0;if(phase>=4||phase===5)return 180;
 const cardDealTime=T.p3+revealPos[idx]*perCard;const tLocal=t-cardDealTime;
 const liftD=0.3,flipD=0.5;
 if(tLocal<liftD)return 0;if(tLocal<liftD+flipD){return((tLocal-liftD)/flipD)*180;}return 180;
@@ -768,9 +769,11 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*over
 {/* Cards (all phases) - CSS 3D flip */}
 {names.map((name,idx)=>{const ct=getCardTeam(idx);const ac=C[ct.teamIdx]?C[ct.teamIdx].ac:"#888";const suit=SUITS[ct.teamIdx]||SUITS[0];const orderNum=ct.inTeamIdx+1;
 const outer=getCardOuter(idx);const flipDeg=getFlipDeg(idx);const br=isTabletSA?16:12;
-const vName=name.length>7?name.slice(0,7):name;
-const vFs=isTabletSA?(name.length<=2?32:name.length<=4?28:name.length<=7?24:20):(name.length<=2?22:name.length<=4?18:name.length<=7?15:13);
-const vLs=isTabletSA?(name.length<=2?"6px":name.length<=4?"4px":"2px"):(name.length<=2?"4px":name.length<=4?"2px":"0px");
+const availNameH=cardH-(cornerNum*3+16);const minFs=isTabletSA?12:10;
+const vFsCalc=(len)=>{const baseFs=isTabletSA?(len<=2?32:len<=4?28:len<=5?24:22):(len<=2?22:len<=4?18:len<=5?15:13);const needed=len*baseFs*1.1;if(needed<=availNameH)return baseFs;const fitted=Math.floor(availNameH/(len*1.1));return Math.max(fitted,minFs);};
+const rawFs=vFsCalc(name.length);const maxChars=rawFs<=minFs?Math.max(1,Math.floor(availNameH/(minFs*1.1))):name.length;
+const vName=name.length>maxChars?name.slice(0,maxChars):name;const vFs=vFsCalc(vName.length);
+const vLs=isTabletSA?(vName.length<=2?"6px":vName.length<=4?"4px":"2px"):(vName.length<=2?"4px":vName.length<=4?"2px":"0px");
 const cardDealTime2=T.p3+revealPos[idx]*perCard;const holdStart2=cardDealTime2+0.8;const holdEnd2=holdStart2+1.0;
 const isHolding=phase===3&&t>=holdStart2&&t<holdEnd2;const holdProg2=isHolding?(t-holdStart2)/1.0:0;
 const glowSh=isHolding?", 0 0 30px "+ac+"66":"";
@@ -1296,7 +1299,7 @@ return(
 {!editMode&&mems.length>2&&<button style={{width:"100%",padding:10,border:"2px dashed #f0b0b0",borderRadius:8,background:"transparent",color:"var(--text-danger)",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:4}} onClick={()=>rM(mems.length-1)}>− 最後を削除</button>}</div>
 {!okS&&okSReason&&<div style={{fontSize:13,fontWeight:700,color:"#e74c3c",textAlign:"center",marginBottom:4}}>{okSReason}</div>}
 <button style={{width:"100%",padding:16,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"var(--text-inverse)",fontSize:20,fontWeight:800,cursor:"pointer",opacity:okS?1:0.3}} onClick={okS?doShuf:undefined}>🎲 シャッフル</button>
-{courtCount>=2&&allCourtData&&<button onClick={()=>setShowCourtOverview(true)} style={{width:"100%",padding:20,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"var(--text-inverse)",fontSize:28,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:4,boxShadow:"0 3px 16px rgba(43,125,233,0.3)"}}>{"\uD83D\uDCCB"} コート一覧を見る</button>}
+{courtCount>=2&&allCourtData&&<button onClick={()=>setShowCourtOverview(true)} style={{width:"100%",padding:18,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#1a6dd4)",color:"#fff",fontSize:24,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:4,boxShadow:"0 3px 12px rgba(43,125,233,0.3)"}}>{"\uD83D\uDCCB"} コート一覧を見る</button>}
 {courtCount===1&&sp&&(<div style={{marginTop:8}}>{sp.map((t,ti)=>(<div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac,padding:"10px 16px",marginBottom:6}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:26,height:26,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-inverse)",fontWeight:900,fontSize:14,background:C[ti].ac}}>{ti+1}</div><input value={t.name} onChange={e=>setSp(p=>p.map((x,i)=>i===ti?{...x,name:e.target.value}:x))} style={{...TIN,fontSize:18}}/></div><div style={{paddingLeft:34,fontSize:16,color:"#555"}}>{t.players.join("\u3001")}</div></div>))}
 <button style={{width:"100%",padding:20,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"var(--text-inverse)",fontSize:32,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:4,opacity:isSpValid()?1:0.3}} onClick={isSpValid()?go:undefined}><Target size={28} style={{display:"inline",verticalAlign:"middle",marginRight:6}}/> 開始</button>
 <button style={{width:"100%",padding:14,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"var(--text-inverse)",fontSize:18,fontWeight:800,cursor:"pointer",marginTop:6,opacity:okS?1:0.3}} onClick={okS?()=>{if(window.confirm("\u30b7\u30e3\u30c3\u30d5\u30eb\u3057\u76f4\u3057\u307e\u3059\u304b\uff1f"))doShuf();}:undefined}><RefreshCw size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 再シャッフル</button></div>)}
