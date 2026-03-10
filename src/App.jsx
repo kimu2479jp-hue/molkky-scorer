@@ -769,11 +769,9 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*over
 {/* Cards (all phases) - CSS 3D flip */}
 {names.map((name,idx)=>{const ct=getCardTeam(idx);const ac=C[ct.teamIdx]?C[ct.teamIdx].ac:"#888";const suit=SUITS[ct.teamIdx]||SUITS[0];const orderNum=ct.inTeamIdx+1;
 const outer=getCardOuter(idx);const flipDeg=getFlipDeg(idx);const br=isTabletSA?16:12;
-const availNameH=cardH-(cornerNum*3+16);const minFs=isTabletSA?12:10;
-const vFsCalc=(len)=>{const baseFs=isTabletSA?(len<=2?32:len<=4?28:len<=5?24:22):(len<=2?22:len<=4?18:len<=5?15:13);const needed=len*baseFs*1.1;if(needed<=availNameH)return baseFs;const fitted=Math.floor(availNameH/(len*1.1));return Math.max(fitted,minFs);};
-const rawFs=vFsCalc(name.length);const maxChars=rawFs<=minFs?Math.max(1,Math.floor(availNameH/(minFs*1.1))):name.length;
-const vName=name.length>maxChars?name.slice(0,maxChars):name;const vFs=vFsCalc(vName.length);
-const vLs=isTabletSA?(vName.length<=2?"6px":vName.length<=4?"4px":"2px"):(vName.length<=2?"4px":vName.length<=4?"2px":"0px");
+const vName=name.length>7?name.slice(0,7):name;const nl=vName.length;
+const vFs=isTabletSA?(nl<=2?34:nl<=3?30:nl<=4?28:nl<=5?24:nl<=6?22:20):(nl<=2?22:nl<=3?18:nl<=4?16:nl<=5?15:nl<=6?14:13);
+const vLs=nl<=2?"6px":nl<=3?"4px":"2px";
 const cardDealTime2=T.p3+revealPos[idx]*perCard;const holdStart2=cardDealTime2+0.8;const holdEnd2=holdStart2+1.0;
 const isHolding=phase===3&&t>=holdStart2&&t<holdEnd2;const holdProg2=isHolding?(t-holdStart2)/1.0:0;
 const glowSh=isHolding?", 0 0 30px "+ac+"66":"";
@@ -905,7 +903,7 @@ const handleStartGame=()=>{const teams=courtData[1];const order=Array.from({leng
 return(<div style={{position:"fixed",inset:0,zIndex:8000,height:"100dvh",display:"flex",flexDirection:"column",overflow:"auto",background:"linear-gradient(170deg,var(--bg-tertiary),var(--bg-secondary))",WebkitOverflowScrolling:"touch",overscrollBehavior:"none"}}>
 <div style={{padding:"calc(16px + env(safe-area-inset-top, 0px)) 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <div style={{fontSize:22,fontWeight:900,color:"var(--text-inverse)"}}>全コート メンバー一覧</div>
-<button onClick={()=>setBackConfirm(true)} style={{background:"none",border:"none",fontSize:15,color:"rgba(255,255,255,0.6)",cursor:"pointer",padding:"6px 10px"}}>{"\u2190"} 戻る</button>
+<button onClick={()=>setBackConfirm(true)} style={{padding:"10px 20px",border:"2px solid rgba(255,255,255,0.4)",borderRadius:12,background:"rgba(255,255,255,0.1)",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>{"\u2190"} 戻る</button>
 </div>
 <div style={{flex:1,padding:"0 16px 16px",overflow:"auto"}}>
 {[1,2,3].filter(c=>c<=courtCount).map(cNum=>{const teams=courtData[cNum]||[];const nTeams=teams.length;const icon=cNum===1?"\uD83D\uDCF1":"\uD83D\uDCCB";const label=cNum===1?cNum+"コート（端末）":cNum+"コート（紙）";
