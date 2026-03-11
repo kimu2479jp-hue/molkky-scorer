@@ -1210,6 +1210,9 @@ const isKimuraEnabled=syncCode==="MolkkyFuji223"&&currentFavs.includes("キム�
 let kimuraName=null;if(isKimuraEnabled){const ki=allNames.findIndex(n=>n==="キムラ");if(ki>=0)kimuraName=allNames.splice(ki,1)[0];}
 const total=allNames.length;const remaining=total-courtCount*2;const base2=remaining>=0?Math.floor(remaining/courtCount):0;const rem2=remaining>=0?remaining%courtCount:0;
 const courtSizes={};for(let c=1;c<=courtCount;c++){const extraOrder=c===1?courtCount:c-1;courtSizes[c]=2+base2+(extraOrder<=rem2?1:0);}
+/* MAX_PLキャップ: 各コートの人数がチーム数×MAX_PLを超えないよう再配分 */
+let overflow=0;for(let c=1;c<=courtCount;c++){const cap=courtTeamCounts[c]*MAX_PL-(c===1&&kimuraName?1:0);if(courtSizes[c]>cap){overflow+=courtSizes[c]-cap;courtSizes[c]=cap;}}
+if(overflow>0){for(let c=courtCount;c>=1&&overflow>0;c--){const cap=courtTeamCounts[c]*MAX_PL-(c===1&&kimuraName?1:0);const room=cap-courtSizes[c];if(room>0){const add=Math.min(room,overflow);courtSizes[c]+=add;overflow-=add;}}}
 const shuffled=shuf(allNames);const courtPlayers={};let idx=0;
 for(let c=1;c<=courtCount;c++){courtPlayers[c]=shuffled.slice(idx,idx+courtSizes[c]);idx+=courtSizes[c];}
 if(kimuraName)courtPlayers[1].push(kimuraName);
@@ -1249,6 +1252,9 @@ const base2=remaining>=0?Math.floor(remaining/cc):0;
 const rem2=remaining>=0?remaining%cc:0;
 const courtSizes={};
 for(let c=1;c<=cc;c++){const extraOrder=c===1?cc:c-1;courtSizes[c]=2+base2+(extraOrder<=rem2?1:0);}
+/* MAX_PLキャップ */
+let overflow=0;for(let c=1;c<=cc;c++){const cap=ctc[c]*MAX_PL-(c===1&&kimuraName?1:0);if(courtSizes[c]>cap){overflow+=courtSizes[c]-cap;courtSizes[c]=cap;}}
+if(overflow>0){for(let c=cc;c>=1&&overflow>0;c--){const cap=ctc[c]*MAX_PL-(c===1&&kimuraName?1:0);const room=cap-courtSizes[c];if(room>0){const add=Math.min(room,overflow);courtSizes[c]+=add;overflow-=add;}}}
 /* シャッフル＋チーム分け（重複チェック付き、最大10回再抽選） */
 const prevData=ca.courtData;
 const isSameAsPrev=(newResult)=>{
