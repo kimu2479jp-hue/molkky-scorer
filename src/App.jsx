@@ -1175,6 +1175,7 @@ const[showSettings,setShowSettings]=useState(false);const[shufAnimData,setShufAn
 const[multiCourtShufData,setMultiCourtShufData]=useState(null);const[allCourtData,setAllCourtData]=useState(null);const[showCourtOverview,setShowCourtOverview]=useState(false);const[showSmartFav,setShowSmartFav]=useState(false);
 const[editMode,setEditMode]=useState(false);const[expandedDel,setExpandedDel]=useState(null);const lpRef=useRef(null);
 const[caDiscardStep,setCaDiscardStep]=useState(0);/* 0=none, 1=first confirm, 2=second confirm */
+const[reshuffleSettingsMode,setReshuffleSettingsMode]=useState(false);
 const[draftRestored,setDraftRestored]=useState(false);
 const draftTimerRef=useRef(null);
 const saveDraft=useCallback(()=>{if(draftTimerRef.current)clearTimeout(draftTimerRef.current);draftTimerRef.current=setTimeout(()=>{const filledMems=mems.filter(m=>m.trim());const filledTeams=teams.slice(0,tc).some(t=>t.players.some(p=>p.trim()));if(filledMems.length===0&&!filledTeams){if(_db)idbDel(_db,"setup-draft").catch(e=>{});return;}if(_db)idbSet(_db,"setup-draft",{mems,teams:teams.slice(0,tc),sp,courtCount,courtTeamCounts,mode,tc,savedAt:new Date().toISOString()}).catch(e=>console.error("setup-draft save error",e));},500);},[mems,teams,tc,sp,courtCount,courtTeamCounts,mode]);
@@ -1216,6 +1217,110 @@ const courtResults={};for(let c=1;c<=courtCount;c++){const players=shuf(courtPla
 const tSizes=[];const b2=Math.floor(players.length/nT);const r2=players.length%nT;for(let i=0;i<nT;i++)tSizes.push(b2+(i<r2?1:0));
 const tms=[];let pi=0;for(let i=0;i<nT;i++){tms.push({name:"チーム"+(i+1),players:players.slice(pi,pi+tSizes[i])});pi+=tSizes[i];}
 courtResults[c]=tms;}return courtResults;};
+const doReshuffleFromCA=(ca)=>{
+if(!ca||!ca.courtData||!ca.courtCount)return;
+const cc=ca.courtCount;
+const ctc=ca.courtTeamCounts;
+/* 全コートの全メンバーをフラット配列に展開 */
+const allNames=[];
+for(let c=1;c<=cc;c++){
+const teams=ca.courtData[c]||[];
+teams.forEach(t=>{
+const players=t.players||[];
+players.forEach(p=>{
+const nm=typeof p==="string"?p:(typeof p==="object"?(p.name||""):String(p));
+if(nm.trim())allNames.push(nm.trim());
+});
+});
+}
+/* 最低人数チェック */
+const totalTeams=Object.entries(ctc).filter(([k])=>Number(k)<=cc).reduce((s,[,v])=>s+v,0);
+const minReq=Math.max(totalTeams,cc*2);
+if(allNames.length<minReq)return;
+/* キムラ隠し仕様 */
+const syncCode=getSyncCode();
+const currentFavs=loadFavs();
+const isKimuraEnabled=syncCode==="MolkkyFuji223"&&currentFavs.includes("キムラ");
+let kimuraName=null;
+if(isKimuraEnabled){const ki=allNames.findIndex(n=>n==="キムラ");if(ki>=0)kimuraName=allNames.splice(ki,1)[0];}
+/* コート別人数配分 */
+const total=allNames.length;const remaining=total-cc*2;
+const base2=remaining>=0?Math.floor(remaining/cc):0;
+const rem2=remaining>=0?remaining%cc:0;
+const courtSizes={};
+for(let c=1;c<=cc;c++){const extraOrder=c===1?cc:c-1;courtSizes[c]=2+base2+(extraOrder<=rem2?1:0);}
+/* シャッフル＋チーム分け（重複チェック付き、最大10回再抽選） */
+const prevData=ca.courtData;
+const isSameAsPrev=(newResult)=>{
+for(let c=1;c<=cc;c++){
+const prevTeams=prevData[c]||[];const newTeams=newResult[c]||[];
+if(prevTeams.length!==newTeams.length)return false;
+const prevSets=prevTeams.map(t=>new Set(t.players));
+const newSets=newTeams.map(t=>new Set(t.players));
+const allMatch=prevSets.every(ps=>newSets.some(ns=>ns.size===ps.size&&[...ps].every(n=>ns.has(n))));
+if(!allMatch)return false;
+}return true;
+};
+const buildResult=()=>{
+const namesPool=[...allNames];const shuffled=shuf(namesPool);
+const courtPlayers={};let idx=0;
+for(let c=1;c<=cc;c++){courtPlayers[c]=shuffled.slice(idx,idx+courtSizes[c]);idx+=courtSizes[c];}
+if(kimuraName)courtPlayers[1].push(kimuraName);
+const courtResults={};
+for(let c=1;c<=cc;c++){
+const players=shuf(courtPlayers[c]);const nT=ctc[c];
+const tSizes=[];const b=Math.floor(players.length/nT);const r=players.length%nT;
+for(let i=0;i<nT;i++)tSizes.push(b+(i<r?1:0));
+const tms=[];let pi=0;
+for(let i=0;i<nT;i++){tms.push({name:"チーム"+(i+1),players:players.slice(pi,pi+tSizes[i])});pi+=tSizes[i];}
+courtResults[c]=tms;
+}return courtResults;
+};
+let courtResults=buildResult();
+for(let att=0;att<10;att++){if(!isSameAsPrev(courtResults))break;courtResults=buildResult();}
+/* state更新 */
+const nGames=ca.numGames||1;const bo=ca.bestOf||0;
+const dq=ca.dqEnd!==undefined?ca.dqEnd:true;
+const sts=ca.saveToStats!==undefined?ca.saveToStats:true;
+setCourtCount(cc);setCourtTeamCounts(ctc);setNumGames(nGames);setBestOf(bo);setDqEnd(dq);setSaveToStats(sts);
+setMems(kimuraName?[...allNames,kimuraName]:[...allNames]);
+/* シャッフルアニメーション or 直接セット */
+if(shufAnim){
+const courtOrder=[];for(let c=2;c<=cc;c++)courtOrder.push(c);courtOrder.push(1);
+setMultiCourtShufData({courtData:courtResults,courtOrder:courtOrder});
+}else{
+setSp(courtResults[1]);setAllCourtData(courtResults);setShowCourtOverview(true);
+if(_db&&cc>=2)idbSet(_db,"court-allocation",{courtCount:cc,courtTeamCounts:ctc,courtData:courtResults,numGames:nGames,bestOf:bo,dqEnd:dq,saveToStats:sts,savedAt:new Date().toISOString()}).then(()=>{if(_db)idbDel(_db,"setup-draft").catch(e=>{});}).catch(e=>console.error("court-allocation save error",e));
+}
+};
+const handleChangeCourtSettings=(ca)=>{
+if(!ca||!ca.courtData||!ca.courtCount)return;
+/* 全メンバーを抽出して mems にセット */
+const allNames=[];
+for(let c=1;c<=ca.courtCount;c++){
+const teams=ca.courtData[c]||[];
+teams.forEach(t=>{
+const players=t.players||[];
+players.forEach(p=>{
+const nm=typeof p==="string"?p:(typeof p==="object"?(p.name||""):String(p));
+if(nm.trim())allNames.push(nm.trim());
+});
+});
+}
+setMems(allNames.length>=2?allNames:["",""]);
+/* 前回のコート設定を復元 */
+setCourtCount(ca.courtCount);setCourtTeamCounts(ca.courtTeamCounts);
+if(ca.numGames)setNumGames(ca.numGames);
+if(ca.bestOf!==undefined)setBestOf(ca.bestOf);
+if(ca.dqEnd!==undefined)setDqEnd(ca.dqEnd);
+if(ca.saveToStats!==undefined)setSaveToStats(ca.saveToStats);
+/* モードをランダムに設定 */
+setMode("shuffle");
+/* 前回のシャッフル結果をクリア */
+setSp(null);setAllCourtData(null);
+/* reshuffleSettingsModeでバナーを一時的に非表示 */
+setReshuffleSettingsMode(true);
+};
 const doShufCore=()=>{const names=mems.filter(m=>m.trim());if(names.length<tc)return null;
 const prevSets=sp?sp.map(t=>new Set(t.players)):null;
 const teamSizes=[];{const base=Math.floor(names.length/tc);const rem=names.length%tc;for(let i=0;i<tc;i++)teamSizes.push(base+(i<rem?1:0));}
@@ -1225,11 +1330,11 @@ if(prevSets&&names.length>tc){for(let att=0;att<10;att++){const same=result.some
 const ord=shuf(Array.from({length:tc},(_,i)=>i));
 return ord.map(i=>result[i]);};
 const doShuf=()=>{if(courtCount===1){const result=doShufCore();if(!result)return;
-if(shufAnim){const allNames=result.flatMap(t=>t.players);setShufAnimData({names:allNames,teams:result});}
-else{setSp(result);}}else{const courtResults=doMultiCourtShuf();if(!courtResults)return;
+if(shufAnim){setReshuffleSettingsMode(false);const allNames=result.flatMap(t=>t.players);setShufAnimData({names:allNames,teams:result});}
+else{setReshuffleSettingsMode(false);setSp(result);}}else{const courtResults=doMultiCourtShuf();if(!courtResults)return;
 if(shufAnim){const courtOrder=[];for(let c=2;c<=courtCount;c++)courtOrder.push(c);courtOrder.push(1);
-setMultiCourtShufData({courtData:courtResults,courtOrder:courtOrder});}
-else{setSp(courtResults[1]);setAllCourtData(courtResults);if(_db&&courtCount>=2)idbSet(_db,"court-allocation",{courtCount,courtTeamCounts,courtData:courtResults,numGames,bestOf,dqEnd,saveToStats,savedAt:new Date().toISOString()}).then(()=>{if(_db)idbDel(_db,"setup-draft").catch(e=>{});}).catch(e=>console.error("court-allocation save error",e));}}};
+setReshuffleSettingsMode(false);setMultiCourtShufData({courtData:courtResults,courtOrder:courtOrder});}
+else{setReshuffleSettingsMode(false);setSp(courtResults[1]);setAllCourtData(courtResults);if(_db&&courtCount>=2)idbSet(_db,"court-allocation",{courtCount,courtTeamCounts,courtData:courtResults,numGames,bestOf,dqEnd,saveToStats,savedAt:new Date().toISOString()}).then(()=>{if(_db)idbDel(_db,"setup-draft").catch(e=>{});}).catch(e=>console.error("court-allocation save error",e));}}};
 const okM=teams.slice(0,tc).every(t=>t.name.trim()&&t.players.some(p=>p.trim()));const totalTeamsForAllCourts=courtCount===1?tc:Object.entries(courtTeamCounts).filter(([k])=>Number(k)<=courtCount).reduce((s,[,v])=>s+v,0);
 const filledCount=mems.filter(m=>m.trim()).length;const hasEmpty=mems.some(m=>!m.trim());const minRequired=Math.max(totalTeamsForAllCourts,courtCount*2);const okS=!hasEmpty&&filledCount>=minRequired;
 const okSReason=hasEmpty?"未入力の欄があります":filledCount<minRequired?("最低"+minRequired+"人必要です"):"";
@@ -1248,11 +1353,15 @@ return(
 <div style={{height:"100dvh",display:"flex",flexDirection:"column",overflow:"auto",background:"linear-gradient(170deg,var(--bg-tertiary),var(--bg-secondary))",WebkitOverflowScrolling:"touch",overscrollBehavior:"none"}}>
 <div style={{padding:"36px 20px 8px",textAlign:"center",position:"relative"}}><button onClick={()=>setShowSettings(true)} style={{position:"absolute",top:40,right:20,padding:"8px 14px",border:"1px solid rgba(255,255,255,0.25)",borderRadius:10,background:"rgba(255,255,255,0.08)",color:"var(--text-inverse)",fontSize:18,cursor:"pointer",zIndex:10}}><Settings size={18}/></button><img src={MASCOT_S} alt="モルック" style={{width:200,height:200,objectFit:"contain",display:"block",margin:"0 auto -6px"}}/><h1 style={{fontSize:38,fontWeight:900,color:"var(--text-inverse)",letterSpacing:4}}>モルック スコアラー</h1><div style={{fontSize:13,color:"rgba(255,255,255,0.3)",fontWeight:600,letterSpacing:5}}>MÖLKKY SCORER</div></div>
 <div style={{flex:1,padding:"0 20px",paddingBottom:"calc(36px + env(safe-area-inset-bottom, 0px))",maxWidth:720,margin:"0 auto",width:"100%"}}>
-{courtAllocation&&<div style={{background:"rgba(43,125,233,0.12)",border:"2px solid rgba(43,125,233,0.3)",borderRadius:14,padding:16,marginBottom:14}}>
+{courtAllocation&&!reshuffleSettingsMode&&<div style={{background:"rgba(43,125,233,0.12)",border:"2px solid rgba(43,125,233,0.3)",borderRadius:14,padding:16,marginBottom:14}}>
 <div style={{fontSize:16,fontWeight:800,color:"var(--text-inverse)",marginBottom:10}}>{"🔄"} 前回のコート割り当てがあります</div>
-<div style={{display:"flex",gap:8}}>
+<div style={{display:"flex",gap:8,marginBottom:8}}>
 <button onClick={()=>{setCourtCount(courtAllocation.courtCount);setCourtTeamCounts(courtAllocation.courtTeamCounts);setAllCourtData(courtAllocation.courtData);setSp(courtAllocation.courtData[1]);setNumGames(courtAllocation.numGames||1);setBestOf(courtAllocation.bestOf||0);setDqEnd(courtAllocation.dqEnd!==undefined?courtAllocation.dqEnd:true);setSaveToStats(courtAllocation.saveToStats!==undefined?courtAllocation.saveToStats:true);setShowCourtOverview(true);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"linear-gradient(135deg,#2b7de9,#1a6dd4)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>{"📋"} コート一覧を見る</button>
-<button onClick={()=>setCaDiscardStep(1)} style={{flex:"0 0 auto",padding:"12px 16px",border:"2px solid rgba(231,76,60,0.4)",borderRadius:10,background:"rgba(231,76,60,0.1)",color:"#e74c3c",fontSize:14,fontWeight:700,cursor:"pointer"}}>{"🗑"} データを破棄</button>
+<button onClick={()=>doReshuffleFromCA(courtAllocation)} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"linear-gradient(135deg,#22b566,#1a9d52)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>{"🎲"} 組み換えシャッフル</button>
+</div>
+<div style={{display:"flex",gap:8}}>
+<button onClick={()=>handleChangeCourtSettings(courtAllocation)} style={{flex:1,padding:"10px 0",border:"2px solid rgba(255,255,255,0.25)",borderRadius:10,background:"transparent",color:"var(--text-inverse)",fontSize:13,fontWeight:700,cursor:"pointer"}}>{"⚙"} コート設定を変更して組み換え</button>
+<button onClick={()=>setCaDiscardStep(1)} style={{flex:"0 0 auto",padding:"10px 16px",border:"2px solid rgba(231,76,60,0.4)",borderRadius:10,background:"rgba(231,76,60,0.1)",color:"#e74c3c",fontSize:14,fontWeight:700,cursor:"pointer"}}>{"🗑"} 破棄</button>
 </div></div>}
 {setupDraft&&!draftRestored&&!savedTeams&&<div style={{background:"rgba(34,181,102,0.12)",border:"2px solid rgba(34,181,102,0.3)",borderRadius:14,padding:16,marginBottom:14}}>
 <div style={{fontSize:16,fontWeight:800,color:"var(--text-inverse)",marginBottom:10}}>{"📝"} 前回の入力途中のメンバーがあります</div>
