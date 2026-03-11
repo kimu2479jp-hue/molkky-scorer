@@ -1452,46 +1452,119 @@ return(
 }
 
 /* ═══ Player Modal ═══ */
-function PlModal({teams,dispatch,onClose,isAdmin}){
+function PlModal({teams,dispatch,onClose,isAdmin,courtCount,courtAllocation,onUpdateCourtAllocation}){
 const{favs,addF,rmF}=useFavs();const[name,setName]=useState("");
 const sizes=teams.map(t=>t.players.filter(p=>p.active).length);const mi=sizes.indexOf(Math.min(...sizes));const[sel,setSel]=useState(mi);
 const[addConf,setAddConf]=useState(null);const[delConf,setDelConf]=useState(null);
+const[activeCourt,setActiveCourt]=useState(1);
+const cc=courtCount||1;
 const tog=(ti,pi,a)=>{const nt=teams.map((t,i)=>i===ti?{...t,players:t.players.map((p,j)=>j===pi?{...p,active:a}:p)}:t);dispatch({type:"SET_TEAMS",teams:nt});};
-const rmPlayer=(ti,pi)=>{const nt=teams.map((t,i)=>i===ti?{...t,players:t.players.filter((_,j)=>j!==pi)}:t);dispatch({type:"SET_TEAMS",teams:nt});setDelConf(null);};
-const doAdd=(n,tI)=>{const nm=(n||name).trim().slice(0,MAX_NAME);const tg=tI??sel;if(!nm||teams[tg].players.length>=MAX_PL)return;setAddConf({nm,tg});};
-const confirmAdd=()=>{if(!addConf)return;const{nm,tg}=addConf;const nt=teams.map((t,i)=>i===tg?{...t,players:[...t.players,{name:nm,active:true}]}:t);dispatch({type:"SET_TEAMS",teams:nt});setName("");setAddConf(null);};
-const allUsed=teams.flatMap(t=>t.players.filter(p=>p.active).map(p=>p.name));
+const rmPlayer=(ti,pi)=>{
+/* Block if this would leave any team with 0 active players */
+const team=teams[ti];const activeCount=team.players.filter(p=>p.active).length;
+const isActive=team.players[pi]&&team.players[pi].active;
+if(isActive&&activeCount<=1){window.alert("\u5404\u30c1\u30fc\u30e0\u306b\u6700\u4f4e1\u4eba\u306e\u30a2\u30af\u30c6\u30a3\u30d6\u30e1\u30f3\u30d0\u30fc\u304c\u5fc5\u8981\u3067\u3059");setDelConf(null);return;}
+const nt=teams.map((t,i)=>i===ti?{...t,players:t.players.filter((_,j)=>j!==pi)}:t);dispatch({type:"SET_TEAMS",teams:nt});setDelConf(null);};
+/* Paper court helpers */
+const canDeleteFromPaperCourt=(courtNum,teamIdx,playerIdx)=>{
+if(!courtAllocation||!courtAllocation.courtData||!courtAllocation.courtData[courtNum])return{ok:false,msg:"データなし"};
+const courtTeams=courtAllocation.courtData[courtNum];
+const afterDelete=courtTeams.map((t,ti)=>({...t,players:ti===teamIdx?t.players.filter((_,pi)=>pi!==playerIdx):[...t.players]}));
+const totalPlayers=afterDelete.reduce((s,t)=>s+t.players.length,0);
+if(totalPlayers<2)return{ok:false,msg:"\u5404\u30b3\u30fc\u30c8\u306b\u6700\u4f4e2\u4eba\u306e\u30e1\u30f3\u30d0\u30fc\u304c\u5fc5\u8981\u3067\u3059"};
+const teamsWithPlayers=afterDelete.filter(t=>t.players.length>0).length;
+if(teamsWithPlayers<2)return{ok:false,msg:"\u5bfe\u6226\u3059\u308b\u306b\u306f\u6700\u4f4e2\u30c1\u30fc\u30e0\u304c\u5fc5\u8981\u3067\u3059"};
+return{ok:true};};
+const addToPaperCourt=(courtNum,teamIdx,playerName)=>{
+if(!courtAllocation)return;const updated=JSON.parse(JSON.stringify(courtAllocation));
+updated.courtData[courtNum][teamIdx].players.push(playerName);onUpdateCourtAllocation(updated);};
+const removeFromPaperCourt=(courtNum,teamIdx,playerIdx)=>{
+if(!courtAllocation)return;const check=canDeleteFromPaperCourt(courtNum,teamIdx,playerIdx);
+if(!check.ok){window.alert(check.msg);return;}
+const updated=JSON.parse(JSON.stringify(courtAllocation));
+updated.courtData[courtNum][teamIdx].players.splice(playerIdx,1);onUpdateCourtAllocation(updated);};
+/* doAdd: works for both device court and paper court */
+const doAdd=(n,tI)=>{const nm=(n||name).trim().slice(0,MAX_NAME);if(!nm)return;
+if(activeCourt===1){const tg=tI??sel;if(teams[tg].players.length>=MAX_PL)return;setAddConf({nm,tg,court:1});}
+else{const tg=tI??sel;setAddConf({nm,tg,court:activeCourt});}};
+const confirmAdd=()=>{if(!addConf)return;const{nm,tg,court}=addConf;
+if(court===1){const nt=teams.map((t,i)=>i===tg?{...t,players:[...t.players,{name:nm,active:true}]}:t);dispatch({type:"SET_TEAMS",teams:nt});}
+else{addToPaperCourt(court,tg,nm);}
+setName("");setAddConf(null);};
+/* Auto-add: find team with fewest active members */
+const doAutoAdd=(n)=>{const nm=(n||name).trim().slice(0,MAX_NAME);if(!nm)return;
+if(activeCourt===1){
+const counts=teams.map(t=>t.players.filter(p=>p.active).length);const minC=Math.min(...counts);
+const candidates=teams.map((t,i)=>({i,c:counts[i]})).filter(x=>x.c===minC);
+const pick=candidates[Math.floor(Math.random()*candidates.length)];
+setAddConf({nm,tg:pick.i,court:1,auto:true});}
+else{
+if(!courtAllocation||!courtAllocation.courtData||!courtAllocation.courtData[activeCourt])return;
+const ct=courtAllocation.courtData[activeCourt];
+const counts=ct.map(t=>t.players.length);const minC=Math.min(...counts);
+const candidates=ct.map((t,i)=>({i,c:counts[i]})).filter(x=>x.c===minC);
+const pick=candidates[Math.floor(Math.random()*candidates.length)];
+setAddConf({nm,tg:pick.i,court:activeCourt,auto:true});}};
+/* Get teams list for current court's add section */
+const addTeamsList=activeCourt===1?teams:(courtAllocation&&courtAllocation.courtData&&courtAllocation.courtData[activeCourt])?courtAllocation.courtData[activeCourt]:[];
+/* Get add confirmation team name */
+const getConfTeamName=()=>{if(!addConf)return"";if(addConf.court===1)return teams[addConf.tg]?.name||"";
+if(courtAllocation&&courtAllocation.courtData&&courtAllocation.courtData[addConf.court])return courtAllocation.courtData[addConf.court][addConf.tg]?.name||"";return"";};
+const allUsed=activeCourt===1?teams.flatMap(t=>t.players.filter(p=>p.active).map(p=>p.name)):[];
+/* Reset sel when switching courts */
+const courtTeamsForSel=activeCourt===1?teams:addTeamsList;
+const effectiveSel=sel<courtTeamsForSel.length?sel:0;
 return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" style={{...SS.mod,position:"relative",overflow:"visible"}} onClick={e=>e.stopPropagation()}><div style={{maxHeight:"90vh",overflow:"auto",WebkitOverflowScrolling:"touch"}}>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><h2 style={{fontSize:32,fontWeight:900,color:"var(--text-primary)",display:"flex",alignItems:"center",gap:6}}><Users size={28}/> メンバー</h2><button style={SS.clsB} onClick={onClose}>✕</button></div>
+{/* Court switching tabs (only when courtCount >= 2) */}
+{cc>=2&&<div style={{display:"flex",gap:4,marginBottom:12}}>
+{Array.from({length:cc},(_,i)=>i+1).map(cn=>(<button key={cn} onClick={()=>{setActiveCourt(cn);setSel(0);}} style={{flex:1,padding:"8px 0",border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",background:activeCourt===cn?"var(--accent-blue)":"rgba(0,0,0,0.06)",color:activeCourt===cn?"#fff":"#666"}}>{cn===1?"\ud83d\udcf1":"\ud83d\udccb"} {cn}\u30b3\u30fc\u30c8</button>))}
+</div>}
+{/* Device court (court 1): existing behavior */}
+{activeCourt===1&&<>
 {teams.map((team,ti)=>(<div key={ti} style={{marginBottom:12}}>
-<div style={{fontSize:18,fontWeight:700,color:C[ti].tx,borderBottom:"2px solid "+C[ti].ac,paddingBottom:4,marginBottom:5}}>{team.name}（{team.players.filter(p=>p.active).length}人）</div>
+<div style={{fontSize:18,fontWeight:700,color:C[ti].tx,borderBottom:"2px solid "+C[ti].ac,paddingBottom:4,marginBottom:5}}>{team.name}\uff08{team.players.filter(p=>p.active).length}\u4eba\uff09</div>
 {team.players.map((p,pi)=>(<div key={pi} style={{display:"flex",alignItems:"center",padding:"6px 12px",background:p.active?"#f8f9fa":"#f0f0f0",borderRadius:8,marginBottom:4,opacity:p.active?1:0.4}}>
 <span style={{flex:1,fontSize:17}}>{p.name}</span>
 <div style={{display:"flex",gap:5}}>
-<button onClick={()=>tog(ti,pi,!p.active)} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:p.active?"#e74c3c":"#27ae60",color:"var(--text-inverse)"}}>{p.active?"退出":"復帰"}</button>
-<button onClick={()=>setDelConf({ti,pi,name:p.name})} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:"#888",color:"var(--text-inverse)"}}>削除</button>
+<button onClick={()=>tog(ti,pi,!p.active)} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:p.active?"#e74c3c":"#27ae60",color:"var(--text-inverse)"}}>{p.active?"\u9000\u51fa":"\u5fa9\u5e30"}</button>
+<button onClick={()=>setDelConf({ti,pi,name:p.name,court:1})} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:"#888",color:"var(--text-inverse)"}}>\u524a\u9664</button>
 </div>
 </div>))}
 </div>))}
+</>}
+{/* Paper court (court 2, 3): show from courtAllocation */}
+{activeCourt>=2&&courtAllocation&&courtAllocation.courtData&&courtAllocation.courtData[activeCourt]&&<>
+{courtAllocation.courtData[activeCourt].map((team,ti)=>(<div key={ti} style={{marginBottom:12}}>
+<div style={{fontSize:18,fontWeight:700,color:C[ti]?C[ti].tx:"#333",borderBottom:"2px solid "+(C[ti]?C[ti].ac:"#ccc"),paddingBottom:4,marginBottom:5}}>{team.name}\uff08{team.players.length}\u4eba\uff09</div>
+{team.players.map((pName,pi)=>(<div key={pi} style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#f8f9fa",borderRadius:8,marginBottom:4}}>
+<span style={{flex:1,fontSize:17}}>{pName}</span>
+<div style={{display:"flex",gap:5}}>
+<button onClick={()=>setDelConf({ti,pi,name:pName,court:activeCourt})} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:"#888",color:"var(--text-inverse)"}}>\u524a\u9664</button>
+</div>
+</div>))}
+</div>))}
+</>}
 <div style={{background:"#e6f0fb",borderRadius:10,padding:14,marginTop:8}}>
-<div style={{fontSize:16,fontWeight:700,marginBottom:6}}>➕追加</div>
+<div style={{fontSize:16,fontWeight:700,marginBottom:6}}>➕\u8ffd\u52a0</div>
 <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-<select value={sel} onChange={e=>setSel(+e.target.value)} style={{padding:8,borderRadius:8,border:"1px solid var(--border-input)",fontSize:16}}>{teams.map((t,i)=><option key={i} value={i}>{t.name}</option>)}</select>
-<input value={name} onChange={e=>setName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder="名前" style={{flex:1,minWidth:80,padding:8,borderRadius:8,border:"1px solid var(--border-input)",fontSize:16}}/>
-<button onClick={()=>doAdd()} style={{padding:"8px 14px",borderRadius:8,border:"none",background:"var(--accent-blue)",color:"var(--text-inverse)",fontWeight:700,fontSize:16,cursor:"pointer",opacity:name.trim()?1:0.3}}>追加</button>
+<select value={effectiveSel} onChange={e=>setSel(+e.target.value)} style={{padding:8,borderRadius:8,border:"1px solid var(--border-input)",fontSize:16}}>{addTeamsList.map((t,i)=><option key={i} value={i}>{t.name}</option>)}</select>
+<input value={name} onChange={e=>setName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder="\u540d\u524d" style={{flex:1,minWidth:80,padding:8,borderRadius:8,border:"1px solid var(--border-input)",fontSize:16}}/>
+<button onClick={()=>doAdd()} style={{padding:"8px 14px",borderRadius:8,border:"none",background:"var(--accent-blue)",color:"var(--text-inverse)",fontWeight:700,fontSize:16,cursor:"pointer",opacity:name.trim()?1:0.3}}>\u8ffd\u52a0</button>
+<button onClick={()=>doAutoAdd()} style={{padding:"8px 14px",borderRadius:8,border:"none",background:"#22b566",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",opacity:name.trim()?1:0.3}}>\u81ea\u52d5\u8ffd\u52a0</button>
 <FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={n=>doAdd(n)} usedNames={allUsed} isAdmin={isAdmin}/>
 </div>
 </div>
 </div>
 {addConf&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}}>
-<div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:6}}>メンバー追加確認</div>
-<div style={{fontSize:16,marginBottom:16}}>「{addConf.nm}」を<br/><span style={{fontWeight:800,color:C[addConf.tg]?.tx}}>{teams[addConf.tg]?.name}</span>に追加しますか？</div>
-<div style={{display:"flex",gap:8}}><button onClick={confirmAdd} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--bg-secondary)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>決定</button><button onClick={()=>setAddConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--bg-secondary)",borderRadius:10,background:"transparent",color:"var(--text-primary)",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
+<div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:6}}>{addConf.auto?"\u30e1\u30f3\u30d0\u30fc\u81ea\u52d5\u8ffd\u52a0":"\u30e1\u30f3\u30d0\u30fc\u8ffd\u52a0\u78ba\u8a8d"}</div>
+<div style={{fontSize:16,marginBottom:16}}>{"\u300c"+addConf.nm+"\u300d\u3092"}<br/><span style={{fontWeight:800,color:C[addConf.tg]?.tx||"#333"}}>{getConfTeamName()}</span>{"\u306b\u8ffd\u52a0\u3057\u307e\u3059\u3002"}{addConf.auto&&<><br/><span style={{fontSize:13,color:"var(--text-secondary)"}}>\u6295\u3052\u9806\u306f\u30c1\u30fc\u30e0\u5185\u6700\u5f8c\u306b\u306a\u308a\u307e\u3059\u3002</span></>}</div>
+<div style={{display:"flex",gap:8}}><button onClick={confirmAdd} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--bg-secondary)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>\u6c7a\u5b9a</button><button onClick={()=>setAddConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--bg-secondary)",borderRadius:10,background:"transparent",color:"var(--text-primary)",fontSize:16,fontWeight:700,cursor:"pointer"}}>\u30ad\u30e3\u30f3\u30bb\u30eb</button></div>
 </div></div>}
 {delConf&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}}>
-<div style={{fontSize:18,fontWeight:800,color:"var(--text-danger)",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}><AlertTriangle size={18}/> メンバー削除</div>
-<div style={{fontSize:16,marginBottom:16}}>「{delConf.name}」を完全に削除しますか？<br/><span style={{fontSize:13,color:"var(--text-secondary)"}}>この操作は元に戻せません</span></div>
-<div style={{display:"flex",gap:8}}><button onClick={()=>rmPlayer(delConf.ti,delConf.pi)} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>削除する</button><button onClick={()=>setDelConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
+<div style={{fontSize:18,fontWeight:800,color:"var(--text-danger)",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}><AlertTriangle size={18}/> \u30e1\u30f3\u30d0\u30fc\u524a\u9664</div>
+<div style={{fontSize:16,marginBottom:16}}>{"\u300c"+delConf.name+"\u300d\u3092\u5b8c\u5168\u306b\u524a\u9664\u3057\u307e\u3059\u304b\uff1f"}<br/><span style={{fontSize:13,color:"var(--text-secondary)"}}>\u3053\u306e\u64cd\u4f5c\u306f\u5143\u306b\u623b\u305b\u307e\u305b\u3093</span></div>
+<div style={{display:"flex",gap:8}}><button onClick={()=>{if(delConf.court===1){rmPlayer(delConf.ti,delConf.pi);}else{removeFromPaperCourt(delConf.court,delConf.ti,delConf.pi);setDelConf(null);}}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>\u524a\u9664\u3059\u308b</button><button onClick={()=>setDelConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>\u30ad\u30e3\u30f3\u30bb\u30eb</button></div>
 </div></div>}
 
   </div></div>);
@@ -2118,7 +2191,7 @@ return(
 }
 
 /* ═══ Game Screen — with timing ═══ */
-function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goBack,saveToStatsProp,recoverData,isAdmin,aiEnabled,shufAnim,hasCourtAllocation,clearCourtAllocation}){
+function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goBack,saveToStatsProp,recoverData,isAdmin,aiEnabled,shufAnim,hasCourtAllocation,clearCourtAllocation,courtCount,courtAllocation,onUpdateCourtAllocation}){
 const init=recoverData?{
 teams:recoverData.teams.map(t=>({...t,players:t.players.map(p=>typeof p==="string"?{name:p,active:true}:p)})),
 history:recoverData.history,currentOrderIdx:recoverData.currentOrderIdx,currentTurn:recoverData.currentTurn,
@@ -2269,7 +2342,7 @@ return(
 {(view==="both"||view==="sheet")&&(<div style={{flex:view==="both"?1:"1",minHeight:0,overflow:"hidden"}}><GameSheet teams={teams} history={history} currentTurn={currentTurn} teamOrder={teamOrder} activeCell={activeCell}/></div>)}
 {(view==="both"||view==="input")&&(<ScoreInput dispatch={dispatch} canUndo={history.length>0} teamName={teams[ti].name} teamScore={score} teamColor={C[ti].ac} playerName={cp?.name} fails={fails} onConfirm={(t,s,m)=>setConf({t,s,msg:m})} minimized={inputMin} onToggleMin={()=>setInputMin(p=>!p)}/>)}
 </div>
-{showPl&&<PlModal teams={teams} dispatch={dispatch} onClose={()=>setShowPl(false)} isAdmin={isAdmin}/>}
+{showPl&&<PlModal teams={teams} dispatch={dispatch} onClose={()=>setShowPl(false)} isAdmin={isAdmin} courtCount={courtCount} courtAllocation={courtAllocation} onUpdateCourtAllocation={onUpdateCourtAllocation}/>}
 {conf&&<Confirm msg={conf.msg} onOk={execConf} onCancel={()=>setConf(null)}/>}
 {showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} timestamps={timestamps} isAdmin={isAdmin} aiEnabled={aiEnabled} autoEnd={!!autoEnd} dqEndGame={!!dqEndGame} shufAnim={shufAnim}/>}
 {animState.confetti&&<CSSConfetti/>}
@@ -2327,7 +2400,7 @@ if(!dbReady||scr==="loading"||(scr==="recover"&&!recovery)){return(<div style={{
       <div style={{display:"flex",gap:10}}><button onClick={doRecover} style={{flex:1,padding:"16px 0",border:"none",borderRadius:12,background:"var(--bg-secondary)",color:"var(--text-inverse)",fontSize:18,fontWeight:700,cursor:"pointer"}}>{recovery.winner!=null?"表示する":"再開する"}</button><button onClick={dismissRecover} style={{flex:1,padding:"16px 0",border:"2px solid var(--bg-secondary)",borderRadius:12,background:"transparent",color:"var(--text-primary)",fontSize:18,fontWeight:700,cursor:"pointer"}}>破棄する</button></div>
     </div>
   </div>);}
-  return(<div style={{width:"100%",height:"100dvh"}}>{(scr==="setup"||!cfg)?<SetupScreen savedTeams={saved} isAdmin={isAdmin} onAdminToggle={setIsAdmin} aiEnabled={aiEnabled} onAIToggle={handleAIToggle} shufAnim={shufAnim} onShufAnimToggle={handleShufAnimToggle} courtAllocation={courtAllocation} onClearCourtAllocation={()=>{setCourtAllocation(null);if(_db)idbDel(_db,"court-allocation").catch(e=>console.error(e));}} setupDraft={setupDraft} onClearSetupDraft={()=>{setSetupDraft(null);if(_db)idbDel(_db,"setup-draft").catch(e=>{});}} onStart={(t,o,ng,bo,dq,sts)=>{setSetupDraft(null);if(_db)idbDel(_db,"setup-draft").catch(e=>{});setCfg({t,o,ng,bo,dq,sts});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts!==false} recoverData={cfg.recover||null} isAdmin={isAdmin} aiEnabled={aiEnabled} shufAnim={shufAnim} hasCourtAllocation={!!courtAllocation} clearCourtAllocation={()=>{setCourtAllocation(null);if(_db)idbDel(_db,"court-allocation").catch(e=>console.error(e));}} goBack={saveData=>{if(_db)idbDel(_db,"game-progress").catch(e=>console.error("progress delete error",e));try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);setScr("setup");setCfg(null);if(_db)idbGet(_db,"court-allocation").then(data=>{if(data&&data.courtData&&data.courtCount>=2)setCourtAllocation(data);}).catch(e=>console.error(e));}}/>}</div>);
+  return(<div style={{width:"100%",height:"100dvh"}}>{(scr==="setup"||!cfg)?<SetupScreen savedTeams={saved} isAdmin={isAdmin} onAdminToggle={setIsAdmin} aiEnabled={aiEnabled} onAIToggle={handleAIToggle} shufAnim={shufAnim} onShufAnimToggle={handleShufAnimToggle} courtAllocation={courtAllocation} onClearCourtAllocation={()=>{setCourtAllocation(null);if(_db)idbDel(_db,"court-allocation").catch(e=>console.error(e));}} setupDraft={setupDraft} onClearSetupDraft={()=>{setSetupDraft(null);if(_db)idbDel(_db,"setup-draft").catch(e=>{});}} onStart={(t,o,ng,bo,dq,sts)=>{setSetupDraft(null);if(_db)idbDel(_db,"setup-draft").catch(e=>{});setCfg({t,o,ng,bo,dq,sts});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts!==false} recoverData={cfg.recover||null} isAdmin={isAdmin} aiEnabled={aiEnabled} shufAnim={shufAnim} hasCourtAllocation={!!courtAllocation} clearCourtAllocation={()=>{setCourtAllocation(null);if(_db)idbDel(_db,"court-allocation").catch(e=>console.error(e));}} courtCount={courtAllocation?courtAllocation.courtCount:1} courtAllocation={courtAllocation} onUpdateCourtAllocation={(updatedData)=>{setCourtAllocation(updatedData);if(_db)idbSet(_db,"court-allocation",{...updatedData,savedAt:new Date().toISOString()}).catch(e=>console.error(e));}} goBack={saveData=>{if(_db)idbDel(_db,"game-progress").catch(e=>console.error("progress delete error",e));try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);setScr("setup");setCfg(null);if(_db)idbGet(_db,"court-allocation").then(data=>{if(data&&data.courtData&&data.courtCount>=2)setCourtAllocation(data);}).catch(e=>console.error(e));}}/>}</div>);
 }
 
 const SS={
