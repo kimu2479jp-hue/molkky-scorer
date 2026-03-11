@@ -336,7 +336,7 @@ if(!r.ok)return{has_pin:false,pin_updated_at:null,exists:false};
 const d=await r.json();return{has_pin:!!d.has_pin,pin_updated_at:d.pin_updated_at||null,exists:true};
 }catch(e){return{has_pin:false,pin_updated_at:null,exists:false};}
 }
-function maskSyncCode(code){if(!code||code.length<=2)return code?"***":"";return code.slice(0,2)+"\u2022".repeat(Math.min(code.length-2,8));}
+function maskSyncCode(code){if(!code||code.length<=2)return code?"***":"";return code.slice(0,2)+"\•".repeat(Math.min(code.length-2,8));}
 
 /* ═══ AI Enabled Setting ═══ */
 function getAIEnabled(){try{const v=localStorage.getItem(AI_ENABLED_KEY);return v===null?true:v==="true";}catch(e){return true;}}
@@ -659,7 +659,7 @@ function ShuffleAnimation({names,teams,onDone,skipIntro,remainingDeck,isLastCour
 const nCards=names.length;const nTeams=teams.length;
 const shufDur=nCards<=4?2:nCards<=6?3:nCards<=8?3.5:4;
 const perCard=2.8;const dealDur=nCards*perCard;
-const SUITS=["\u2660","\u2665","\u2666","\u2663"];
+const SUITS=["\♠","\♥","\♦","\♣"];
 const vwSA=typeof window!=="undefined"?window.innerWidth:375;const isTabletSA=vwSA>=768;
 const viewH=typeof window!=="undefined"?window.innerHeight:700;
 const maxPT=Math.max(...teams.map(tm=>tm.players.length));
@@ -819,7 +819,7 @@ boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+glowSh,display:"flex",alignItems:"center"
 </div>
 </div>))}
 </div>
-<button onClick={()=>setClosing(true)} style={{marginTop:isTabletSA?28:20,padding:isTabletSA?"16px 40px":"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?28:18,fontWeight:800,cursor:"pointer",opacity:Math.min(1,Math.max(0,(t-T.p4-0.5)/0.3)),transition:"opacity 0.2s"}}>{isMultiCourt&&!isLastCourt?"次のコートへ \u25B6":"閉じる"}</button>
+<button onClick={()=>setClosing(true)} style={{marginTop:isTabletSA?28:20,padding:isTabletSA?"16px 40px":"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?28:18,fontWeight:800,cursor:"pointer",opacity:Math.min(1,Math.max(0,(t-T.p4-0.5)/0.3)),transition:"opacity 0.2s"}}>{isMultiCourt&&!isLastCourt?"次のコートへ \▶":"閉じる"}</button>
 </div>)}
 {/* Court label for multi-court */}
 {courtLabel&&<div style={{position:"fixed",top:"calc(16px + env(safe-area-inset-top, 0px))",left:isTabletSA?32:16,zIndex:9200,pointerEvents:"none"}}><span style={{fontSize:isTabletSA?22:16,fontWeight:900,color:"rgba(255,255,255,0.9)",background:"rgba(0,0,0,0.5)",padding:isTabletSA?"8px 24px":"6px 16px",borderRadius:12,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>{courtLabel}</span></div>}
@@ -844,39 +844,41 @@ boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+glowSh,display:"flex",alignItems:"center"
 }
 
 const DEV_MASTER_LIST=["キムラ"];
-function SmartFavPicker({favs,stats,usedNames,onAdd,onClose}){
+function SmartFavPicker({favs,stats,usedNames,onAdd,onClose,maxMembers,currentCount,minMembers}){
 const usedSet=new Set(Array.isArray(usedNames)?usedNames:[]);
 const[selected,setSelected]=useState(()=>{const s=new Set();const showDev=(()=>{try{if(localStorage.getItem("mk-dev-master")==="1")return true;const params=new URLSearchParams(window.location.search);if(params.get("dev")==="1")return true;return false;}catch(e){return false;}})();if(showDev){DEV_MASTER_LIST.forEach(n=>{if(favs.includes(n)&&!usedSet.has(n))s.add(n);});}return s;});
+const[deselected,setDeselected]=useState(()=>new Set());
 const showDevMaster=(()=>{try{if(localStorage.getItem("mk-dev-master")==="1")return true;const params=new URLSearchParams(window.location.search);if(params.get("dev")==="1")return true;return false;}catch(e){return false;}})();
 const classify=(name)=>{if(showDevMaster&&DEV_MASTER_LIST.includes(name))return"master";if(!showDevMaster&&DEV_MASTER_LIST.includes(name))return"regular";const gs=stats[name]||[];const gc=gs.length;if(gc===0)return"never";const lastDate=gs.reduce((lat,g)=>{const d=new Date(g.d);return d>lat?d:lat;},new Date(0));const days=Math.floor((new Date()-lastDate)/(1000*60*60*24));if(days<=14&&gc>=5)return"regular";if(days<=30&&gc>=2)return"semi";return"occasional";};
 const grouped={};favs.forEach(name=>{const g=classify(name);if(!grouped[g])grouped[g]=[];const gs=stats[name]||[];grouped[g].push({name,gameCount:gs.length});});
 Object.values(grouped).forEach(arr=>arr.sort((a,b)=>b.gameCount-a.gameCount));
-const GC=[{key:"master",label:"master",color:"#1a1a2e",accent:"#ffd700",show:showDevMaster},{key:"regular",label:"\u5E38\u9023",color:"#22b566"},{key:"semi",label:"\u6E96\u30EC\u30AE\u30E5\u30E9\u30FC",color:"#2b7de9"},{key:"occasional",label:"\u305F\u307E\u306B\u53C2\u52A0",color:"#f0a030"},{key:"never",label:"\u672A\u53C2\u52A0",color:"#999"}];
-const toggle=(name)=>{if(usedSet.has(name))return;setSelected(p=>{const n=new Set(p);if(n.has(name))n.delete(name);else n.add(name);return n;});};
-const toggleGroup=(members)=>{const selectable=members.filter(f=>!usedSet.has(f.name)).map(f=>f.name);const allSel=selectable.length>0&&selectable.every(n=>selected.has(n));setSelected(p=>{const n=new Set(p);if(allSel)selectable.forEach(nm=>n.delete(nm));else selectable.forEach(nm=>n.add(nm));return n;});};
+const GC=[{key:"master",label:"master",color:"#1a1a2e",accent:"#ffd700",show:showDevMaster},{key:"regular",label:"\常\連",color:"#22b566"},{key:"semi",label:"\準\レ\ギ\ュ\ラ\ー",color:"#2b7de9"},{key:"occasional",label:"\た\ま\に\参\加",color:"#f0a030"},{key:"never",label:"\未\参\加",color:"#999"}];
+const toggle=(name)=>{if(usedSet.has(name)){setDeselected(p=>{const n=new Set(p);if(n.has(name))n.delete(name);else n.add(name);return n;});return;}setSelected(p=>{const n=new Set(p);if(n.has(name))n.delete(name);else n.add(name);return n;});};
+const toggleGroup=(members)=>{const selectable=members.filter(f=>!usedSet.has(f.name)).map(f=>f.name);const allSel=selectable.length>0&&selectable.every(n=>selected.has(n));setSelected(p=>{const n=new Set(p);if(allSel)selectable.forEach(nm=>n.delete(nm));else selectable.forEach(nm=>n.add(nm));return n;});const addedInGroup=members.filter(f=>usedSet.has(f.name)).map(f=>f.name);const allDesel=addedInGroup.length>0&&addedInGroup.every(n=>deselected.has(n));setDeselected(p=>{const n=new Set(p);if(allDesel)addedInGroup.forEach(nm=>n.delete(nm));else addedInGroup.forEach(nm=>n.add(nm));return n;});};
 return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:500,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
 <div style={{background:"#fff",borderRadius:16,padding:16,maxWidth:500,width:"100%",maxHeight:"85vh",overflow:"auto"}}>
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-<div style={{fontSize:18,fontWeight:800,color:"#14365a"}}>{"\u2606"} お気に入りから選択</div>
-<button onClick={onClose} style={{padding:"4px 12px",border:"1px solid #ddd",borderRadius:8,background:"transparent",color:"#666",fontSize:18,fontWeight:700,cursor:"pointer"}}>{"\u2715"}</button>
+<div style={{fontSize:18,fontWeight:800,color:"#14365a"}}>{"\☆"} お気に入りから選択</div>
+<button onClick={onClose} style={{padding:"4px 12px",border:"1px solid #ddd",borderRadius:8,background:"transparent",color:"#666",fontSize:18,fontWeight:700,cursor:"pointer"}}>{"\✕"}</button>
 </div>
 {GC.filter(g=>g.show!==false).map(gc=>{const members=grouped[gc.key]||[];if(members.length===0)return null;
 const selectable=members.filter(f=>!usedSet.has(f.name)).map(f=>f.name);const allSel=selectable.length>0&&selectable.every(n=>selected.has(n));
 return(<div key={gc.key} style={{marginBottom:10}}>
 <div onClick={()=>toggleGroup(members)} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 12px",borderRadius:8,background:(gc.accent||gc.color)+"11",border:"1px solid "+(gc.accent||gc.color)+"33",cursor:"pointer",marginBottom:4}}>
 <div style={{display:"flex",alignItems:"center",gap:8}}>
-<div style={{width:18,height:18,borderRadius:4,border:allSel?"none":"2px solid "+(gc.accent||gc.color)+"66",background:allSel?(gc.accent||gc.color):"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11,fontWeight:900}}>{allSel&&"\u2713"}</div>
-{gc.key==="master"?<span style={{fontSize:14,fontWeight:800,color:gc.color}}>{"\u25E4"} 開発者{"\u300A"}<span style={{fontStyle:"italic",fontWeight:900}}>Master</span>{"\u300B\u25E2"}</span>:<span style={{fontSize:14,fontWeight:800,color:gc.color}}>{gc.label}</span>}
+<div style={{width:18,height:18,borderRadius:4,border:allSel?"none":"2px solid "+(gc.accent||gc.color)+"66",background:allSel?(gc.accent||gc.color):"transparent",display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:11,fontWeight:900}}>{allSel&&"\✓"}</div>
+{gc.key==="master"?<span style={{fontSize:14,fontWeight:800,color:gc.color}}>{"\◤"} 開発者{"\《"}<span style={{fontStyle:"italic",fontWeight:900}}>Master</span>{"\》\◢"}</span>:<span style={{fontSize:14,fontWeight:800,color:gc.color}}>{gc.label}</span>}
 </div>
 <span style={{fontSize:12,color:(gc.accent||gc.color)+"99"}}>{members.length}人</span>
 </div>
 <div style={{display:"flex",flexWrap:"wrap",gap:5,paddingLeft:4}}>
-{members.map(fav=>{const isAdded=usedSet.has(fav.name);const isSel=selected.has(fav.name);return(
-<button key={fav.name} onClick={()=>toggle(fav.name)} style={{padding:"6px 14px",borderRadius:20,border:isSel?"2px solid "+gc.color:"1px solid #ddd",background:isAdded?"#eee":isSel?gc.color+"15":"#fff",color:isAdded?"#aaa":isSel?gc.color:"#1a1a2e",fontSize:14,fontWeight:isSel?800:600,cursor:isAdded?"default":"pointer",opacity:isAdded?0.4:1}}>{fav.name}<span style={{fontSize:10,marginLeft:4,color:isAdded?"#ccc":"#aaa"}}>{fav.gameCount}</span></button>);})}
+{members.map(fav=>{const isAdded=usedSet.has(fav.name);const isDesel=deselected.has(fav.name);const isSel=selected.has(fav.name);return(
+<button key={fav.name} onClick={()=>toggle(fav.name)} style={{padding:"6px 14px",borderRadius:20,border:isSel?"2px solid "+gc.color:isAdded&&!isDesel?"2px solid "+gc.color+"66":"1px solid #ddd",background:isAdded&&isDesel?"#fee":isAdded?gc.color+"10":isSel?gc.color+"15":"#fff",color:isAdded&&isDesel?"#c00":isAdded?gc.color:isSel?gc.color:"#1a1a2e",fontSize:14,fontWeight:isSel||isAdded?800:600,cursor:"pointer",opacity:isAdded&&isDesel?0.6:1,textDecoration:isAdded&&isDesel?"line-through":"none"}}>{fav.name}{isAdded&&!isDesel&&<span style={{fontSize:9,marginLeft:4,color:gc.color+"88"}}>追加済</span>}<span style={{fontSize:10,marginLeft:4,color:isAdded?"#ccc":"#aaa"}}>{fav.gameCount}</span></button>);})}
 </div></div>);})}
+{maxMembers&&(selected.size+(currentCount||0)-deselected.size)>maxMembers&&<div style={{padding:"8px 12px",background:"#fff3e0",borderRadius:8,marginTop:6,fontSize:13,fontWeight:700,color:"#e65100"}}>上限を超えています（最大{maxMembers}人）</div>}
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderTop:"1px solid #eee",paddingTop:12,marginTop:10}}>
-<div style={{fontSize:14,fontWeight:700,color:"#1a1a2e"}}>選択中: <span style={{color:"#2b7de9"}}>{selected.size}人</span></div>
-<button onClick={()=>{onAdd([...selected]);onClose();}} style={{padding:"10px 24px",border:"none",borderRadius:10,background:selected.size>0?"#2b7de9":"#ccc",color:"#fff",fontSize:15,fontWeight:800,cursor:selected.size>0?"pointer":"default"}}>追加する</button>
+<div style={{fontSize:14,fontWeight:700,color:"#1a1a2e"}}>選択中: <span style={{color:"#2b7de9"}}>{selected.size}人</span>{deselected.size>0&&<span style={{color:"#e74c3c",marginLeft:8}}>解除: {deselected.size}人</span>}</div>
+<button onClick={()=>{const toAdd=[...selected];const toRemove=[...deselected];onAdd({toAdd,toRemove});onClose();}} disabled={maxMembers&&(selected.size+(currentCount||0)-deselected.size)>maxMembers} style={{padding:"10px 24px",border:"none",borderRadius:10,background:(selected.size>0||deselected.size>0)&&!(maxMembers&&(selected.size+(currentCount||0)-deselected.size)>maxMembers)?"#2b7de9":"#ccc",color:"#fff",fontSize:15,fontWeight:800,cursor:(selected.size>0||deselected.size>0)?"pointer":"default",opacity:maxMembers&&(selected.size+(currentCount||0)-deselected.size)>maxMembers?0.3:1}}>追加する</button>
 </div></div></div>);
 }
 
@@ -892,27 +894,24 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.85)",zInde
 {tm.players.map((p,pi)=>(<div key={pi} style={{fontSize:isTabletSA?30:18,fontWeight:700,color:"#fff",textAlign:"center",padding:isTabletSA?"6px 0":"4px 0",textShadow:"0 1px 2px rgba(0,0,0,0.4)"}}>{p}</div>))}
 </div></div>))}
 </div>
-<button onClick={onNext} style={{marginTop:isTabletSA?28:20,padding:isTabletSA?"16px 40px":"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?28:18,fontWeight:800,cursor:"pointer"}}>{isLast?"閉じる":"次のコートへ \u25B6"}</button>
+<button onClick={onNext} style={{marginTop:isTabletSA?28:20,padding:isTabletSA?"16px 40px":"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?28:18,fontWeight:800,cursor:"pointer"}}>{isLast?"閉じる":"次のコートへ \▶"}</button>
 </div>);
 }
 
-function CourtOverview({courtData,courtCount,courtTeamCounts,numGames,bestOf,dqEnd,saveToStats,onStartGame,onBack,onDeleteCourt,onDeleteAllCourts}){
+function CourtOverview({courtData,courtCount,courtTeamCounts,numGames,bestOf,dqEnd,saveToStats,onStartGame,onBack}){
 const isTab=typeof window!=="undefined"&&window.innerWidth>=768;
 const[backConfirm,setBackConfirm]=useState(false);
-const[delCourtConfirm,setDelCourtConfirm]=useState(null);/* {courtNum,step} */
-const[delAllConfirm,setDelAllConfirm]=useState(0);/* 0=none,1=first,2=second */
 const handleStartGame=()=>{const teams=courtData[1];const order=Array.from({length:teams.length},(_,i)=>i);onStartGame(teams,order);};
 return(<div style={{position:"fixed",inset:0,zIndex:8000,height:"100dvh",display:"flex",flexDirection:"column",overflow:"auto",background:"linear-gradient(170deg,var(--bg-tertiary),var(--bg-secondary))",WebkitOverflowScrolling:"touch",overscrollBehavior:"none"}}>
 <div style={{padding:"calc(16px + env(safe-area-inset-top, 0px)) 20px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
 <div style={{fontSize:22,fontWeight:900,color:"var(--text-inverse)"}}>全コート メンバー一覧</div>
-<button onClick={()=>setBackConfirm(true)} style={{padding:"10px 20px",border:"2px solid rgba(255,255,255,0.4)",borderRadius:12,background:"rgba(255,255,255,0.1)",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>{"\u2190"} 戻る</button>
+<button onClick={()=>setBackConfirm(true)} style={{padding:"10px 20px",border:"2px solid rgba(255,255,255,0.4)",borderRadius:12,background:"rgba(255,255,255,0.1)",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>{"\←"} 戻る</button>
 </div>
 <div style={{flex:1,padding:"0 16px 16px",overflow:"auto"}}>
-{[1,2,3].filter(c=>c<=courtCount).map(cNum=>{const teams=courtData[cNum]||[];const nTeams=teams.length;const icon=cNum===1?"\uD83D\uDCF1":"\uD83D\uDCCB";const label=cNum===1?cNum+"コート（端末）":cNum+"コート（紙）";
+{[1,2,3].filter(c=>c<=courtCount).map(cNum=>{const teams=courtData[cNum]||[];const nTeams=teams.length;const icon=cNum===1?"\�\�":"\�\�";const label=cNum===1?cNum+"コート（端末）":cNum+"コート（紙）";
 return(<div key={cNum} style={{background:cNum===1?"rgba(43,125,233,0.08)":"rgba(255,255,255,0.04)",border:cNum===1?"2px solid rgba(43,125,233,0.3)":"1px solid rgba(255,255,255,0.15)",borderRadius:16,padding:"16px 18px",marginBottom:14}}>
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
 <div style={{fontSize:18,fontWeight:900,color:"#fff"}}>{icon} {label}</div>
-{cNum!==1&&onDeleteCourt&&<button onClick={()=>setDelCourtConfirm({courtNum:cNum,step:1})} style={{width:36,height:36,border:"1px solid rgba(231,76,60,0.3)",borderRadius:8,background:"rgba(231,76,60,0.1)",color:"#e74c3c",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>{"\uD83D\uDDD1"}</button>}
 </div>
 <div style={{display:"grid",gridTemplateColumns:nTeams>=2?"1fr 1fr":"1fr",gap:10,marginTop:10}}>
 {teams.map((t,ti)=>(<div key={ti} style={{background:"rgba(255,255,255,0.95)",borderRadius:12,padding:"12px 14px",borderLeft:"5px solid "+C[ti%4].ac}}>
@@ -924,8 +923,7 @@ return(<div key={cNum} style={{background:cNum===1?"rgba(43,125,233,0.08)":"rgba
 </div>))}
 </div></div>);
 })}
-<button onClick={handleStartGame} style={{width:"100%",padding:20,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"var(--text-inverse)",fontSize:28,fontWeight:900,cursor:"pointer",letterSpacing:3,boxShadow:"0 3px 16px rgba(43,125,233,0.3)",marginTop:8}}>{"\uD83D\uDCF1"} 1コートで試合開始</button>
-{onDeleteAllCourts&&<button onClick={()=>setDelAllConfirm(1)} style={{width:"100%",padding:14,border:"2px solid rgba(231,76,60,0.3)",borderRadius:12,background:"rgba(231,76,60,0.08)",color:"#e74c3c",fontSize:15,fontWeight:700,cursor:"pointer",marginTop:12}}>全コートデータを破棄</button>}
+<button onClick={handleStartGame} style={{width:"100%",padding:20,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"var(--text-inverse)",fontSize:28,fontWeight:900,cursor:"pointer",letterSpacing:3,boxShadow:"0 3px 16px rgba(43,125,233,0.3)",marginTop:8}}>{"\�\�"} 1コートで試合開始</button>
 </div>
 {backConfirm&&(<div style={{position:"fixed",inset:0,zIndex:9500,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
 <div style={{background:"#1a1a2e",borderRadius:16,padding:"24px 28px",maxWidth:360,width:"100%"}}>
@@ -934,38 +932,6 @@ return(<div key={cNum} style={{background:cNum===1?"rgba(43,125,233,0.08)":"rgba
 <button onClick={()=>{setBackConfirm(false);onBack();}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--accent-blue)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
 <button onClick={()=>setBackConfirm(false)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>いいえ</button>
 </div></div></div>)}
-{delCourtConfirm&&(<div style={{position:"fixed",inset:0,zIndex:9500,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-<div style={{background:"#1a1a2e",borderRadius:16,padding:"24px 28px",maxWidth:360,width:"100%"}}>
-{delCourtConfirm.step===1?(<>
-<div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>{delCourtConfirm.courtNum}コートのデータを破棄しますか？</div>
-<div style={{display:"flex",gap:10}}>
-<button onClick={()=>setDelCourtConfirm(p=>({...p,step:2}))} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"#e74c3c",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
-<button onClick={()=>setDelCourtConfirm(null)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>いいえ</button>
-</div>
-</>):(<>
-<div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>この操作は取り消せません。</div>
-<div style={{display:"flex",gap:10}}>
-<button onClick={()=>{const cn=delCourtConfirm.courtNum;setDelCourtConfirm(null);if(onDeleteCourt)onDeleteCourt(cn);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"#e74c3c",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>破棄する</button>
-<button onClick={()=>setDelCourtConfirm(null)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>キャンセル</button>
-</div>
-</>)}
-</div></div>)}
-{delAllConfirm>0&&(<div style={{position:"fixed",inset:0,zIndex:9500,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
-<div style={{background:"#1a1a2e",borderRadius:16,padding:"24px 28px",maxWidth:360,width:"100%"}}>
-{delAllConfirm===1?(<>
-<div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>全コートのデータを破棄しますか？</div>
-<div style={{display:"flex",gap:10}}>
-<button onClick={()=>setDelAllConfirm(2)} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"#e74c3c",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
-<button onClick={()=>setDelAllConfirm(0)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>いいえ</button>
-</div>
-</>):(<>
-<div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>この操作は取り消せません。破棄しますか？</div>
-<div style={{display:"flex",gap:10}}>
-<button onClick={()=>{setDelAllConfirm(0);if(onDeleteAllCourts)onDeleteAllCourts();}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"#e74c3c",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>破棄する</button>
-<button onClick={()=>setDelAllConfirm(0)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>キャンセル</button>
-</div>
-</>)}
-</div></div>)}
 </div>);
 }
 
@@ -981,7 +947,7 @@ const isLast=safeIdx===courtOrder.length-1;
 const currentTeams=courtData[currentCourtNum];
 const currentNames=currentTeams.flatMap(t=>t.players);
 const remainingCards=courtOrder.slice(safeIdx+1).reduce((sum,cn)=>sum+courtData[cn].flatMap(t=>t.players).length,0);
-const courtLabel=currentCourtNum===1?"\uD83D\uDCF1 1コート（端末）":"\uD83D\uDCCB "+currentCourtNum+"コート（紙）";
+const courtLabel=currentCourtNum===1?"\�\� 1コート（端末）":"\�\� "+currentCourtNum+"コート（紙）";
 const handleCourtDone=()=>{setCurrentCourtIdx(-1);setSkipToReveal(false);setTimeout(()=>{if(isLast){onAllDone(courtData);}else{setCurrentCourtIdx(safeIdx+1);}},50);};
 const handleSkipThisCourt=()=>{setSkipToReveal(true);};
 if(currentCourtIdx<0)return null;
@@ -1105,7 +1071,7 @@ const savedCode=getSyncCode();/* from localStorage — may be stale */
 const[syncInput,setSyncInput]=useState(savedCode);/* input field value */
 const[syncConfirmed,setSyncConfirmed]=useState(!!savedCode);/* was a sync ever successful? */
 const[syncStatus,setSyncStatus]=useState("");
-const total=getAnalysisTotal();const totalDisplay=total>=10000?"\u221E":total;
+const total=getAnalysisTotal();const totalDisplay=total>=10000?"\∞":total;
 const costYen=(total*0.1).toFixed(1);
 /* On mount: verify saved code is actually valid on server */
 useEffect(()=>{if(savedCode){checkServerHasPin(savedCode).then(r=>{setServerHasPin(r.has_pin);setSyncConfirmed(r.exists);if(!r.exists){setSyncInput("");setSyncCodeLS("");}});}else{setServerHasPin(false);setSyncConfirmed(false);}},[]);
@@ -1239,8 +1205,8 @@ const aM=()=>{if(mems.length<maxShufForCourt){setMems(p=>[...p,""]);setSp(null);
 const rM=i=>{if(mems.length>2){setMems(p=>p.filter((_,j)=>j!==i));setSp(null);setAllCourtData(null);}};
 const doMultiCourtShuf=()=>{const totalTeams=Object.entries(courtTeamCounts).filter(([k])=>Number(k)<=courtCount).reduce((s,[,v])=>s+v,0);const allNames=[...mems.filter(m=>m.trim())];const minReq=Math.max(totalTeams,courtCount*2);if(allNames.length<minReq)return null;
 const syncCode=getSyncCode();const currentFavs=loadFavs();
-const isKimuraEnabled=syncCode==="MolkkyFuji223"&&currentFavs.includes("\u30AD\u30E0\u30E9");
-let kimuraName=null;if(isKimuraEnabled){const ki=allNames.findIndex(n=>n==="\u30AD\u30E0\u30E9");if(ki>=0)kimuraName=allNames.splice(ki,1)[0];}
+const isKimuraEnabled=syncCode==="MolkkyFuji223"&&currentFavs.includes("\キ\ム\ラ");
+let kimuraName=null;if(isKimuraEnabled){const ki=allNames.findIndex(n=>n==="\キ\ム\ラ");if(ki>=0)kimuraName=allNames.splice(ki,1)[0];}
 const total=allNames.length;const remaining=total-courtCount*2;const base2=remaining>=0?Math.floor(remaining/courtCount):0;const rem2=remaining>=0?remaining%courtCount:0;
 const courtSizes={};for(let c=1;c<=courtCount;c++){const extraOrder=c===1?courtCount:c-1;courtSizes[c]=2+base2+(extraOrder<=rem2?1:0);}
 const shuffled=shuf(allNames);const courtPlayers={};let idx=0;
@@ -1248,7 +1214,7 @@ for(let c=1;c<=courtCount;c++){courtPlayers[c]=shuffled.slice(idx,idx+courtSizes
 if(kimuraName)courtPlayers[1].push(kimuraName);
 const courtResults={};for(let c=1;c<=courtCount;c++){const players=shuf(courtPlayers[c]);const nT=courtTeamCounts[c];
 const tSizes=[];const b2=Math.floor(players.length/nT);const r2=players.length%nT;for(let i=0;i<nT;i++)tSizes.push(b2+(i<r2?1:0));
-const tms=[];let pi=0;for(let i=0;i<nT;i++){tms.push({name:"\u30C1\u30FC\u30E0"+(i+1),players:players.slice(pi,pi+tSizes[i])});pi+=tSizes[i];}
+const tms=[];let pi=0;for(let i=0;i<nT;i++){tms.push({name:"\チ\ー\ム"+(i+1),players:players.slice(pi,pi+tSizes[i])});pi+=tSizes[i];}
 courtResults[c]=tms;}return courtResults;};
 const doShufCore=()=>{const names=mems.filter(m=>m.trim());if(names.length<tc)return null;
 const prevSets=sp?sp.map(t=>new Set(t.players)):null;
@@ -1283,20 +1249,20 @@ return(
 <div style={{padding:"36px 20px 8px",textAlign:"center",position:"relative"}}><button onClick={()=>setShowSettings(true)} style={{position:"absolute",top:40,right:20,padding:"8px 14px",border:"1px solid rgba(255,255,255,0.25)",borderRadius:10,background:"rgba(255,255,255,0.08)",color:"var(--text-inverse)",fontSize:18,cursor:"pointer",zIndex:10}}><Settings size={18}/></button><img src={MASCOT_S} alt="モルック" style={{width:200,height:200,objectFit:"contain",display:"block",margin:"0 auto -6px"}}/><h1 style={{fontSize:38,fontWeight:900,color:"var(--text-inverse)",letterSpacing:4}}>モルック スコアラー</h1><div style={{fontSize:13,color:"rgba(255,255,255,0.3)",fontWeight:600,letterSpacing:5}}>MÖLKKY SCORER</div></div>
 <div style={{flex:1,padding:"0 20px",paddingBottom:"calc(36px + env(safe-area-inset-bottom, 0px))",maxWidth:720,margin:"0 auto",width:"100%"}}>
 {courtAllocation&&<div style={{background:"rgba(43,125,233,0.12)",border:"2px solid rgba(43,125,233,0.3)",borderRadius:14,padding:16,marginBottom:14}}>
-<div style={{fontSize:16,fontWeight:800,color:"var(--text-inverse)",marginBottom:10}}>{"\uD83D\uDD04"} 前回のコート割り当てがあります</div>
+<div style={{fontSize:16,fontWeight:800,color:"var(--text-inverse)",marginBottom:10}}>{"\�\�"} 前回のコート割り当てがあります</div>
 <div style={{display:"flex",gap:8}}>
-<button onClick={()=>{setCourtCount(courtAllocation.courtCount);setCourtTeamCounts(courtAllocation.courtTeamCounts);setAllCourtData(courtAllocation.courtData);setSp(courtAllocation.courtData[1]);setNumGames(courtAllocation.numGames||1);setBestOf(courtAllocation.bestOf||0);setDqEnd(courtAllocation.dqEnd!==undefined?courtAllocation.dqEnd:true);setSaveToStats(courtAllocation.saveToStats!==undefined?courtAllocation.saveToStats:true);setShowCourtOverview(true);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"linear-gradient(135deg,#2b7de9,#1a6dd4)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>{"\uD83D\uDCCB"} コート一覧を見る</button>
-<button onClick={()=>setCaDiscardStep(1)} style={{flex:"0 0 auto",padding:"12px 16px",border:"2px solid rgba(231,76,60,0.4)",borderRadius:10,background:"rgba(231,76,60,0.1)",color:"#e74c3c",fontSize:14,fontWeight:700,cursor:"pointer"}}>{"\uD83D\uDDD1"} データを破棄</button>
+<button onClick={()=>{setCourtCount(courtAllocation.courtCount);setCourtTeamCounts(courtAllocation.courtTeamCounts);setAllCourtData(courtAllocation.courtData);setSp(courtAllocation.courtData[1]);setNumGames(courtAllocation.numGames||1);setBestOf(courtAllocation.bestOf||0);setDqEnd(courtAllocation.dqEnd!==undefined?courtAllocation.dqEnd:true);setSaveToStats(courtAllocation.saveToStats!==undefined?courtAllocation.saveToStats:true);setShowCourtOverview(true);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"linear-gradient(135deg,#2b7de9,#1a6dd4)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>{"\�\�"} コート一覧を見る</button>
+<button onClick={()=>setCaDiscardStep(1)} style={{flex:"0 0 auto",padding:"12px 16px",border:"2px solid rgba(231,76,60,0.4)",borderRadius:10,background:"rgba(231,76,60,0.1)",color:"#e74c3c",fontSize:14,fontWeight:700,cursor:"pointer"}}>{"\�\�"} データを破棄</button>
 </div></div>}
 {setupDraft&&!draftRestored&&!savedTeams&&<div style={{background:"rgba(34,181,102,0.12)",border:"2px solid rgba(34,181,102,0.3)",borderRadius:14,padding:16,marginBottom:14}}>
-<div style={{fontSize:16,fontWeight:800,color:"var(--text-inverse)",marginBottom:10}}>{"\uD83D\uDCDD"} 前回の入力途中のメンバーがあります</div>
+<div style={{fontSize:16,fontWeight:800,color:"var(--text-inverse)",marginBottom:10}}>{"\�\�"} 前回の入力途中のメンバーがあります</div>
 <div style={{display:"flex",gap:8}}>
-<button onClick={()=>{if(setupDraft.mems)setMems(setupDraft.mems);if(setupDraft.mode)setMode(setupDraft.mode);if(setupDraft.tc)setTc(setupDraft.tc);if(setupDraft.courtCount)setCourtCount(setupDraft.courtCount);if(setupDraft.courtTeamCounts)setCourtTeamCounts(setupDraft.courtTeamCounts);if(setupDraft.sp)setSp(setupDraft.sp);if(setupDraft.teams){setTeams(prev=>{const base=[...prev];setupDraft.teams.forEach((t,i)=>{if(i<base.length)base[i]={...base[i],name:t.name,players:t.players&&t.players.length>0?t.players:[""]};});return base;});}setDraftRestored(true);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"linear-gradient(135deg,#22b566,#1a9d52)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>{"\u2705"} 復元する</button>
-<button onClick={()=>{setDraftRestored(true);if(onClearSetupDraft)onClearSetupDraft();}} style={{flex:"0 0 auto",padding:"12px 16px",border:"2px solid rgba(231,76,60,0.4)",borderRadius:10,background:"rgba(231,76,60,0.1)",color:"#e74c3c",fontSize:14,fontWeight:700,cursor:"pointer"}}>{"\uD83D\uDDD1"} 破棄する</button>
+<button onClick={()=>{if(setupDraft.mems)setMems(setupDraft.mems);if(setupDraft.mode)setMode(setupDraft.mode);if(setupDraft.tc)setTc(setupDraft.tc);if(setupDraft.courtCount)setCourtCount(setupDraft.courtCount);if(setupDraft.courtTeamCounts)setCourtTeamCounts(setupDraft.courtTeamCounts);if(setupDraft.sp)setSp(setupDraft.sp);if(setupDraft.teams){setTeams(prev=>{const base=[...prev];setupDraft.teams.forEach((t,i)=>{if(i<base.length)base[i]={...base[i],name:t.name,players:t.players&&t.players.length>0?t.players:[""]};});return base;});}setDraftRestored(true);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"linear-gradient(135deg,#22b566,#1a9d52)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>{"\✅"} 復元する</button>
+<button onClick={()=>{setDraftRestored(true);if(onClearSetupDraft)onClearSetupDraft();}} style={{flex:"0 0 auto",padding:"12px 16px",border:"2px solid rgba(231,76,60,0.4)",borderRadius:10,background:"rgba(231,76,60,0.1)",color:"#e74c3c",fontSize:14,fontWeight:700,cursor:"pointer"}}>{"\�\�"} 破棄する</button>
 </div></div>}
-<div style={{marginBottom:14}}><label style={SL}>入力モード</label><div style={{display:"flex",gap:8}}>{[["manual","✏\uFE0F 手動"],["shuffle","\uD83C\uDFB2 ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>{if(k===mode)return;const doSwitch=()=>{if(k==="shuffle"){let ns;if(courtCount>=2){ns=[];for(let c=1;c<=courtCount;c++){const ct=courtTeams[c]||[];ct.slice(0,courtTeamCounts[c]).forEach(t=>{t.players.filter(p=>p.trim()).forEach(p=>ns.push(p));});}if(ns.length===0)ns=["",""];}else{ns=teams.slice(0,tc).flatMap(t=>t.players).filter(p=>p.trim());if(ns.length>0)ns=ns.length<2?[...ns,""]:ns;}setMems(ns.length>0?ns:["","","",""]);}else if(k==="manual"){const ns=mems.filter(m=>m.trim());if(ns.length>0){setTeams(p=>{const nt=p.map((t,i)=>i<tc?{...t,players:[]}:t);ns.forEach((n,j)=>{const ti=j%tc;nt[ti]={...nt[ti],players:[...nt[ti].players,n]};});for(let i=0;i<tc;i++){if(nt[i].players.length===0)nt[i]={...nt[i],players:[""]};} return nt;});}}setMode(k);setSp(null);setAllCourtData(null);setEditMode(false);setExpandedDel(null);};if(mode==="shuffle"&&k==="manual"){const fc=mems.filter(m=>m.trim()).length;const manualMax=courtCount===1?tc*MAX_PL:18;if(fc>manualMax&&fc>0){showTrimConfirm(fc,manualMax,doSwitch);return;}}doSwitch();}} style={{...CH,...(mode===k?CHA:{})}}>{l}</button>))}</div></div>
+<div style={{marginBottom:14}}><label style={SL}>入力モード</label><div style={{display:"flex",gap:8}}>{[["manual","✏\️ 手動"],["shuffle","\�\� ランダム"]].map(([k,l])=>(<button key={k} onClick={()=>{if(k===mode)return;const doSwitch=()=>{if(k==="shuffle"){let ns;if(courtCount>=2){ns=[];for(let c=1;c<=courtCount;c++){const ct=courtTeams[c]||[];ct.slice(0,courtTeamCounts[c]).forEach(t=>{t.players.filter(p=>p.trim()).forEach(p=>ns.push(p));});}if(ns.length===0)ns=["",""];}else{ns=teams.slice(0,tc).flatMap(t=>t.players).filter(p=>p.trim());if(ns.length>0)ns=ns.length<2?[...ns,""]:ns;}setMems(ns.length>0?ns:["","","",""]);}else if(k==="manual"){const ns=mems.filter(m=>m.trim());if(ns.length>0){setTeams(p=>{const nt=p.map((t,i)=>i<tc?{...t,players:[]}:t);ns.forEach((n,j)=>{const ti=j%tc;nt[ti]={...nt[ti],players:[...nt[ti].players,n]};});for(let i=0;i<tc;i++){if(nt[i].players.length===0)nt[i]={...nt[i],players:[""]};} return nt;});}}setMode(k);setSp(null);setAllCourtData(null);setEditMode(false);setExpandedDel(null);};if(mode==="shuffle"&&k==="manual"){const fc=mems.filter(m=>m.trim()).length;const manualMax=courtCount===1?tc*MAX_PL:18;if(fc>manualMax&&fc>0){showTrimConfirm(fc,manualMax,doSwitch);return;}}doSwitch();}} style={{...CH,...(mode===k?CHA:{})}}>{l}</button>))}</div></div>
 <div style={{display:"flex",gap:14,marginBottom:14}}>{courtCount===1&&<div style={{flex:1}}><label style={SL}>チーム数</label><div style={{display:"flex",gap:8}}>{[2,3,4].map(n=>{const pCount=mode==="shuffle"?mems.filter(m=>m.trim()).length:teams.slice(0,tc).reduce((s,t)=>s+t.players.filter(p=>p.trim()).length,0);const minTeams=pCount>=13?4:pCount>=9?3:2;const dis=n<minTeams;return(<button key={n} onClick={()=>{if(dis)return;if(mode==="shuffle"&&n<tc){const fc=mems.filter(m=>m.trim()).length;const nm=n*MAX_PL;if(fc>nm&&fc>0){showTrimConfirm(fc,nm,()=>{setTc(n);setSp(null);});return;}}setTc(n);setSp(null);}} style={{...CH,...(tc===n?CHA:{}),padding:"16px 0",opacity:dis?0.3:1,cursor:dis?"not-allowed":"pointer"}}>{n}</button>);})}</div></div>}<div style={{flex:1}}><label style={SL}>コート数</label><div style={{display:"flex",gap:8}}>{[1,2,3].map(n=>{const isTab=typeof window!=="undefined"&&window.innerWidth>=768;const dis=n>=2&&!isTab;return(<button key={n} onClick={()=>{if(dis)return;if(mode==="shuffle"&&n<courtCount){const fc=mems.filter(m=>m.trim()).length;const newTotalT=n===1?tc:[1,2,3].filter(c=>c<=n).reduce((s,c)=>s+courtTeamCounts[c],0);const nm=n===1?tc*MAX_PL:newTotalT*MAX_PL;if(fc>nm&&fc>0){showTrimConfirm(fc,nm,()=>{setCourtCount(n);if(n===1)setActiveCourt(1);setSp(null);});return;}}setCourtCount(n);if(n===1){setActiveCourt(1);}}} style={{...CH,...(courtCount===n?CHA:{}),padding:"16px 0",opacity:dis?0.3:1,cursor:dis?"not-allowed":"pointer"}}>{n}コート</button>);})}</div></div></div>
-{courtCount>=2&&(<div style={{marginBottom:14}}>{[1,2,3].filter(c=>c<=courtCount).map(c=>(<div key={c} style={{background:"rgba(255,255,255,0.06)",borderRadius:10,padding:"12px 14px",marginBottom:8,border:c===1?"2px solid rgba(43,125,233,0.3)":"1px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:15,fontWeight:800,color:"var(--text-inverse)"}}>{c===1?"\uD83D\uDCF1":"\uD83D\uDCCB"} {c}コート（{c===1?"端末":"紙"}）</span><div style={{display:"flex",gap:6}}>{[2,3,4].map(n=>(<button key={n} onClick={()=>{if(mode==="shuffle"&&n<courtTeamCounts[c]){const fc=mems.filter(m=>m.trim()).length;const newCTC={...courtTeamCounts,[c]:n};const newTotalT=[1,2,3].filter(x=>x<=courtCount).reduce((s,x)=>s+newCTC[x],0);const nm=newTotalT*MAX_PL;if(fc>nm&&fc>0){showTrimConfirm(fc,nm,()=>{setCourtTeamCounts(p=>({...p,[c]:n}));setSp(null);});return;}}setCourtTeamCounts(p=>({...p,[c]:n}));}} style={{width:44,height:36,borderRadius:8,border:"1px solid rgba(255,255,255,0.15)",background:courtTeamCounts[c]===n?"var(--accent-blue)":"transparent",color:courtTeamCounts[c]===n?"#fff":"rgba(255,255,255,0.5)",fontSize:16,fontWeight:800,cursor:"pointer"}}>{n}</button>))}</div></div>))}<div style={{fontSize:20,fontWeight:900,color:"var(--text-inverse)",textAlign:"right",marginTop:8}}>合計 {[1,2,3].filter(c=>c<=courtCount).reduce((s,c)=>s+courtTeamCounts[c],0)} チーム</div></div>)}
+{courtCount>=2&&(<div style={{marginBottom:14}}>{[1,2,3].filter(c=>c<=courtCount).map(c=>(<div key={c} style={{background:"rgba(255,255,255,0.06)",borderRadius:10,padding:"12px 14px",marginBottom:8,border:c===1?"2px solid rgba(43,125,233,0.3)":"1px solid rgba(255,255,255,0.15)",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span style={{fontSize:15,fontWeight:800,color:"var(--text-inverse)"}}>{c===1?"\�\�":"\�\�"} {c}コート（{c===1?"端末":"紙"}）</span><div style={{display:"flex",gap:6}}>{[2,3,4].map(n=>(<button key={n} onClick={()=>{if(mode==="shuffle"&&n<courtTeamCounts[c]){const fc=mems.filter(m=>m.trim()).length;const newCTC={...courtTeamCounts,[c]:n};const newTotalT=[1,2,3].filter(x=>x<=courtCount).reduce((s,x)=>s+newCTC[x],0);const nm=newTotalT*MAX_PL;if(fc>nm&&fc>0){showTrimConfirm(fc,nm,()=>{setCourtTeamCounts(p=>({...p,[c]:n}));setSp(null);});return;}}setCourtTeamCounts(p=>({...p,[c]:n}));}} style={{width:44,height:36,borderRadius:8,border:"1px solid rgba(255,255,255,0.15)",background:courtTeamCounts[c]===n?"var(--accent-blue)":"transparent",color:courtTeamCounts[c]===n?"#fff":"rgba(255,255,255,0.5)",fontSize:16,fontWeight:800,cursor:"pointer"}}>{n}</button>))}</div></div>))}<div style={{fontSize:20,fontWeight:900,color:"var(--text-inverse)",textAlign:"right",marginTop:8}}>合計 {[1,2,3].filter(c=>c<=courtCount).reduce((s,c)=>s+courtTeamCounts[c],0)} チーム</div></div>)}
 <div style={{display:"flex",gap:8,marginBottom:14}}><div style={{flex:"1 1 0"}}><label style={SL}>ゲーム数</label><select value={numGames} onChange={e=>setNumGames(+e.target.value)} style={SEL}>{Array.from({length:10},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}ゲーム</option>)}</select></div><div style={{flex:"1 1 0"}}><label style={SL}>先取機能</label><select value={bestOf} onChange={e=>setBestOf(+e.target.value)} style={SEL}><option value={0}>なし</option>{Array.from({length:11},(_,i)=>i+2).map(n=><option key={n} value={n}>{n}先取</option>)}</select></div><div style={{flex:"1 1 0"}}><label style={SL}>失格時</label><select value={dqEnd?"end":"cont"} onChange={e=>setDqEnd(e.target.value==="end")} style={SEL}><option value="end">即終了</option><option value="cont">継続</option></select></div></div>
 {/* Stats toggle (UISwitch) + Stats button */}
 <div style={{display:"flex",gap:8,marginBottom:14}}>
@@ -1313,7 +1279,7 @@ return(
 {editMode&&<div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}><button onClick={()=>{setEditMode(false);setExpandedDel(null);}} style={{padding:"6px 18px",border:"none",borderRadius:8,background:"var(--accent-blue)",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>Done</button></div>}
 {teams.slice(0,tc).map((team,ti)=>(<div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac}} onTouchStart={lpStart} onTouchEnd={lpEnd} onTouchMove={lpMove}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><div style={{width:34,height:34,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-inverse)",fontWeight:900,fontSize:18,flexShrink:0,background:C[ti].ac}}>{ti+1}</div><input value={team.name} onChange={e=>uN(ti,e.target.value)} style={TIN} placeholder={"チーム"+(ti+1)}/></div>
 <div style={{paddingLeft:editMode?28:44}}>{team.players.map((p,pi)=>{const delKey="m"+ti+"_"+pi;const isExp=expandedDel===delKey;return(<div key={pi} style={{display:"flex",alignItems:"center",gap:6,marginBottom:7,overflow:"hidden"}}>
-{editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#e74c3c",color:"#fff",fontSize:18,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"\u2212"}</button>}
+{editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#e74c3c",color:"#fff",fontSize:18,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"\−"}</button>}
 <span style={{width:20,fontSize:16,color:"var(--text-muted)",fontWeight:700,textAlign:"center"}}>{pi+1}</span><input value={p} onChange={e=>uP(ti,pi,e.target.value)} maxLength={MAX_NAME} style={{...PIN,flex:isExp?"0 1 auto":"1"}} placeholder={"名前("+MAX_NAME+"文字)"}/>
 {!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uP(ti,pi,name)} usedNames={used} isAdmin={isAdmin}/>}
 {editMode&&isExp&&team.players.length>1&&<button onClick={()=>{rP(ti,pi);setExpandedDel(null);}} style={{padding:"6px 16px",border:"none",borderRadius:8,background:"#e74c3c",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
@@ -1324,12 +1290,12 @@ return(
 <button style={{width:"100%",padding:20,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"var(--text-inverse)",fontSize:32,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:6,boxShadow:"0 3px 16px rgba(43,125,233,0.3)",opacity:okM?1:0.3}} onClick={okM?go:undefined}><Target size={28} style={{display:"inline",verticalAlign:"middle",marginRight:6}}/> ゲーム開始</button>
 </>)}
 {mode==="manual"&&courtCount>=2&&(<>
-<div style={{display:"flex",gap:8,marginBottom:10}}>{[1,2,3].filter(c=>c<=courtCount).map(c=>{const act=activeCourt===c;return(<button key={c} onClick={()=>setActiveCourt(c)} style={{flex:1,padding:"12px 0",border:act?"2px solid #2b7de9":"2px solid rgba(255,255,255,0.2)",borderRadius:10,background:act?"rgba(43,125,233,0.2)":"rgba(255,255,255,0.06)",color:act?"#fff":"rgba(255,255,255,0.5)",fontSize:16,fontWeight:800,cursor:"pointer",textAlign:"center"}}><div>{c===1?"\uD83D\uDCF1":"\uD83D\uDCCB"} {c}コート</div><div style={{fontSize:12,fontWeight:600,marginTop:2}}>{courtTeamCounts[c]}チーム</div></button>);})}</div>
+<div style={{display:"flex",gap:8,marginBottom:10}}>{[1,2,3].filter(c=>c<=courtCount).map(c=>{const act=activeCourt===c;return(<button key={c} onClick={()=>setActiveCourt(c)} style={{flex:1,padding:"12px 0",border:act?"2px solid #2b7de9":"2px solid rgba(255,255,255,0.2)",borderRadius:10,background:act?"rgba(43,125,233,0.2)":"rgba(255,255,255,0.06)",color:act?"#fff":"rgba(255,255,255,0.5)",fontSize:16,fontWeight:800,cursor:"pointer",textAlign:"center"}}><div>{c===1?"\�\�":"\�\�"} {c}コート</div><div style={{fontSize:12,fontWeight:600,marginTop:2}}>{courtTeamCounts[c]}チーム</div></button>);})}</div>
 <div style={{padding:"8px 14px",borderRadius:10,marginBottom:10,background:activeCourt===1?"rgba(43,125,233,0.15)":"rgba(255,255,255,0.06)",border:activeCourt===1?"1px solid rgba(43,125,233,0.3)":"1px solid rgba(255,255,255,0.1)"}}><span style={{fontSize:14,fontWeight:700,color:activeCourt===1?"#6ab0ff":"rgba(255,255,255,0.5)"}}>{activeCourt===1?"端末で試合するコート":"紙で記録するコート"}</span></div>
 {editMode&&<div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}><button onClick={()=>{setEditMode(false);setExpandedDel(null);}} style={{padding:"6px 18px",border:"none",borderRadius:8,background:"var(--accent-blue)",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>Done</button></div>}
 {courtTeams[activeCourt].slice(0,courtTeamCounts[activeCourt]).map((team,ti)=>(<div key={activeCourt+"-"+ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac}} onTouchStart={lpStart} onTouchEnd={lpEnd} onTouchMove={lpMove}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><div style={{width:34,height:34,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-inverse)",fontWeight:900,fontSize:18,flexShrink:0,background:C[ti].ac}}>{ti+1}</div><input value={team.name} onChange={e=>ctUn(activeCourt,ti,e.target.value)} style={TIN} placeholder={"チーム"+(ti+1)}/></div>
 <div style={{paddingLeft:editMode?28:44}}>{team.players.map((p,pi)=>{const delKey="c"+activeCourt+"_"+ti+"_"+pi;const isExp=expandedDel===delKey;return(<div key={pi} style={{display:"flex",alignItems:"center",gap:6,marginBottom:7,overflow:"hidden"}}>
-{editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#e74c3c",color:"#fff",fontSize:18,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"\u2212"}</button>}
+{editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#e74c3c",color:"#fff",fontSize:18,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"\−"}</button>}
 <span style={{width:20,fontSize:16,color:"var(--text-muted)",fontWeight:700,textAlign:"center"}}>{pi+1}</span><input value={p} onChange={e=>ctUp(activeCourt,ti,pi,e.target.value)} maxLength={MAX_NAME} style={{...PIN,flex:isExp?"0 1 auto":"1"}} placeholder={"名前("+MAX_NAME+"文字)"}/>
 {!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>ctUp(activeCourt,ti,pi,name)} usedNames={used} isAdmin={isAdmin}/>}
 {editMode&&isExp&&team.players.length>1&&<button onClick={()=>{ctRp(activeCourt,ti,pi);setExpandedDel(null);}} style={{padding:"6px 16px",border:"none",borderRadius:8,background:"#e74c3c",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
@@ -1342,32 +1308,32 @@ return(
 {mode==="shuffle"&&(<><div style={CARD} onTouchStart={lpStart} onTouchEnd={lpEnd} onTouchMove={lpMove}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}><div style={{fontWeight:700,fontSize:18,color:"var(--text-primary)"}}>参加メンバー（最大{maxShufForCourt}人）</div>
 {editMode&&<button onClick={()=>{setEditMode(false);setExpandedDel(null);}} style={{padding:"4px 14px",border:"none",borderRadius:8,background:"var(--accent-blue)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>Done</button>}</div>
 <div style={{display:"grid",gridTemplateColumns:editMode?"1fr":"1fr 1fr",gap:7}}>{mems.map((m,i)=>{const delKey="s"+i;const isExp=expandedDel===delKey;return(<div key={i} style={{display:"flex",alignItems:"center",gap:4}}>
-{editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:24,height:24,borderRadius:12,border:"none",background:"#e74c3c",color:"#fff",fontSize:16,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"\u2212"}</button>}
+{editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:24,height:24,borderRadius:12,border:"none",background:"#e74c3c",color:"#fff",fontSize:16,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"\−"}</button>}
 <span style={{width:20,fontSize:14,color:"var(--text-muted)",fontWeight:700,textAlign:"right",flexShrink:0}}>{i+1}</span><input value={m} onChange={e=>uM(i,e.target.value)} maxLength={MAX_NAME} style={{...PIN,padding:"10px 12px",fontSize:18,flex:isExp?"0 1 auto":"1",minWidth:0}} placeholder="メンバー"/>
 {!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uM(i,name)} usedNames={used} isAdmin={isAdmin}/>}
 {editMode&&isExp&&mems.length>2&&<button onClick={()=>{rM(i);setExpandedDel(null);}} style={{padding:"4px 14px",border:"none",borderRadius:8,background:"#e74c3c",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
 </div>);})}</div>
 {!editMode&&mems.length<maxShufForCourt&&<button style={{width:"100%",padding:10,border:"2px dashed var(--border-input)",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:6}} onClick={aM}>＋</button>}
-{!editMode&&<button onClick={()=>setShowSmartFav(true)} style={{width:"100%",padding:10,border:"2px solid var(--accent-blue)",borderRadius:8,background:"rgba(43,125,233,0.08)",color:"var(--accent-blue)",fontSize:16,fontWeight:700,cursor:"pointer",marginTop:4}}>{"\u2606"} お気に入りから選択追加</button>}
+{!editMode&&<button onClick={()=>setShowSmartFav(true)} style={{width:"100%",padding:10,border:"2px solid var(--accent-blue)",borderRadius:8,background:"rgba(43,125,233,0.08)",color:"var(--accent-blue)",fontSize:16,fontWeight:700,cursor:"pointer",marginTop:4}}>{"\☆"} お気に入りから選択追加</button>}
 {!editMode&&mems.length>2&&<button style={{width:"100%",padding:10,border:"2px dashed #f0b0b0",borderRadius:8,background:"transparent",color:"var(--text-danger)",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:4}} onClick={()=>rM(mems.length-1)}>− 最後を削除</button>}</div>
 {!okS&&okSReason&&<div style={{fontSize:13,fontWeight:700,color:"#e74c3c",textAlign:"center",marginBottom:4}}>{okSReason}</div>}
 <button style={{width:"100%",padding:16,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"var(--text-inverse)",fontSize:20,fontWeight:800,cursor:"pointer",opacity:okS?1:0.3}} onClick={okS?doShuf:undefined}>🎲 シャッフル</button>
-{courtCount>=2&&allCourtData&&<button onClick={()=>setShowCourtOverview(true)} style={{width:"100%",padding:18,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#1a6dd4)",color:"#fff",fontSize:24,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:4,boxShadow:"0 3px 12px rgba(43,125,233,0.3)"}}>{"\uD83D\uDCCB"} コート一覧を見る</button>}
-{courtCount===1&&sp&&(<div style={{marginTop:8}}>{sp.map((t,ti)=>(<div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac,padding:"10px 16px",marginBottom:6}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:26,height:26,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-inverse)",fontWeight:900,fontSize:14,background:C[ti].ac}}>{ti+1}</div><input value={t.name} onChange={e=>setSp(p=>p.map((x,i)=>i===ti?{...x,name:e.target.value}:x))} style={{...TIN,fontSize:18}}/></div><div style={{paddingLeft:34,fontSize:16,color:"#555"}}>{t.players.join("\u3001")}</div></div>))}
+{courtCount>=2&&allCourtData&&<button onClick={()=>setShowCourtOverview(true)} style={{width:"100%",padding:18,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#1a6dd4)",color:"#fff",fontSize:24,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:4,boxShadow:"0 3px 12px rgba(43,125,233,0.3)"}}>{"\�\�"} コート一覧を見る</button>}
+{courtCount===1&&sp&&(<div style={{marginTop:8}}>{sp.map((t,ti)=>(<div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac,padding:"10px 16px",marginBottom:6}}><div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:26,height:26,borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-inverse)",fontWeight:900,fontSize:14,background:C[ti].ac}}>{ti+1}</div><input value={t.name} onChange={e=>setSp(p=>p.map((x,i)=>i===ti?{...x,name:e.target.value}:x))} style={{...TIN,fontSize:18}}/></div><div style={{paddingLeft:34,fontSize:16,color:"#555"}}>{t.players.join("\、")}</div></div>))}
 <button style={{width:"100%",padding:20,border:"none",borderRadius:14,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"var(--text-inverse)",fontSize:32,fontWeight:900,cursor:"pointer",letterSpacing:3,marginTop:4,opacity:isSpValid()?1:0.3}} onClick={isSpValid()?go:undefined}><Target size={28} style={{display:"inline",verticalAlign:"middle",marginRight:6}}/> 開始</button>
-<button style={{width:"100%",padding:14,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"var(--text-inverse)",fontSize:18,fontWeight:800,cursor:"pointer",marginTop:6,opacity:okS?1:0.3}} onClick={okS?()=>{if(window.confirm("\u30b7\u30e3\u30c3\u30d5\u30eb\u3057\u76f4\u3057\u307e\u3059\u304b\uff1f"))doShuf();}:undefined}><RefreshCw size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 再シャッフル</button></div>)}
+<button style={{width:"100%",padding:14,border:"2px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.06)",color:"var(--text-inverse)",fontSize:18,fontWeight:800,cursor:"pointer",marginTop:6,opacity:okS?1:0.3}} onClick={okS?()=>{if(window.confirm("\シ\ャ\ッ\フ\ル\し\直\し\ま\す\か\？"))doShuf();}:undefined}><RefreshCw size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 再シャッフル</button></div>)}
 </>)}
 </div>
 {showSetupStats&&<StatsModal onClose={()=>setShowSetupStats(false)} source="setup" isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
-{showSmartFav&&<SmartFavPicker favs={favs} stats={_cache.stats} usedNames={used} onAdd={(names)=>{setMems(prev=>{const filled=[...prev];let ai=0;for(let i=0;i<filled.length&&ai<names.length;i++){if(!filled[i].trim()){filled[i]=names[ai++];}}while(ai<names.length&&filled.length<maxShufForCourt){filled.push(names[ai++]);}return filled;});setSp(null);setAllCourtData(null);}} onClose={()=>setShowSmartFav(false)}/>}
+{showSmartFav&&<SmartFavPicker favs={favs} stats={_cache.stats} usedNames={used} maxMembers={maxShufForCourt} currentCount={used.length} minMembers={courtCount===1?tc:totalTeamsMulti} onAdd={({toAdd,toRemove})=>{setMems(prev=>{let updated=[...prev];if(toRemove&&toRemove.length>0){updated=updated.filter(m=>!toRemove.includes(m));}let ai=0;for(let i=0;i<updated.length&&ai<toAdd.length;i++){if(!updated[i].trim()){updated[i]=toAdd[ai++];}}while(ai<toAdd.length&&updated.length<maxShufForCourt){updated.push(toAdd[ai++]);}const filled=updated.filter(m=>m.trim()).length;const minReq=courtCount===1?tc:totalTeamsMulti;if(filled<minReq){window.alert("最低"+minReq+"人必要です");return prev;}return updated;});setSp(null);setAllCourtData(null);}} onClose={()=>setShowSmartFav(false)}/>}
 {showSettings&&<SettingsPage onClose={()=>setShowSettings(false)} isAdmin={isAdmin} onAdminToggle={onAdminToggle} aiEnabled={aiEnabled} onAIToggle={onAIToggle} shufAnim={shufAnim} onShufAnimToggle={onShufAnimToggle}/>}
 {shufAnimData&&<ShuffleAnimation names={shufAnimData.names} teams={shufAnimData.teams} onDone={()=>{if(shufAnimData.goData){const{ft,ord}=shufAnimData.goData;setShufAnimData(null);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats);}else{setSp(shufAnimData.teams);setShufAnimData(null);}}}/>}
 {multiCourtShufData&&<MultiCourtShuffleManager courtData={multiCourtShufData.courtData} courtCount={courtCount} courtOrder={multiCourtShufData.courtOrder} onAllDone={(data)=>{setMultiCourtShufData(null);setAllCourtData(data);setSp(data[1]);setShowCourtOverview(true);if(_db&&courtCount>=2)idbSet(_db,"court-allocation",{courtCount,courtTeamCounts,courtData:data,numGames,bestOf,dqEnd,saveToStats,savedAt:new Date().toISOString()}).then(()=>{if(_db)idbDel(_db,"setup-draft").catch(e=>{});}).catch(e=>console.error("court-allocation save error",e));}} onSkipAll={(data)=>{setMultiCourtShufData(null);setAllCourtData(data);setSp(data[1]);setShowCourtOverview(true);if(_db&&courtCount>=2)idbSet(_db,"court-allocation",{courtCount,courtTeamCounts,courtData:data,numGames,bestOf,dqEnd,saveToStats,savedAt:new Date().toISOString()}).then(()=>{if(_db)idbDel(_db,"setup-draft").catch(e=>{});}).catch(e=>console.error("court-allocation save error",e));}}/>}
-{showCourtOverview&&allCourtData&&<CourtOverview courtData={allCourtData} courtCount={courtCount} courtTeamCounts={courtTeamCounts} numGames={numGames} bestOf={bestOf} dqEnd={dqEnd} saveToStats={saveToStats} onStartGame={(teams,order)=>{setShowCourtOverview(false);onStart(teams,order,numGames,bestOf,dqEnd,saveToStats);}} onBack={()=>{setShowCourtOverview(false);}} onDeleteCourt={(cNum)=>{const newData={...allCourtData};delete newData[cNum];const newCount=courtCount-1;if(newCount<=1){setAllCourtData(null);setShowCourtOverview(false);setCourtCount(1);if(onClearCourtAllocation)onClearCourtAllocation();}else{setAllCourtData(newData);setCourtCount(newCount);const newCTC={...courtTeamCounts};delete newCTC[cNum];setCourtTeamCounts(newCTC);setSp(newData[1]);if(_db)idbSet(_db,"court-allocation",{courtCount:newCount,courtTeamCounts:newCTC,courtData:newData,numGames,bestOf,dqEnd,saveToStats,savedAt:new Date().toISOString()}).catch(e=>console.error("court-allocation update error",e));}}} onDeleteAllCourts={()=>{setAllCourtData(null);setShowCourtOverview(false);setSp(null);if(onClearCourtAllocation)onClearCourtAllocation();}}/>}
+{showCourtOverview&&allCourtData&&<CourtOverview courtData={allCourtData} courtCount={courtCount} courtTeamCounts={courtTeamCounts} numGames={numGames} bestOf={bestOf} dqEnd={dqEnd} saveToStats={saveToStats} onStartGame={(teams,order)=>{setShowCourtOverview(false);onStart(teams,order,numGames,bestOf,dqEnd,saveToStats);}} onBack={()=>{setShowCourtOverview(false);if(allCourtData){const allNames=[];for(let c=1;c<=courtCount;c++){const teams=allCourtData[c]||[];teams.forEach(t=>t.players.forEach(p=>{const nm=typeof p==="string"?p:(typeof p==="object"?(p.name||""):String(p));if(nm.trim())allNames.push(nm);}));}if(allNames.length>0)setMems(allNames);}}}/>}
 {trimConfirm&&(<div style={{position:"fixed",inset:0,zIndex:9300,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
 <div style={{background:"#1a1a2e",borderRadius:16,padding:"24px 28px",maxWidth:400,width:"100%"}}>
 {trimConfirm.step===1?(<>
-<div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:10}}>{"\u26A0"} メンバー数が超過します</div>
+<div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:10}}>{"\⚠"} メンバー数が超過します</div>
 <div style={{fontSize:14,color:"rgba(255,255,255,0.7)",marginBottom:16,lineHeight:1.6}}>現在<span style={{color:"#e74c3c",fontWeight:800}}>{trimConfirm.filled}人</span>入力済みですが、変更後の上限は<span style={{color:"#e74c3c",fontWeight:800}}>{trimConfirm.newMax}人</span>です。超過分の<span style={{color:"#e74c3c",fontWeight:800}}>{trimConfirm.filled-trimConfirm.newMax}人</span>が末尾から削除されます。続けますか？</div>
 <div style={{display:"flex",gap:10}}>
 <button onClick={()=>setTrimConfirm(p=>({...p,step:2}))} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"#e74c3c",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
@@ -1444,7 +1410,7 @@ return(
 <div style={{width:ACT_W,display:"flex",flexDirection:"column",gap:isNarrow?4:(isTabletSI?10:6),flexShrink:0}}>
 <button style={{flex:1,border:"none",borderRadius:isNarrow?10:(isTabletSI?16:14),background:sel!=null?"var(--bg-secondary)":"#ccc",color:"var(--text-inverse)",fontSize:isNarrow?20:(isTabletSI?34:26),fontWeight:900,cursor:"pointer",boxShadow:sel!=null?"0 2px 8px rgba(20,54,90,0.3)":"none",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doScore}>決定</button>
 <button style={{padding:isNarrow?"10px 0":(isTabletSI?"16px 0":"12px 0"),border:"2px solid #f0b0b0",borderRadius:isNarrow?8:(isTabletSI?12:10),background:"#fde8e8",color:"var(--text-danger)",fontSize:isNarrow?13:(isTabletSI?20:15),fontWeight:900,cursor:"pointer",flexShrink:0}} onClick={doFault}>x フォルト</button>
-<button style={{flex:1,border:"2px solid #f0d4a0",borderRadius:isNarrow?10:(isTabletSI?16:14),background:"#fff3e0",color:"var(--accent-orange)",fontSize:isNarrow?15:(isTabletSI?24:17),fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doMiss}>{"\uFF0D"} ミス</button>
+<button style={{flex:1,border:"2px solid #f0d4a0",borderRadius:isNarrow?10:(isTabletSI?16:14),background:"#fff3e0",color:"var(--accent-orange)",fontSize:isNarrow?15:(isTabletSI?24:17),fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onClick={doMiss}>{"\－"} ミス</button>
 </div>
 </div>
 </div>
@@ -1463,7 +1429,7 @@ const rmPlayer=(ti,pi)=>{
 /* Block if this would leave any team with 0 active players */
 const team=teams[ti];const activeCount=team.players.filter(p=>p.active).length;
 const isActive=team.players[pi]&&team.players[pi].active;
-if(isActive&&activeCount<=1){window.alert("\u5404\u30c1\u30fc\u30e0\u306b\u6700\u4f4e1\u4eba\u306e\u30a2\u30af\u30c6\u30a3\u30d6\u30e1\u30f3\u30d0\u30fc\u304c\u5fc5\u8981\u3067\u3059");setDelConf(null);return;}
+if(isActive&&activeCount<=1){window.alert("\各\チ\ー\ム\に\最\低1\人\の\ア\ク\テ\ィ\ブ\メ\ン\バ\ー\が\必\要\で\す");setDelConf(null);return;}
 const nt=teams.map((t,i)=>i===ti?{...t,players:t.players.filter((_,j)=>j!==pi)}:t);dispatch({type:"SET_TEAMS",teams:nt});setDelConf(null);};
 /* Paper court helpers */
 const canDeleteFromPaperCourt=(courtNum,teamIdx,playerIdx)=>{
@@ -1471,9 +1437,9 @@ if(!courtAllocation||!courtAllocation.courtData||!courtAllocation.courtData[cour
 const courtTeams=courtAllocation.courtData[courtNum];
 const afterDelete=courtTeams.map((t,ti)=>({...t,players:ti===teamIdx?t.players.filter((_,pi)=>pi!==playerIdx):[...t.players]}));
 const totalPlayers=afterDelete.reduce((s,t)=>s+t.players.length,0);
-if(totalPlayers<2)return{ok:false,msg:"\u5404\u30b3\u30fc\u30c8\u306b\u6700\u4f4e2\u4eba\u306e\u30e1\u30f3\u30d0\u30fc\u304c\u5fc5\u8981\u3067\u3059"};
+if(totalPlayers<2)return{ok:false,msg:"\各\コ\ー\ト\に\最\低2\人\の\メ\ン\バ\ー\が\必\要\で\す"};
 const teamsWithPlayers=afterDelete.filter(t=>t.players.length>0).length;
-if(teamsWithPlayers<2)return{ok:false,msg:"\u5bfe\u6226\u3059\u308b\u306b\u306f\u6700\u4f4e2\u30c1\u30fc\u30e0\u304c\u5fc5\u8981\u3067\u3059"};
+if(teamsWithPlayers<2)return{ok:false,msg:"\対\戦\す\る\に\は\最\低2\チ\ー\ム\が\必\要\で\す"};
 return{ok:true};};
 const addToPaperCourt=(courtNum,teamIdx,playerName)=>{
 if(!courtAllocation)return;const updated=JSON.parse(JSON.stringify(courtAllocation));
@@ -1518,17 +1484,17 @@ return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" st
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><h2 style={{fontSize:32,fontWeight:900,color:"var(--text-primary)",display:"flex",alignItems:"center",gap:6}}><Users size={28}/> メンバー</h2><button style={SS.clsB} onClick={onClose}>✕</button></div>
 {/* Court switching tabs (only when courtCount >= 2) */}
 {cc>=2&&<div style={{display:"flex",gap:4,marginBottom:12}}>
-{Array.from({length:cc},(_,i)=>i+1).map(cn=>(<button key={cn} onClick={()=>{setActiveCourt(cn);setSel(0);}} style={{flex:1,padding:"8px 0",border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",background:activeCourt===cn?"var(--accent-blue)":"rgba(0,0,0,0.06)",color:activeCourt===cn?"#fff":"#666"}}>{cn===1?"\ud83d\udcf1":"\ud83d\udccb"} {cn}\u30b3\u30fc\u30c8</button>))}
+{Array.from({length:cc},(_,i)=>i+1).map(cn=>(<button key={cn} onClick={()=>{setActiveCourt(cn);setSel(0);}} style={{flex:1,padding:"8px 0",border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",background:activeCourt===cn?"var(--accent-blue)":"rgba(0,0,0,0.06)",color:activeCourt===cn?"#fff":"#666"}}>{cn===1?"\�\�":"\�\�"} {cn}\コ\ー\ト</button>))}
 </div>}
 {/* Device court (court 1): existing behavior */}
 {activeCourt===1&&<>
 {teams.map((team,ti)=>(<div key={ti} style={{marginBottom:12}}>
-<div style={{fontSize:18,fontWeight:700,color:C[ti].tx,borderBottom:"2px solid "+C[ti].ac,paddingBottom:4,marginBottom:5}}>{team.name}\uff08{team.players.filter(p=>p.active).length}\u4eba\uff09</div>
+<div style={{fontSize:18,fontWeight:700,color:C[ti].tx,borderBottom:"2px solid "+C[ti].ac,paddingBottom:4,marginBottom:5}}>{team.name}\（{team.players.filter(p=>p.active).length}\人\）</div>
 {team.players.map((p,pi)=>(<div key={pi} style={{display:"flex",alignItems:"center",padding:"6px 12px",background:p.active?"#f8f9fa":"#f0f0f0",borderRadius:8,marginBottom:4,opacity:p.active?1:0.4}}>
 <span style={{flex:1,fontSize:17}}>{p.name}</span>
 <div style={{display:"flex",gap:5}}>
-<button onClick={()=>tog(ti,pi,!p.active)} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:p.active?"#e74c3c":"#27ae60",color:"var(--text-inverse)"}}>{p.active?"\u9000\u51fa":"\u5fa9\u5e30"}</button>
-<button onClick={()=>setDelConf({ti,pi,name:p.name,court:1})} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:"#888",color:"var(--text-inverse)"}}>\u524a\u9664</button>
+<button onClick={()=>tog(ti,pi,!p.active)} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:p.active?"#e74c3c":"#27ae60",color:"var(--text-inverse)"}}>{p.active?"\退\出":"\復\帰"}</button>
+<button onClick={()=>setDelConf({ti,pi,name:p.name,court:1})} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:"#888",color:"var(--text-inverse)"}}>\削\除</button>
 </div>
 </div>))}
 </div>))}
@@ -1536,35 +1502,35 @@ return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" st
 {/* Paper court (court 2, 3): show from courtAllocation */}
 {activeCourt>=2&&courtAllocation&&courtAllocation.courtData&&courtAllocation.courtData[activeCourt]&&<>
 {courtAllocation.courtData[activeCourt].map((team,ti)=>(<div key={ti} style={{marginBottom:12}}>
-<div style={{fontSize:18,fontWeight:700,color:C[ti]?C[ti].tx:"#333",borderBottom:"2px solid "+(C[ti]?C[ti].ac:"#ccc"),paddingBottom:4,marginBottom:5}}>{team.name}\uff08{team.players.length}\u4eba\uff09</div>
+<div style={{fontSize:18,fontWeight:700,color:C[ti]?C[ti].tx:"#333",borderBottom:"2px solid "+(C[ti]?C[ti].ac:"#ccc"),paddingBottom:4,marginBottom:5}}>{team.name}\（{team.players.length}\人\）</div>
 {team.players.map((pName,pi)=>(<div key={pi} style={{display:"flex",alignItems:"center",padding:"6px 12px",background:"#f8f9fa",borderRadius:8,marginBottom:4}}>
 <span style={{flex:1,fontSize:17}}>{pName}</span>
 <div style={{display:"flex",gap:5}}>
-<button onClick={()=>setDelConf({ti,pi,name:pName,court:activeCourt})} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:"#888",color:"var(--text-inverse)"}}>\u524a\u9664</button>
+<button onClick={()=>setDelConf({ti,pi,name:pName,court:activeCourt})} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:"#888",color:"var(--text-inverse)"}}>\削\除</button>
 </div>
 </div>))}
 </div>))}
 </>}
 <div style={{background:"#e6f0fb",borderRadius:10,padding:14,marginTop:8}}>
-<div style={{fontSize:16,fontWeight:700,marginBottom:6}}>➕\u8ffd\u52a0</div>
+<div style={{fontSize:16,fontWeight:700,marginBottom:6}}>➕\追\加</div>
 <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
 <select value={effectiveSel} onChange={e=>setSel(+e.target.value)} style={{padding:8,borderRadius:8,border:"1px solid var(--border-input)",fontSize:16}}>{addTeamsList.map((t,i)=><option key={i} value={i}>{t.name}</option>)}</select>
-<input value={name} onChange={e=>setName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder="\u540d\u524d" style={{flex:1,minWidth:80,padding:8,borderRadius:8,border:"1px solid var(--border-input)",fontSize:16}}/>
-<button onClick={()=>doAdd()} style={{padding:"8px 14px",borderRadius:8,border:"none",background:"var(--accent-blue)",color:"var(--text-inverse)",fontWeight:700,fontSize:16,cursor:"pointer",opacity:name.trim()?1:0.3}}>\u8ffd\u52a0</button>
-<button onClick={()=>doAutoAdd()} style={{padding:"8px 14px",borderRadius:8,border:"none",background:"#22b566",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",opacity:name.trim()?1:0.3}}>\u81ea\u52d5\u8ffd\u52a0</button>
+<input value={name} onChange={e=>setName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder="\名\前" style={{flex:1,minWidth:80,padding:8,borderRadius:8,border:"1px solid var(--border-input)",fontSize:16}}/>
+<button onClick={()=>doAdd()} style={{minWidth:80,padding:"8px 14px",borderRadius:8,border:"none",background:"var(--accent-blue)",color:"var(--text-inverse)",fontWeight:700,fontSize:15,cursor:"pointer",opacity:name.trim()?1:0.3}}>\追\加</button>
+<button onClick={()=>doAutoAdd()} style={{minWidth:80,padding:"8px 14px",borderRadius:8,border:"none",background:"#22b566",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",opacity:name.trim()?1:0.3}}>\自\動\追\加</button>
 <FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={n=>doAdd(n)} usedNames={allUsed} isAdmin={isAdmin}/>
 </div>
 </div>
 </div>
 {addConf&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}}>
-<div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:6}}>{addConf.auto?"\u30e1\u30f3\u30d0\u30fc\u81ea\u52d5\u8ffd\u52a0":"\u30e1\u30f3\u30d0\u30fc\u8ffd\u52a0\u78ba\u8a8d"}</div>
-<div style={{fontSize:16,marginBottom:16}}>{"\u300c"+addConf.nm+"\u300d\u3092"}<br/><span style={{fontWeight:800,color:C[addConf.tg]?.tx||"#333"}}>{getConfTeamName()}</span>{"\u306b\u8ffd\u52a0\u3057\u307e\u3059\u3002"}{addConf.auto&&<><br/><span style={{fontSize:13,color:"var(--text-secondary)"}}>\u6295\u3052\u9806\u306f\u30c1\u30fc\u30e0\u5185\u6700\u5f8c\u306b\u306a\u308a\u307e\u3059\u3002</span></>}</div>
-<div style={{display:"flex",gap:8}}><button onClick={confirmAdd} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--bg-secondary)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>\u6c7a\u5b9a</button><button onClick={()=>setAddConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--bg-secondary)",borderRadius:10,background:"transparent",color:"var(--text-primary)",fontSize:16,fontWeight:700,cursor:"pointer"}}>\u30ad\u30e3\u30f3\u30bb\u30eb</button></div>
+<div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:6}}>{addConf.auto?"\メ\ン\バ\ー\自\動\追\加":"\メ\ン\バ\ー\追\加\確\認"}</div>
+<div style={{fontSize:16,marginBottom:16}}>{"\「"+addConf.nm+"\」\を"}<br/><span style={{fontWeight:800,color:C[addConf.tg]?.tx||"#333"}}>{getConfTeamName()}</span>{"\に\追\加\し\ま\す\。"}{addConf.auto&&<><br/><span style={{fontSize:13,color:"var(--text-secondary)"}}>\投\げ\順\は\チ\ー\ム\内\最\後\に\な\り\ま\す\。</span></>}</div>
+<div style={{display:"flex",gap:8}}><button onClick={confirmAdd} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--bg-secondary)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>\決\定</button><button onClick={()=>setAddConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--bg-secondary)",borderRadius:10,background:"transparent",color:"var(--text-primary)",fontSize:16,fontWeight:700,cursor:"pointer"}}>\キ\ャ\ン\セ\ル</button></div>
 </div></div>}
 {delConf&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}}>
-<div style={{fontSize:18,fontWeight:800,color:"var(--text-danger)",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}><AlertTriangle size={18}/> \u30e1\u30f3\u30d0\u30fc\u524a\u9664</div>
-<div style={{fontSize:16,marginBottom:16}}>{"\u300c"+delConf.name+"\u300d\u3092\u5b8c\u5168\u306b\u524a\u9664\u3057\u307e\u3059\u304b\uff1f"}<br/><span style={{fontSize:13,color:"var(--text-secondary)"}}>\u3053\u306e\u64cd\u4f5c\u306f\u5143\u306b\u623b\u305b\u307e\u305b\u3093</span></div>
-<div style={{display:"flex",gap:8}}><button onClick={()=>{if(delConf.court===1){rmPlayer(delConf.ti,delConf.pi);}else{removeFromPaperCourt(delConf.court,delConf.ti,delConf.pi);setDelConf(null);}}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>\u524a\u9664\u3059\u308b</button><button onClick={()=>setDelConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>\u30ad\u30e3\u30f3\u30bb\u30eb</button></div>
+<div style={{fontSize:18,fontWeight:800,color:"var(--text-danger)",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}><AlertTriangle size={18}/> \メ\ン\バ\ー\削\除</div>
+<div style={{fontSize:16,marginBottom:16}}>{"\「"+delConf.name+"\」\を\完\全\に\削\除\し\ま\す\か\？"}<br/><span style={{fontSize:13,color:"var(--text-secondary)"}}>\こ\の\操\作\は\元\に\戻\せ\ま\せ\ん</span></div>
+<div style={{display:"flex",gap:8}}><button onClick={()=>{if(delConf.court===1){rmPlayer(delConf.ti,delConf.pi);}else{removeFromPaperCourt(delConf.court,delConf.ti,delConf.pi);setDelConf(null);}}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>\削\除\す\る</button><button onClick={()=>setDelConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>\キ\ャ\ン\セ\ル</button></div>
 </div></div>}
 
   </div></div>);
@@ -1595,7 +1561,7 @@ else onChangeOrd("manual",man,null);};
 const dispTeams=value==="random"&&randTeams?randTeams:teams;
 const disp=value==="reverse"?rev:value==="manual"?man:value==="same"?[...teamOrder]:value==="random"?(randOrd||[...teamOrder]):null;
 return(<><div style={{display:"flex",gap:6,marginBottom:6}}>{[["same","🔁同順"],["reverse","🔄裏"],["random","🎲ランダム"],["manual","✏️手動"]].map(([k,l])=>(<button key={k} onClick={()=>pick(k)} style={{flex:1,padding:"8px 0",border:"1px solid var(--border-input)",borderRadius:8,background:value===k?"var(--bg-secondary)":"var(--bg-surface)",color:value===k?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}}>{l}</button>))}</div>
-{value==="random"&&<button onClick={()=>{if(!hasShuffled||window.confirm("\u30b7\u30e3\u30c3\u30d5\u30eb\u3057\u76f4\u3057\u307e\u3059\u304b\uff1f"))doRand();}} style={{width:"100%",marginBottom:6,padding:"10px 0",border:"2px dashed var(--accent-blue)",borderRadius:8,background:"transparent",color:"var(--accent-blue)",fontSize:15,fontWeight:700,cursor:"pointer"}}><RefreshCw size={14} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> {hasShuffled?"再シャッフル":"シャッフル"}</button>}
+{value==="random"&&<button onClick={()=>{if(!hasShuffled||window.confirm("\シ\ャ\ッ\フ\ル\し\直\し\ま\す\か\？"))doRand();}} style={{width:"100%",marginBottom:6,padding:"10px 0",border:"2px dashed var(--accent-blue)",borderRadius:8,background:"transparent",color:"var(--accent-blue)",fontSize:15,fontWeight:700,cursor:"pointer"}}><RefreshCw size={14} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> {hasShuffled?"再シャッフル":"シャッフル"}</button>}
 {disp&&(<div style={{background:"var(--bg-surface-dim)",borderRadius:8,padding:8,marginBottom:6}}>{disp.map((ti,i)=>{const t=dispTeams[ti];const ap=t?.players?t.players.filter(p=>typeof p==="object"?p.active:true):[];return(<div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:i<disp.length-1?"1px solid var(--border-lighter)":"none"}}><span style={{fontSize:16,fontWeight:800,color:C[ti]?.ac||"#aaa",width:24,textAlign:"center"}}>{i+1}</span><span style={{fontSize:17,fontWeight:700,color:C[ti]?.tx||"#333"}}>{t?.name||""}</span><span style={{fontSize:13,color:"var(--text-secondary)",marginLeft:2}}>{ap.map(p=>typeof p==="object"?p.name:p).join("・")}</span>{value==="manual"&&i>0&&<button onClick={()=>mvUp(i)} style={{marginLeft:"auto",padding:"4px 10px",border:"1px solid var(--border-input)",borderRadius:5,background:"var(--bg-surface)",fontSize:12,cursor:"pointer"}}>▲</button>}</div>);})}
 </div>)}
 {shufAnimData&&<ShuffleAnimation names={shufAnimData.names} teams={shufAnimData.teams} onDone={()=>{onChangeOrd("random",shufAnimData.order,shufAnimData.newTeams);setShufAnimData(null);}}/>}
@@ -2386,7 +2352,7 @@ const handleShufAnimToggle=(v)=>{setShufAnim(v);setShufAnimLS(v);};
 const[courtAllocation,setCourtAllocation]=useState(null);
 const[setupDraft,setSetupDraft]=useState(null);
 useEffect(()=>{if(!dbReady)return;(async()=>{try{if(_db){const ca=await idbGet(_db,"court-allocation");if(ca&&ca.courtData&&ca.courtCount>=2)setCourtAllocation(ca);const sd=await idbGet(_db,"setup-draft");if(sd&&sd.mems){const filled=sd.mems.filter(m=>m&&m.trim());if(filled.length>0)setSetupDraft(sd);}}const p=_db?await idbGet(_db,"game-progress"):null;if(p&&p.teams){setRecovery(p);setScr("recover");return;}const lp=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(lp&&lp.teams){if(_db)await idbSet(_db,"game-progress",lp);try{localStorage.removeItem(PROGRESS_KEY);}catch(e2){}setRecovery(lp);setScr("recover");return;}}catch(e){console.error("progress check error",e);}setScr("setup");})();},[dbReady]);
-const doRecover=()=>{if(!recovery)return;const r=recovery;setCfg({t:r.teams,o:r.teamOrder,ng:r.numGames||1,bo:r.bestOf||0,dq:r.dqEndGame!==undefined?r.dqEndGame:true,sts:true,recover:r});setScr("game");};
+const doRecover=()=>{if(!recovery)return;const r=recovery;const cc=courtAllocation?courtAllocation.courtCount:1;setCfg({t:r.teams,o:r.teamOrder,ng:r.numGames||1,bo:r.bestOf||0,dq:r.dqEndGame!==undefined?r.dqEndGame:true,sts:true,recover:r,courtCount:cc});setScr("game");};
 const dismissRecover=()=>{if(_db)idbDel(_db,"game-progress").catch(e=>console.error("progress delete error",e));try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}setRecovery(null);setScr("setup");};
 if(!dbReady||scr==="loading"||(scr==="recover"&&!recovery)){return(<div style={{width:"100%",height:"100dvh",display:"flex",alignItems:"center",justifyContent:"center",background:"linear-gradient(170deg,var(--bg-tertiary),var(--bg-secondary))"}}>
 <div style={{textAlign:"center"}}><div style={{marginBottom:12}}><Target size={48} color="var(--text-inverse)"/></div><div style={{fontSize:20,fontWeight:700,color:"var(--text-inverse)"}}>データ読み込み中...</div></div>
@@ -2400,7 +2366,7 @@ if(!dbReady||scr==="loading"||(scr==="recover"&&!recovery)){return(<div style={{
       <div style={{display:"flex",gap:10}}><button onClick={doRecover} style={{flex:1,padding:"16px 0",border:"none",borderRadius:12,background:"var(--bg-secondary)",color:"var(--text-inverse)",fontSize:18,fontWeight:700,cursor:"pointer"}}>{recovery.winner!=null?"表示する":"再開する"}</button><button onClick={dismissRecover} style={{flex:1,padding:"16px 0",border:"2px solid var(--bg-secondary)",borderRadius:12,background:"transparent",color:"var(--text-primary)",fontSize:18,fontWeight:700,cursor:"pointer"}}>破棄する</button></div>
     </div>
   </div>);}
-  return(<div style={{width:"100%",height:"100dvh"}}>{(scr==="setup"||!cfg)?<SetupScreen savedTeams={saved} isAdmin={isAdmin} onAdminToggle={setIsAdmin} aiEnabled={aiEnabled} onAIToggle={handleAIToggle} shufAnim={shufAnim} onShufAnimToggle={handleShufAnimToggle} courtAllocation={courtAllocation} onClearCourtAllocation={()=>{setCourtAllocation(null);if(_db)idbDel(_db,"court-allocation").catch(e=>console.error(e));}} setupDraft={setupDraft} onClearSetupDraft={()=>{setSetupDraft(null);if(_db)idbDel(_db,"setup-draft").catch(e=>{});}} onStart={(t,o,ng,bo,dq,sts)=>{setSetupDraft(null);if(_db)idbDel(_db,"setup-draft").catch(e=>{});setCfg({t,o,ng,bo,dq,sts});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts!==false} recoverData={cfg.recover||null} isAdmin={isAdmin} aiEnabled={aiEnabled} shufAnim={shufAnim} hasCourtAllocation={!!courtAllocation} clearCourtAllocation={()=>{setCourtAllocation(null);if(_db)idbDel(_db,"court-allocation").catch(e=>console.error(e));}} courtCount={courtAllocation?courtAllocation.courtCount:1} courtAllocation={courtAllocation} onUpdateCourtAllocation={(updatedData)=>{setCourtAllocation(updatedData);if(_db)idbSet(_db,"court-allocation",{...updatedData,savedAt:new Date().toISOString()}).catch(e=>console.error(e));}} goBack={saveData=>{if(_db)idbDel(_db,"game-progress").catch(e=>console.error("progress delete error",e));try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);setScr("setup");setCfg(null);if(_db)idbGet(_db,"court-allocation").then(data=>{if(data&&data.courtData&&data.courtCount>=2)setCourtAllocation(data);}).catch(e=>console.error(e));}}/>}</div>);
+  return(<div style={{width:"100%",height:"100dvh"}}>{(scr==="setup"||!cfg)?<SetupScreen savedTeams={saved} isAdmin={isAdmin} onAdminToggle={setIsAdmin} aiEnabled={aiEnabled} onAIToggle={handleAIToggle} shufAnim={shufAnim} onShufAnimToggle={handleShufAnimToggle} courtAllocation={courtAllocation} onClearCourtAllocation={()=>{setCourtAllocation(null);if(_db)idbDel(_db,"court-allocation").catch(e=>console.error(e));}} setupDraft={setupDraft} onClearSetupDraft={()=>{setSetupDraft(null);if(_db)idbDel(_db,"setup-draft").catch(e=>{});}} onStart={(t,o,ng,bo,dq,sts)=>{setSetupDraft(null);if(_db)idbDel(_db,"setup-draft").catch(e=>{});const cc=courtAllocation?courtAllocation.courtCount:1;setCfg({t,o,ng,bo,dq,sts,courtCount:cc});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts!==false} recoverData={cfg.recover||null} isAdmin={isAdmin} aiEnabled={aiEnabled} shufAnim={shufAnim} hasCourtAllocation={!!courtAllocation} clearCourtAllocation={()=>{setCourtAllocation(null);if(_db)idbDel(_db,"court-allocation").catch(e=>console.error(e));}} courtCount={cfg.courtCount||1} courtAllocation={courtAllocation} onUpdateCourtAllocation={(updatedData)=>{setCourtAllocation(updatedData);if(_db)idbSet(_db,"court-allocation",{...updatedData,savedAt:new Date().toISOString()}).catch(e=>console.error(e));}} goBack={saveData=>{if(_db)idbDel(_db,"game-progress").catch(e=>console.error("progress delete error",e));try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);setScr("setup");setCfg(null);if(_db)idbGet(_db,"court-allocation").then(data=>{if(data&&data.courtData&&data.courtCount>=2)setCourtAllocation(data);}).catch(e=>console.error(e));}}/>}</div>);
 }
 
 const SS={
