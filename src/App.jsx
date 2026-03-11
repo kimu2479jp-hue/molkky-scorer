@@ -1561,7 +1561,7 @@ updated.courtData[courtNum][teamIdx].players.splice(playerIdx,1);onUpdateCourtAl
 /* doAdd: works for both device court and paper court */
 const doAdd=(n,tI)=>{const nm=(n||name).trim().slice(0,MAX_NAME);if(!nm)return;
 if(activeCourt===1){const tg=tI??sel;if(teams[tg].players.length>=MAX_PL)return;setAddConf({nm,tg,court:1});}
-else{const tg=tI??sel;setAddConf({nm,tg,court:activeCourt});}};
+else{const tg=tI??sel;if(courtAllocation&&courtAllocation.courtData&&courtAllocation.courtData[activeCourt]){const targetTeam=courtAllocation.courtData[activeCourt][tg];if(targetTeam&&targetTeam.players.length>=MAX_PL){window.alert("1チーム最大"+MAX_PL+"人までです");return;}}setAddConf({nm,tg,court:activeCourt});}};
 const confirmAdd=()=>{if(!addConf)return;const{nm,tg,court}=addConf;
 if(court===1){const nt=teams.map((t,i)=>i===tg?{...t,players:[...t.players,{name:nm,active:true}]}:t);dispatch({type:"SET_TEAMS",teams:nt});}
 else{addToPaperCourt(court,tg,nm);}
@@ -1576,8 +1576,11 @@ setAddConf({nm,tg:pick.i,court:1,auto:true});}
 else{
 if(!courtAllocation||!courtAllocation.courtData||!courtAllocation.courtData[activeCourt])return;
 const ct=courtAllocation.courtData[activeCourt];
-const counts=ct.map(t=>t.players.length);const minC=Math.min(...counts);
-const candidates=ct.map((t,i)=>({i,c:counts[i]})).filter(x=>x.c===minC);
+const counts=ct.map(t=>t.players.length);
+const underMax=counts.filter(c=>c<MAX_PL);
+if(underMax.length===0){window.alert("全チームが上限("+MAX_PL+"人)に達しています");return;}
+const minC=Math.min(...underMax);
+const candidates=ct.map((t,i)=>({i,c:counts[i]})).filter(x=>x.c===minC&&x.c<MAX_PL);
 const pick=candidates[Math.floor(Math.random()*candidates.length)];
 setAddConf({nm,tg:pick.i,court:activeCourt,auto:true});}};
 /* Get teams list for current court's add section */
