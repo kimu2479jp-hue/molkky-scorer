@@ -1180,18 +1180,6 @@ const[draftRestored,setDraftRestored]=useState(false);
 const draftTimerRef=useRef(null);
 const saveDraft=useCallback(()=>{if(draftTimerRef.current)clearTimeout(draftTimerRef.current);draftTimerRef.current=setTimeout(()=>{const filledMems=mems.filter(m=>m.trim());const filledTeams=teams.slice(0,tc).some(t=>t.players.some(p=>p.trim()));if(filledMems.length===0&&!filledTeams){if(_db)idbDel(_db,"setup-draft").catch(e=>{});return;}if(_db)idbSet(_db,"setup-draft",{mems,teams:teams.slice(0,tc),sp,courtCount,courtTeamCounts,mode,tc,savedAt:new Date().toISOString()}).catch(e=>console.error("setup-draft save error",e));},500);},[mems,teams,tc,sp,courtCount,courtTeamCounts,mode]);
 useEffect(()=>{saveDraft();return()=>{if(draftTimerRef.current)clearTimeout(draftTimerRef.current);};},[mems,teams,tc,sp,courtCount,courtTeamCounts,mode]);
-useEffect(()=>{
-if(!autoReshuffleMode||!courtAllocation)return;
-const mode=autoReshuffleMode;
-if(onClearAutoReshuffle)onClearAutoReshuffle();
-if(mode==="all"){
-doReshuffleFromCA(courtAllocation);
-}else if(mode==="local"){
-doLocalReshuffle(courtAllocation);
-}else if(mode==="settings"){
-handleChangeCourtSettings(courtAllocation);
-}
-},[autoReshuffleMode]);
 const[trimConfirm,setTrimConfirm]=useState(null);/* {filled,newMax,step,onConfirm} */
 const showTrimConfirm=(filled,newMax,onConfirm)=>{if(filled<=newMax||filled===0){onConfirm();return;}setTrimConfirm({filled,newMax,step:1,onConfirm});};
 const trimDialogExec=()=>{if(!trimConfirm)return;const{newMax,onConfirm}=trimConfirm;onConfirm();setMems(prev=>prev.slice(0,Math.max(newMax,2)));setSp(null);setAllCourtData(null);setTrimConfirm(null);};
@@ -1380,6 +1368,18 @@ setSp(null);setAllCourtData(null);
 /* reshuffleSettingsModeでバナーを一時的に非表示 */
 setReshuffleSettingsMode(true);
 };
+useEffect(()=>{
+if(!autoReshuffleMode||!courtAllocation)return;
+const mode=autoReshuffleMode;
+if(onClearAutoReshuffle)onClearAutoReshuffle();
+if(mode==="all"){
+doReshuffleFromCA(courtAllocation);
+}else if(mode==="local"){
+doLocalReshuffle(courtAllocation);
+}else if(mode==="settings"){
+handleChangeCourtSettings(courtAllocation);
+}
+},[autoReshuffleMode]);
 const doShufCore=()=>{const names=mems.filter(m=>m.trim());if(names.length<tc)return null;
 const prevSets=sp?sp.map(t=>new Set(t.players)):null;
 const teamSizes=[];{const base=Math.floor(names.length/tc);const rem=names.length%tc;for(let i=0;i<tc;i++)teamSizes.push(base+(i<rem?1:0));}
