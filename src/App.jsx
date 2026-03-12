@@ -1162,7 +1162,7 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 </div>);
 }
 
-function SetupScreen({onStart,savedTeams,isAdmin,onAdminToggle,aiEnabled,onAIToggle,shufAnim,onShufAnimToggle,courtAllocation,onClearCourtAllocation,setupDraft,onClearSetupDraft}){
+function SetupScreen({onStart,savedTeams,isAdmin,onAdminToggle,aiEnabled,onAIToggle,shufAnim,onShufAnimToggle,courtAllocation,onClearCourtAllocation,setupDraft,onClearSetupDraft,autoReshuffleMode,onClearAutoReshuffle}){
 const{favs,addF,rmF}=useFavs();
 const[mode,setMode]=useState("shuffle");const[tc,setTc]=useState(savedTeams?savedTeams.length:2);
 const[courtCount,setCourtCount]=useState(1);const[courtTeamCounts,setCourtTeamCounts]=useState({1:2,2:2,3:2});const[activeCourt,setActiveCourt]=useState(1);
@@ -1173,7 +1173,7 @@ const[teams,setTeams]=useState(()=>{if(savedTeams){const base=savedTeams.map(t=>
 const[mems,setMems]=useState(()=>{if(savedTeams){const ap=savedTeams.flatMap(t=>(t.players||[]).map(p=>typeof p==="object"?(p.name||""):typeof p==="string"?p:String(p))).filter(p=>p.trim());if(ap.length>=2)return ap;}return Array(4).fill("");});const[sp,setSp]=useState(null);const[showSetupStats,setShowSetupStats]=useState(false);
 const[showSettings,setShowSettings]=useState(false);const[shufAnimData,setShufAnimData]=useState(null);
 const[multiCourtShufData,setMultiCourtShufData]=useState(null);const[allCourtData,setAllCourtData]=useState(null);const[showCourtOverview,setShowCourtOverview]=useState(false);const[showSmartFav,setShowSmartFav]=useState(false);
-const[editMode,setEditMode]=useState(false);const[expandedDel,setExpandedDel]=useState(null);const lpRef=useRef(null);
+const[editMode,setEditMode]=useState(false);const[expandedDel,setExpandedDel]=useState(null);const lpRef=useRef(null);const reshuffleGuard=useRef(false);
 const[caDiscardStep,setCaDiscardStep]=useState(0);/* 0=none, 1=first confirm, 2=second confirm */
 const[reshuffleSettingsMode,setReshuffleSettingsMode]=useState(false);
 const[draftRestored,setDraftRestored]=useState(false);
@@ -1191,7 +1191,7 @@ const pCountSetup=mode==="shuffle"?mems.filter(m=>m.trim()).length:teams.slice(0
 useEffect(()=>{if(courtCount>=2)return;const minT=pCountSetup>=13?4:pCountSetup>=9?3:2;if(tc<minT){setTc(minT);setSp(null);}},[pCountSetup,courtCount]);
 /* Trim mems when maxShufForCourt decreases (e.g. team count reduced) */
 const maxShufRef=courtCount===1?tc*MAX_PL:[1,2,3].filter(c=>c<=courtCount).reduce((s,c)=>s+courtTeamCounts[c],0)*MAX_PL;
-useEffect(()=>{if(mode!=="shuffle")return;setMems(prev=>{if(prev.length<=maxShufRef)return prev;const trimmed=prev.slice(0,maxShufRef);return trimmed.length>=2?trimmed:["",""];});setSp(null);setAllCourtData(null);},[maxShufRef]);
+useEffect(()=>{if(reshuffleGuard.current){reshuffleGuard.current=false;return;}if(mode!=="shuffle")return;setMems(prev=>{if(prev.length<=maxShufRef)return prev;const trimmed=prev.slice(0,maxShufRef);return trimmed.length>=2?trimmed:["",""];});setSp(null);setAllCourtData(null);},[maxShufRef]);
 const uN=(i,v)=>setTeams(p=>p.map((t,j)=>j===i?{...t,name:v}:t));
 const uP=(ti,pi,v)=>setTeams(p=>p.map((t,i)=>i===ti?{...t,players:t.players.map((pl,j)=>j===pi?v.slice(0,MAX_NAME):pl)}:t));
 const aP=ti=>setTeams(p=>p.map((t,i)=>i===ti&&t.players.length<MAX_PL?{...t,players:[...t.players,""]}:t));
@@ -1299,6 +1299,52 @@ setSp(courtResults[1]);setAllCourtData(courtResults);setShowCourtOverview(true);
 if(_db&&cc>=2)idbSet(_db,"court-allocation",{courtCount:cc,courtTeamCounts:ctc,courtData:courtResults,numGames:nGames,bestOf:bo,dqEnd:dq,saveToStats:sts,savedAt:new Date().toISOString()}).then(()=>{if(_db)idbDel(_db,"setup-draft").catch(e=>{});}).catch(e=>console.error("court-allocation save error",e));
 }
 };
+const doLocalReshuffle=(ca)=>{
+if(!ca||!ca.courtData||!ca.courtData[1]||!ca.courtCount)return;
+const cc=ca.courtCount;
+const ctc=ca.courtTeamCounts;
+/* 端末コートのメンバーをフラット配列に */
+const court1Teams=ca.courtData[1];
+const allPlayers=[];
+court1Teams.forEach(t=>{
+(t.players||[]).forEach(p=>{
+const nm=typeof p==="string"?p:(typeof p==="object"?(p.name||""):String(p));
+if(nm.trim())allPlayers.push(nm.trim());
+});
+});
+const nT=ctc[1];
+if(allPlayers.length<nT)return;
+/* シャッフル（前回と同じにならないよう最大10回試行） */
+const prevSets=court1Teams.map(t=>new Set(t.players));
+const buildResult=()=>{
+const shuffled=shuf(allPlayers);
+const tSizes=[];const b=Math.floor(shuffled.length/nT);const r=shuffled.length%nT;
+for(let i=0;i<nT;i++)tSizes.push(b+(i<r?1:0));
+const tms=[];let pi=0;
+for(let i=0;i<nT;i++){tms.push({name:"チーム"+(i+1),players:shuffled.slice(pi,pi+tSizes[i])});pi+=tSizes[i];}
+return tms;
+};
+let newCourt1=buildResult();
+for(let att=0;att<10;att++){
+const same=newCourt1.every((t,i)=>{const ns=new Set(t.players);return prevSets[i]&&ns.size===prevSets[i].size&&[...ns].every(n=>prevSets[i].has(n));});
+if(!same)break;
+newCourt1=buildResult();
+}
+/* courtAllocationを更新 */
+const newCourtData={...ca.courtData,1:newCourt1};
+const nGames=ca.numGames||1;const bo=ca.bestOf||0;
+const dq=ca.dqEnd!==undefined?ca.dqEnd:true;
+const sts=ca.saveToStats!==undefined?ca.saveToStats:true;
+setCourtCount(cc);setCourtTeamCounts(ctc);
+setNumGames(nGames);setBestOf(bo);setDqEnd(dq);setSaveToStats(sts);
+if(shufAnim){
+/* 端末コートのみの演出。courtOrder=[1]で端末コートだけ表示 */
+setMultiCourtShufData({courtData:newCourtData,courtOrder:[1]});
+}else{
+setSp(newCourt1);setAllCourtData(newCourtData);setShowCourtOverview(true);
+if(_db&&cc>=2)idbSet(_db,"court-allocation",{courtCount:cc,courtTeamCounts:ctc,courtData:newCourtData,numGames:nGames,bestOf:bo,dqEnd:dq,saveToStats:sts,savedAt:new Date().toISOString()}).catch(e=>console.error("court-allocation save error",e));
+}
+};
 const handleChangeCourtSettings=(ca)=>{
 if(!ca||!ca.courtData||!ca.courtCount)return;
 /* 全メンバーを抽出して mems にセット */
@@ -1327,6 +1373,19 @@ setSp(null);setAllCourtData(null);
 /* reshuffleSettingsModeでバナーを一時的に非表示 */
 setReshuffleSettingsMode(true);
 };
+useEffect(()=>{
+if(!autoReshuffleMode||!courtAllocation)return;
+const mode=autoReshuffleMode;
+if(onClearAutoReshuffle)onClearAutoReshuffle();
+reshuffleGuard.current=true;
+if(mode==="all"){
+doReshuffleFromCA(courtAllocation);
+}else if(mode==="local"){
+doLocalReshuffle(courtAllocation);
+}else if(mode==="settings"){
+handleChangeCourtSettings(courtAllocation);
+}
+},[autoReshuffleMode]);
 const doShufCore=()=>{const names=mems.filter(m=>m.trim());if(names.length<tc)return null;
 const prevSets=sp?sp.map(t=>new Set(t.players)):null;
 const teamSizes=[];{const base=Math.floor(names.length/tc);const rem=names.length%tc;for(let i=0;i<tc;i++)teamSizes.push(base+(i<rem?1:0));}
@@ -2232,7 +2291,7 @@ return(<div key={pd.name} style={{marginBottom:12}}>
 }
 
 /* ═══ Game Result — with stats toggle + long-press delete ═══ */
-function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gameNumber,onNext,onBack,onExtend,timestamps,isAdmin,aiEnabled,autoEnd,dqEndGame,shufAnim}){
+function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gameNumber,onNext,onBack,onExtend,onReshuffle,hasCourtAllocation,courtCount,timestamps,isAdmin,aiEnabled,autoEnd,dqEndGame,shufAnim}){
 const[comment,setComment]=useState("");const[comments,setComments]=useState([]);
 const[ordMode,setOrdMode]=useState("reverse");const[ordVal,setOrdVal]=useState([...teamOrder].reverse());const[ordTeams,setOrdTeams]=useState(null);
 const[saving,setSaving]=useState(false);const[showStats,setShowStats]=useState(false);
@@ -2269,6 +2328,7 @@ return(
 <div style={{marginBottom:14}}><div style={{fontSize:17,fontWeight:800,color:"var(--text-primary)",marginBottom:5}}><MessageCircle size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> コメント追加</div><div style={{display:"flex",gap:6}}><input value={comment} onChange={e=>setComment(e.target.value)} placeholder="コメント..." onKeyDown={e=>{if(e.key==="Enter")addC();}} style={{flex:1,padding:"12px 14px",border:"1px solid var(--border-input)",borderRadius:10,fontSize:17,outline:"none"}}/><button onClick={addC} style={{padding:"12px 20px",border:"none",borderRadius:10,background:"var(--accent-blue)",color:"var(--text-inverse)",fontWeight:700,fontSize:16,cursor:"pointer",opacity:comment.trim()?1:0.3}}>追加</button></div></div>
 {canContinue&&(<div style={{background:"var(--bg-surface)",borderRadius:14,padding:16,marginBottom:12,border:"1px solid var(--border-input)"}}><div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:8}}>次ゲームの投げ順</div><OrderPicker teams={teams} teamOrder={teamOrder} value={ordMode} onChangeOrd={handleOrd} prevOrder={teamOrder} shufAnim={shufAnim}/><button onClick={()=>onNext(ordVal,ordTeams)} style={{width:"100%",padding:"16px 0",border:"none",borderRadius:12,background:"var(--bg-secondary)",color:"var(--text-inverse)",fontSize:19,fontWeight:700,cursor:"pointer",marginTop:6}}>次のゲーム開始</button></div>)}
 {isAllDone&&(<div style={{background:"var(--bg-surface)",borderRadius:14,padding:16,marginBottom:12,border:"1px solid #d0dff0"}}><div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:5}}><RefreshCw size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> ゲーム継続・延長</div><OrderPicker teams={teams} teamOrder={teamOrder} value={ordMode} onChangeOrd={handleOrd} prevOrder={teamOrder} shufAnim={shufAnim}/><div style={{display:"flex",gap:8,marginTop:6}}><button onClick={()=>onExtend("game",ordVal,ordTeams)} style={{flex:1,padding:"14px 0",border:"none",borderRadius:10,background:"var(--accent-blue)",color:"var(--text-inverse)",fontSize:17,fontWeight:700,cursor:"pointer"}}>＋1ゲーム追加</button>{isMatchOver&&<button onClick={()=>onExtend("set",ordVal,ordTeams)} style={{flex:1,padding:"14px 0",border:"none",borderRadius:10,background:"var(--accent-green)",color:"var(--text-inverse)",fontSize:17,fontWeight:700,cursor:"pointer"}}>＋1セット延長</button>}</div></div>)}
+{hasCourtAllocation&&courtCount>=2&&(<div style={{background:"var(--bg-surface)",borderRadius:14,padding:16,marginBottom:12,border:"2px solid rgba(43,125,233,0.3)"}}><div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:10,display:"flex",alignItems:"center",gap:6}}>{"🔄"} 次の試合の組み換え</div><div style={{display:"flex",gap:8,marginBottom:8}}><button onClick={()=>onReshuffle("all")} style={{flex:1,padding:"14px 0",border:"none",borderRadius:10,background:"linear-gradient(135deg,#22b566,#1a9d52)",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>{"🎲"} 全コート組み換え</button><button onClick={()=>onReshuffle("local")} style={{flex:1,padding:"14px 0",border:"none",borderRadius:10,background:"linear-gradient(135deg,#2b7de9,#1a6dd4)",color:"#fff",fontSize:16,fontWeight:800,cursor:"pointer"}}>{"🔀"} コート内組み換え</button></div><button onClick={()=>onReshuffle("settings")} style={{width:"100%",padding:"10px 0",border:"2px solid rgba(255,255,255,0.25)",borderRadius:10,background:"transparent",color:"var(--text-secondary)",fontSize:13,fontWeight:700,cursor:"pointer"}}>{"⚙"} コート設定を変更して組み換え</button></div>)}
 <button onClick={onBack} style={{width:"100%",padding:"16px 0",border:"2px solid var(--bg-secondary)",borderRadius:12,background:"transparent",color:"var(--text-primary)",fontSize:19,fontWeight:700,cursor:"pointer",marginBottom:24}}>設定に戻る</button>
 </div>
 {showStats===true&&<StatsModal onClose={()=>setShowStats(false)} currentGameRecords={currentGameRecords} source="game" isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
@@ -2369,6 +2429,7 @@ const execConf=()=>{if(!conf)return;if(conf.t==="score")dispatch({type:"SCORE",s
 const handleNext=(order,newTeams)=>{if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);turnStartRef.current=Date.now();};
 const handleExtend=(type,order,newTeams)=>{if(type==="game")setNumGames(p=>p+1);else if(type==="set")setBestOf(p=>p+1);if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);turnStartRef.current=Date.now();};
 const extractTeamInfo=()=>teams.map(t=>({name:t.name,players:t.players.map(p=>p.name)}));
+const handleReshuffle=(type)=>{setShowRes(false);goBack(null,type);};
 const handleBack=()=>setSaveDialog(true);const[caKeepDialog,setCaKeepDialog]=useState(false);const[caKeepDiscard,setCaKeepDiscard]=useState(0);/* 0=none,1=first,2=second */
 const doBack=save=>{setSaveDialog(false);setShowRes(false);goBack(save?extractTeamInfo():null);};
 const doBackNoSaveWithCA=()=>{setSaveDialog(false);if(hasCourtAllocation){setCaKeepDialog(true);}else{setShowRes(false);goBack(null);}};
@@ -2431,7 +2492,7 @@ return(
 </div>
 {showPl&&<PlModal teams={teams} dispatch={dispatch} onClose={()=>setShowPl(false)} isAdmin={isAdmin} courtCount={courtCount} courtAllocation={courtAllocation} onUpdateCourtAllocation={onUpdateCourtAllocation}/>}
 {conf&&<Confirm msg={conf.msg} onOk={execConf} onCancel={()=>setConf(null)}/>}
-{showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} timestamps={timestamps} isAdmin={isAdmin} aiEnabled={aiEnabled} autoEnd={!!autoEnd} dqEndGame={!!dqEndGame} shufAnim={shufAnim}/>}
+{showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} onReshuffle={handleReshuffle} hasCourtAllocation={hasCourtAllocation} courtCount={courtCount} timestamps={timestamps} isAdmin={isAdmin} aiEnabled={aiEnabled} autoEnd={!!autoEnd} dqEndGame={!!dqEndGame} shufAnim={shufAnim}/>}
 {animState.confetti&&<CSSConfetti/>}
 {saveDialog&&<Confirm msg={"チーム・プレイヤー情報を\n設定画面に保存しますか？"} sub={"保存すると次のゲームで\n同じメンバーをすぐ使えます"} okLabel="保存する" cancelLabel="保存しない" thirdLabel="キャンセル（試合に戻る）" onOk={()=>doBack(true)} onCancel={doBackNoSaveWithCA} onThird={()=>setSaveDialog(false)}/>}
 {caKeepDialog&&(<div style={{position:"fixed",inset:0,zIndex:9600,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
@@ -2472,6 +2533,7 @@ const[shufAnim,setShufAnim]=useState(()=>getShufAnim());
 const handleShufAnimToggle=(v)=>{setShufAnim(v);setShufAnimLS(v);};
 const[courtAllocation,setCourtAllocation]=useState(null);
 const[setupDraft,setSetupDraft]=useState(null);
+const[autoReshuffleMode,setAutoReshuffleMode]=useState(null);
 useEffect(()=>{if(!dbReady)return;(async()=>{try{if(_db){const ca=await idbGet(_db,"court-allocation");if(ca&&ca.courtData&&ca.courtCount>=2)setCourtAllocation(ca);const sd=await idbGet(_db,"setup-draft");if(sd&&sd.mems){const filled=sd.mems.filter(m=>m&&m.trim());if(filled.length>0)setSetupDraft(sd);}}const p=_db?await idbGet(_db,"game-progress"):null;if(p&&p.teams){setRecovery(p);setScr("recover");return;}const lp=JSON.parse(localStorage.getItem(PROGRESS_KEY));if(lp&&lp.teams){if(_db)await idbSet(_db,"game-progress",lp);try{localStorage.removeItem(PROGRESS_KEY);}catch(e2){}setRecovery(lp);setScr("recover");return;}}catch(e){console.error("progress check error",e);}setScr("setup");})();},[dbReady]);
 const doRecover=()=>{if(!recovery)return;const r=recovery;const cc=courtAllocation?courtAllocation.courtCount:1;setCfg({t:r.teams,o:r.teamOrder,ng:r.numGames||1,bo:r.bestOf||0,dq:r.dqEndGame!==undefined?r.dqEndGame:true,sts:true,recover:r,courtCount:cc});setScr("game");};
 const dismissRecover=()=>{if(_db)idbDel(_db,"game-progress").catch(e=>console.error("progress delete error",e));try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}setRecovery(null);setScr("setup");};
@@ -2487,7 +2549,7 @@ if(!dbReady||scr==="loading"||(scr==="recover"&&!recovery)){return(<div style={{
       <div style={{display:"flex",gap:10}}><button onClick={doRecover} style={{flex:1,padding:"16px 0",border:"none",borderRadius:12,background:"var(--bg-secondary)",color:"var(--text-inverse)",fontSize:18,fontWeight:700,cursor:"pointer"}}>{recovery.winner!=null?"表示する":"再開する"}</button><button onClick={dismissRecover} style={{flex:1,padding:"16px 0",border:"2px solid var(--bg-secondary)",borderRadius:12,background:"transparent",color:"var(--text-primary)",fontSize:18,fontWeight:700,cursor:"pointer"}}>破棄する</button></div>
     </div>
   </div>);}
-  return(<div style={{width:"100%",height:"100dvh"}}>{(scr==="setup"||!cfg)?<SetupScreen savedTeams={saved} isAdmin={isAdmin} onAdminToggle={setIsAdmin} aiEnabled={aiEnabled} onAIToggle={handleAIToggle} shufAnim={shufAnim} onShufAnimToggle={handleShufAnimToggle} courtAllocation={courtAllocation} onClearCourtAllocation={()=>{setCourtAllocation(null);if(_db)idbDel(_db,"court-allocation").catch(e=>console.error(e));}} setupDraft={setupDraft} onClearSetupDraft={()=>{setSetupDraft(null);if(_db)idbDel(_db,"setup-draft").catch(e=>{});}} onStart={(t,o,ng,bo,dq,sts,cc,caData)=>{setSetupDraft(null);if(_db)idbDel(_db,"setup-draft").catch(e=>{});if(caData)setCourtAllocation(caData);setCfg({t,o,ng,bo,dq,sts,courtCount:cc||1});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts!==false} recoverData={cfg.recover||null} isAdmin={isAdmin} aiEnabled={aiEnabled} shufAnim={shufAnim} hasCourtAllocation={!!courtAllocation} clearCourtAllocation={()=>{setCourtAllocation(null);if(_db)idbDel(_db,"court-allocation").catch(e=>console.error(e));}} courtCount={cfg.courtCount||1} courtAllocation={courtAllocation} onUpdateCourtAllocation={(updatedData)=>{setCourtAllocation(updatedData);if(_db)idbSet(_db,"court-allocation",{...updatedData,savedAt:new Date().toISOString()}).catch(e=>console.error(e));}} goBack={saveData=>{if(_db)idbDel(_db,"game-progress").catch(e=>console.error("progress delete error",e));try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);setScr("setup");setCfg(null);if(_db)idbGet(_db,"court-allocation").then(data=>{if(data&&data.courtData&&data.courtCount>=2)setCourtAllocation(data);}).catch(e=>console.error(e));}}/>}</div>);
+  return(<div style={{width:"100%",height:"100dvh"}}>{(scr==="setup"||!cfg)?<SetupScreen savedTeams={saved} isAdmin={isAdmin} onAdminToggle={setIsAdmin} aiEnabled={aiEnabled} onAIToggle={handleAIToggle} shufAnim={shufAnim} onShufAnimToggle={handleShufAnimToggle} courtAllocation={courtAllocation} onClearCourtAllocation={()=>{setCourtAllocation(null);if(_db)idbDel(_db,"court-allocation").catch(e=>console.error(e));}} setupDraft={setupDraft} onClearSetupDraft={()=>{setSetupDraft(null);if(_db)idbDel(_db,"setup-draft").catch(e=>{});}} autoReshuffleMode={autoReshuffleMode} onClearAutoReshuffle={()=>setAutoReshuffleMode(null)} onStart={(t,o,ng,bo,dq,sts,cc,caData)=>{setSetupDraft(null);if(_db)idbDel(_db,"setup-draft").catch(e=>{});if(caData)setCourtAllocation(caData);setCfg({t,o,ng,bo,dq,sts,courtCount:cc||1});setScr("game");}}/>:<GameScreen initialTeams={cfg.t} initialOrder={cfg.o} bestOf={cfg.bo} numGames={cfg.ng} dqEnd={cfg.dq} saveToStatsProp={cfg.sts!==false} recoverData={cfg.recover||null} isAdmin={isAdmin} aiEnabled={aiEnabled} shufAnim={shufAnim} hasCourtAllocation={!!courtAllocation} clearCourtAllocation={()=>{setCourtAllocation(null);if(_db)idbDel(_db,"court-allocation").catch(e=>console.error(e));}} courtCount={cfg.courtCount||1} courtAllocation={courtAllocation} onUpdateCourtAllocation={(updatedData)=>{setCourtAllocation(updatedData);if(_db)idbSet(_db,"court-allocation",{...updatedData,savedAt:new Date().toISOString()}).catch(e=>console.error(e));}} goBack={(saveData,reshuffleType)=>{if(_db)idbDel(_db,"game-progress").catch(e=>console.error("progress delete error",e));try{localStorage.removeItem(PROGRESS_KEY);}catch(e){}if(saveData)setSaved(saveData);if(reshuffleType)setAutoReshuffleMode(reshuffleType);setScr("setup");setCfg(null);if(_db)idbGet(_db,"court-allocation").then(data=>{if(data&&data.courtData&&data.courtCount>=2)setCourtAllocation(data);}).catch(e=>console.error(e));}}/>}</div>);
 }
 
 const SS={
