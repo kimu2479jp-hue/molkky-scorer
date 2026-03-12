@@ -1337,8 +1337,13 @@ const dq=ca.dqEnd!==undefined?ca.dqEnd:true;
 const sts=ca.saveToStats!==undefined?ca.saveToStats:true;
 setCourtCount(cc);setCourtTeamCounts(ctc);
 setNumGames(nGames);setBestOf(bo);setDqEnd(dq);setSaveToStats(sts);
+if(shufAnim){
+/* 端末コートのみの演出。courtOrder=[1]で端末コートだけ表示 */
+setMultiCourtShufData({courtData:newCourtData,courtOrder:[1]});
+}else{
 setSp(newCourt1);setAllCourtData(newCourtData);setShowCourtOverview(true);
 if(_db&&cc>=2)idbSet(_db,"court-allocation",{courtCount:cc,courtTeamCounts:ctc,courtData:newCourtData,numGames:nGames,bestOf:bo,dqEnd:dq,saveToStats:sts,savedAt:new Date().toISOString()}).catch(e=>console.error("court-allocation save error",e));
+}
 };
 const handleChangeCourtSettings=(ca)=>{
 if(!ca||!ca.courtData||!ca.courtCount)return;
