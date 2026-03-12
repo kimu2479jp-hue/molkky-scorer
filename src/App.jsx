@@ -1498,7 +1498,7 @@ return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" st
 }
 
 function OrderPicker({teams,teamOrder,value,onChangeOrd,prevOrder,shufAnim,onShufAnimDone}){
-const rev=[...teamOrder].reverse();const[man,setMan]=useState([...teamOrder]);const[randOrd,setRandOrd]=useState(null);const[randTeams,setRandTeams]=useState(null);const[hasShuffled,setHasShuffled]=useState(false);const[shufAnimData,setShufAnimData]=useState(null);
+const rev=[...teamOrder].reverse();const rot=[...teamOrder.slice(1),teamOrder[0]];const[man,setMan]=useState([...teamOrder]);const[randOrd,setRandOrd]=useState(null);const[randTeams,setRandTeams]=useState(null);const[hasShuffled,setHasShuffled]=useState(false);const[shufAnimData,setShufAnimData]=useState(null);
 const mvUp=i=>{if(i===0)return;const m=[...man];[m[i-1],m[i]]=[m[i],m[i-1]];setMan(m);onChangeOrd("manual",m,null);};
 const doRand=()=>{
 /* Collect all active players from all teams */
@@ -1517,11 +1517,11 @@ if(shufAnim){const allNames=[];newOrd.forEach(ti=>{newTeams[ti].players.forEach(
 const animTeams=newOrd.map(ti=>({name:newTeams[ti].name,players:newTeams[ti].players.map(p=>p.name)}));
 setShufAnimData({names:allNames,teams:animTeams,order:newOrd,newTeams});}
 else{onChangeOrd("random",newOrd,newTeams);}};
-const pick=v=>{if(v==="same")onChangeOrd("same",[...teamOrder],null);else if(v==="reverse")onChangeOrd("reverse",rev,null);else if(v==="random"){if(randOrd)onChangeOrd("random",randOrd,randTeams);else onChangeOrd("random",[...teamOrder],null);/* show tab without auto-shuffle */}
+const pick=v=>{if(v==="same")onChangeOrd("same",[...teamOrder],null);else if(v==="reverse")onChangeOrd("reverse",rev,null);else if(v==="rotate")onChangeOrd("rotate",rot,null);else if(v==="random"){if(randOrd)onChangeOrd("random",randOrd,randTeams);else onChangeOrd("random",[...teamOrder],null);/* show tab without auto-shuffle */}
 else onChangeOrd("manual",man,null);};
 const dispTeams=value==="random"&&randTeams?randTeams:teams;
-const disp=value==="reverse"?rev:value==="manual"?man:value==="same"?[...teamOrder]:value==="random"?(randOrd||[...teamOrder]):null;
-return(<><div style={{display:"flex",gap:6,marginBottom:6}}>{[["same","🔁同順"],["reverse","🔄裏"],["random","🎲ランダム"],["manual","✏️手動"]].map(([k,l])=>(<button key={k} onClick={()=>pick(k)} style={{flex:1,padding:"8px 0",border:"1px solid var(--border-input)",borderRadius:8,background:value===k?"var(--bg-secondary)":"var(--bg-surface)",color:value===k?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}}>{l}</button>))}</div>
+const disp=value==="reverse"?rev:value==="rotate"?rot:value==="manual"?man:value==="same"?[...teamOrder]:value==="random"?(randOrd||[...teamOrder]):null;
+return(<><div style={{display:"flex",gap:6,marginBottom:6}}>{[["same","🔁同順"],["reverse","🔄裏"],["rotate","🔃ローテ"],["random","🎲ランダム"],["manual","✏️手動"]].map(([k,l])=>(<button key={k} onClick={()=>pick(k)} style={{flex:1,padding:"8px 0",border:"1px solid var(--border-input)",borderRadius:8,background:value===k?"var(--bg-secondary)":"var(--bg-surface)",color:value===k?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap",textAlign:"center"}}>{l}</button>))}</div>
 {value==="random"&&<button onClick={()=>{if(!hasShuffled||window.confirm("\u30b7\u30e3\u30c3\u30d5\u30eb\u3057\u76f4\u3057\u307e\u3059\u304b\uff1f"))doRand();}} style={{width:"100%",marginBottom:6,padding:"10px 0",border:"2px dashed var(--accent-blue)",borderRadius:8,background:"transparent",color:"var(--accent-blue)",fontSize:15,fontWeight:700,cursor:"pointer"}}><RefreshCw size={14} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> {hasShuffled?"再シャッフル":"シャッフル"}</button>}
 {disp&&(<div style={{background:"var(--bg-surface-dim)",borderRadius:8,padding:8,marginBottom:6}}>{disp.map((ti,i)=>{const t=dispTeams[ti];const ap=t?.players?t.players.filter(p=>typeof p==="object"?p.active:true):[];return(<div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:i<disp.length-1?"1px solid var(--border-lighter)":"none"}}><span style={{fontSize:16,fontWeight:800,color:C[ti]?.ac||"#aaa",width:24,textAlign:"center"}}>{i+1}</span><span style={{fontSize:17,fontWeight:700,color:C[ti]?.tx||"#333"}}>{t?.name||""}</span><span style={{fontSize:13,color:"var(--text-secondary)",marginLeft:2}}>{ap.map(p=>typeof p==="object"?p.name:p).join("・")}</span>{value==="manual"&&i>0&&<button onClick={()=>mvUp(i)} style={{marginLeft:"auto",padding:"4px 10px",border:"1px solid var(--border-input)",borderRadius:5,background:"var(--bg-surface)",fontSize:12,cursor:"pointer"}}>▲</button>}</div>);})}
 </div>)}
