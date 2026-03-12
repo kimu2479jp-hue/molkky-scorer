@@ -1575,8 +1575,11 @@ setName("");setAddConf(null);};
 /* Auto-add: find team with fewest active members */
 const doAutoAdd=(n)=>{const nm=(n||name).trim().slice(0,MAX_NAME);if(!nm)return;
 if(activeCourt===1){
-const counts=teams.map(t=>t.players.filter(p=>p.active).length);const minC=Math.min(...counts);
-const candidates=teams.map((t,i)=>({i,c:counts[i]})).filter(x=>x.c===minC);
+const counts=teams.map(t=>t.players.filter(p=>p.active).length);
+const underMax=counts.filter(c=>c<MAX_PL);
+if(underMax.length===0){window.alert("全チームが上限("+MAX_PL+"人)に達しています");return;}
+const minC=Math.min(...underMax);
+const candidates=teams.map((t,i)=>({i,c:counts[i]})).filter(x=>x.c===minC&&x.c<MAX_PL);
 const pick=candidates[Math.floor(Math.random()*candidates.length)];
 setAddConf({nm,tg:pick.i,court:1,auto:true});}
 else{
