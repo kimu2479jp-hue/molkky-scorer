@@ -819,7 +819,7 @@ const cornerNum=isTabletSA?Math.round(cardH*0.18):20;const cornerSuit=isTabletSA
 try{
 return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*overlayOp)+")",zIndex:9000,pointerEvents:"auto",transition:closing?"opacity 0.4s ease":"none",opacity:closing?0:1}}>
 {/* Dealer character image */}
-<div style={{position:"fixed",left:cx-(isTabletSA?80:50),top:dealerY-(isTabletSA?180:110),opacity:dealerOp,transform:"scale("+dealerScale+")",transformOrigin:"50% 80%",transition:"none",willChange:"transform",zIndex:9000,pointerEvents:"none"}}>
+<div style={{position:"fixed",left:cx-(isTabletSA?80:50),top:dealerY-(isTabletSA?120:70),opacity:dealerOp,transform:"scale("+dealerScale+")",transformOrigin:"50% 80%",transition:"none",willChange:"transform",zIndex:8999,pointerEvents:"none"}}>
 <img src="/dealer-character.png" alt="" style={{width:isTabletSA?160:100,height:isTabletSA?160:100,objectFit:"contain",pointerEvents:"none",filter:"drop-shadow(0 4px 12px rgba(0,0,0,0.5))"}}/>
 </div>
 {/* Flash effect */}
