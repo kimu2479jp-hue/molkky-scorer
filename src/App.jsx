@@ -731,28 +731,30 @@ const vwSA=typeof window!=="undefined"?window.innerWidth:375;const isTabletSA=vw
 const viewH=typeof window!=="undefined"?window.innerHeight:700;
 const maxPT=Math.max(...teams.map(tm=>tm.players.length));
 /* Dynamic card sizing: ratio 1:1.375 (card_back.JPG aspect) */
-const margin=isTabletSA?32:16;const cardAreaTop=viewH*0.22;const cardAreaBot=viewH-30;
+const margin=isTabletSA?32:16;const cardAreaTop=viewH*(isTabletSA?0.24:0.32);const cardAreaBot=viewH-15;
 const availW=vwSA-margin*2;const availH2=cardAreaBot-cardAreaTop;
 const colW2=availW/nTeams;const cardGap=isTabletSA?8:4;
 const maxCW=colW2-cardGap*2;const maxCH=(availH2-(maxPT-1)*cardGap-40)/maxPT;
 const rawW=Math.min(maxCW,maxCH/1.375);
-const cardW=isTabletSA?Math.max(60,Math.min(200,Math.floor(rawW))):90;
-const cardH=isTabletSA?Math.round(cardW*1.375):124;
-const cx=vwSA/2;const cy=viewH*(isTabletSA?0.18:0.30);
+const shrink=isTabletSA?(maxPT>=4?0.9:0.84):1;
+const cardW=isTabletSA?Math.max(60,Math.min(220,Math.floor(rawW*shrink))):75;
+const cardH=isTabletSA?Math.round(cardW*1.375):103;
+const cx=vwSA/2;const deckCx=isTabletSA?margin+colW2*(nTeams-1)+colW2/2:cx;const cy=viewH*(isTabletSA?0.20:0.18)-(isTabletSA?cardH/5:0);
+const actualCardHeight=maxPT*(cardH+cardGap)-cardGap+40;const availSpace=cardAreaBot-cardAreaTop;const bottomGap=availSpace-actualCardHeight;const cardAreaTopAdj=bottomGap>0?cardAreaTop+bottomGap*0.5:cardAreaTop;
 /* Timing */
 const T=skipIntro?{p0:0,p1:0,p1e:0,p2:0,p2e:0,p3:0,p3e:dealDur,p4:dealDur}:{p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur};
-const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(Date.now());const frameRef=useRef(null);
+const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(null);const frameRef=useRef(null);
 const[flash,setFlash]=useState(false);const dealIdxRef=useRef(-1);const revealTeamRef=useRef(-1);
 const[closing,setClosing]=useState(false);const closeTRef=useRef(null);const[skipConfirm,setSkipConfirm]=useState(false);
 const revealPos=useRef(shuf(names.map((_,i)=>i))).current;
 const lastActivityRef=useRef(Date.now());
 /* Team slot positions: columns for dealt cards */
-const teamSlots=teams.map((_,i)=>({x:margin+colW2*i+colW2/2,yStart:cardAreaTop+24}));
+const teamSlots=teams.map((_,i)=>({x:margin+colW2*i+colW2/2,yStart:cardAreaTopAdj+24}));
 /* Initial card positions: scattered */
 const spreadX=isTabletSA?240:130;const spreadY=isTabletSA?180:80;
 const initPos=useRef(names.map((_,i)=>({x:cx-cardW/2+((i%3)-1)*spreadX,y:(isTabletSA?40:30)+Math.floor(i/3)*spreadY}))).current;
 /* Animation loop */
-useEffect(()=>{const animate=()=>{const el=(Date.now()-startRef.current)/1000;setT(el);
+useEffect(()=>{const animate=()=>{if(!startRef.current)startRef.current=Date.now();const el=(Date.now()-startRef.current)/1000;setT(el);
 if(el<T.p1)setPhase(0);
 else if(el<T.p1e)setPhase(1);
 else if(el<T.p2e){setPhase(2);const shufT=el-T.p2;if(shufT>0.3&&shufT<shufDur-0.3&&Math.random()<0.04)setFlash(true);}
@@ -785,14 +787,14 @@ return{left:cx-cardW/2+offX,top:cy-cardH/2+offY,scale:1,opacity:1,zIndex:9001+id
 if(phase===3){const cardDealTime=T.p3+deckPos*perCard;const tLocal=t-cardDealTime;
 const liftD=0.3,flipD=0.5,holdD=1.0,moveD=0.5,landD=0.5;
 if(t<cardDealTime){const stackIdx=deckPos-Math.max(0,currentDealOrd+1);const sOff=Math.min(Math.max(0,stackIdx),10);
-return{left:cx-cardW/2+sOff,top:cy-cardH/2+sOff,scale:1,opacity:1,zIndex:9010+nCards-deckPos,rotate:0};}
+return{left:deckCx-cardW/2+sOff,top:cy-cardH/2+sOff,scale:1,opacity:1,zIndex:9010+nCards-deckPos,rotate:0};}
 if(tLocal<liftD){const prog=tLocal/liftD;
-return{left:cx-cardW/2,top:cy-cardH/2-prog*30,scale:1,opacity:1,zIndex:9100,rotate:0};}
-if(tLocal<liftD+flipD){return{left:cx-cardW/2,top:cy-cardH/2-30,scale:1,opacity:1,zIndex:9100,rotate:0};}
+return{left:deckCx-cardW/2,top:cy-cardH/2-prog*30,scale:1,opacity:1,zIndex:9100,rotate:0};}
+if(tLocal<liftD+flipD){return{left:deckCx-cardW/2,top:cy-cardH/2-30,scale:1,opacity:1,zIndex:9100,rotate:0};}
 if(tLocal<liftD+flipD+holdD){const hp=(tLocal-liftD-flipD)/holdD;const sc=1+0.12*Math.sin(hp*Math.PI);
-return{left:cx-cardW/2,top:cy-cardH/2-30,scale:sc,opacity:1,zIndex:9100,rotate:0};}
+return{left:deckCx-cardW/2,top:cy-cardH/2-30,scale:sc,opacity:1,zIndex:9100,rotate:0};}
 if(tLocal<liftD+flipD+holdD+moveD){const prog=(tLocal-liftD-flipD-holdD)/moveD;const ease=1-Math.pow(1-prog,3);
-const fromX=cx-cardW/2,fromY=cy-cardH/2-30;const sc=1-0.7*ease;
+const fromX=deckCx-cardW/2,fromY=cy-cardH/2-30;const sc=1-0.7*ease;
 return{left:fromX+(targetX-fromX)*ease,top:fromY+(targetY-fromY)*ease,scale:sc,opacity:1,zIndex:9100-Math.floor(prog*50),rotate:0};}
 if(tLocal<perCard){const prog=(tLocal-liftD-flipD-holdD-moveD)/landD;
 const sc=prog<0.6?0.3+0.75*(prog/0.6):1.05-0.05*((prog-0.6)/0.4);
@@ -810,22 +812,17 @@ const liftD=0.3,flipD=0.5;
 if(tLocal<liftD)return 0;if(tLocal<liftD+flipD){return((tLocal-liftD)/flipD)*180;}return 180;
 };
 /* Dealer position and size */
-const dealerY=phase>=3?viewH*0.08:viewH*0.15;
+const dealerY=phase>=3?viewH*(isTabletSA?0.18:0.05):viewH*(isTabletSA?0.18:0.10);
 const dealerScale=phase===0?1+Math.min(t/2,1)*0.8:1.8;
 const dealerOp=phase>=4?0.4:Math.min(t*2,1);
-const headSz=isTabletSA?100:50;const bodW=isTabletSA?120:60;const bodH=isTabletSA?140:70;
 const overlayOp=closing?0:1;
 /* Corner number/suit font sizes proportional to card */
-const cornerNum=isTabletSA?Math.round(cardH*0.18):20;const cornerSuit=isTabletSA?Math.round(cardH*0.16):18;
+const cornerNum=isTabletSA?Math.round(cardH*0.18):17;const cornerSuit=isTabletSA?Math.round(cardH*0.16):15;
 try{
 return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*overlayOp)+")",zIndex:9000,pointerEvents:"auto",transition:closing?"opacity 0.4s ease":"none",opacity:closing?0:1}}>
-{/* Dealer CSS figure */}
-<div style={{position:"fixed",left:cx-(isTabletSA?60:40),top:dealerY-(isTabletSA?130:80),opacity:dealerOp*0.7,transform:"scale("+dealerScale+")",transformOrigin:"50% 80%",transition:"none",willChange:"transform",zIndex:9000}}>
-<div style={{width:headSz,height:headSz,borderRadius:headSz/2,background:"#555",margin:"0 auto"}}/>
-<div style={{width:bodW,height:bodH,borderRadius:"8px 8px 0 0",background:"#333",margin:"-5px auto 0",display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:isTabletSA?12:8}}>
-<div style={{width:isTabletSA?30:20,height:isTabletSA?21:14,borderRadius:isTabletSA?5:3,background:"#e74c3c",border:(isTabletSA?3:2)+"px solid #fff",transform:"rotate(-10deg)"}}/>
-<div style={{width:isTabletSA?30:20,height:isTabletSA?21:14,borderRadius:isTabletSA?5:3,background:"#2b7de9",border:(isTabletSA?3:2)+"px solid #fff",marginLeft:isTabletSA?-9:-6,transform:"rotate(10deg)"}}/>
-</div>
+{/* Dealer character image */}
+<div style={{position:"fixed",left:cx-(isTabletSA?80:50),top:dealerY-(isTabletSA?100:70),opacity:phase===0?Math.min(t*2,1):phase===1?1:phase===2?0.7:phase>=4?0.4:0.85,transform:"scale("+dealerScale+")",transformOrigin:"50% 80%",transition:"none",willChange:"transform",zIndex:8999,pointerEvents:"none"}}>
+<img src="/dealer-character.png" alt="" style={{width:isTabletSA?160:100,height:isTabletSA?160:100,objectFit:"contain",pointerEvents:"none",filter:"drop-shadow(0 4px 12px rgba(0,0,0,0.5))"}}/>
 </div>
 {/* Flash effect */}
 {flash&&<div style={{position:"fixed",inset:0,background:"rgba(255,255,255,0.2)",zIndex:9050,pointerEvents:"none"}}/>}
@@ -837,7 +834,7 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*over
 {names.map((name,idx)=>{const ct=getCardTeam(idx);const ac=C[ct.teamIdx]?C[ct.teamIdx].ac:"#888";const suit=SUITS[ct.teamIdx]||SUITS[0];const orderNum=ct.inTeamIdx+1;
 const outer=getCardOuter(idx);const flipDeg=getFlipDeg(idx);const br=isTabletSA?16:12;
 const vName=name.length>7?name.slice(0,7):name;const nl=vName.length;
-const vFs=isTabletSA?(nl<=2?34:nl<=3?30:nl<=4?28:nl<=5?24:nl<=6?22:20):(nl<=2?22:nl<=3?18:nl<=4?16:nl<=5?15:nl<=6?14:13);
+const vFs=isTabletSA?(nl<=2?41:nl<=3?36:nl<=4?34:nl<=5?29:nl<=6?26:24):(nl<=2?19:nl<=3?16:nl<=4?14:nl<=5?13:nl<=6?12:11);
 const vLs=nl<=2?"6px":nl<=3?"4px":"2px";
 const cardDealTime2=T.p3+revealPos[idx]*perCard;const holdStart2=cardDealTime2+0.8;const holdEnd2=holdStart2+1.0;
 const isHolding=phase===3&&t>=holdStart2&&t<holdEnd2;const holdProg2=isHolding?(t-holdStart2)/1.0:0;
@@ -874,7 +871,7 @@ boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+glowSh,display:"flex",alignItems:"center"
 </div>
 </div>);})}
 {/* Remaining deck cards for multi-court */}
-{remainingDeck>0&&phase>=3&&Array.from({length:Math.min(remainingDeck,8)},(_,i)=>(<div key={"rem"+i} style={{position:"fixed",left:cx-cardW/2+i*1,top:cy-cardH/2-i*1,width:cardW,height:cardH,borderRadius:isTabletSA?16:12,overflow:"hidden",boxShadow:"0 4px 20px rgba(0,0,0,0.3)",zIndex:9000+i,opacity:dealIdxRef.current>=nCards-1?0.7:1}}><img src="/card_back.JPG" alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:isTabletSA?16:12,pointerEvents:"none"}}/></div>))}
+{remainingDeck>0&&(phase===1||phase>=3)&&Array.from({length:Math.min(remainingDeck,8)},(_,i)=>(<div key={"rem"+i} style={{position:"fixed",left:deckCx-cardW/2+i*1,top:cy-cardH/2-i*1,width:cardW,height:cardH,borderRadius:isTabletSA?16:12,overflow:"hidden",boxShadow:"0 4px 20px rgba(0,0,0,0.3)",zIndex:9000+i,opacity:phase===0?0:phase===1?Math.pow(Math.min((t-T.p1)/(T.p2-T.p1),1),3):phase===2?0:(dealIdxRef.current>=nCards-1?0.7:1)}}><img src="/card_back.JPG" alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:isTabletSA?16:12,pointerEvents:"none"}}/></div>))}
 {/* Phase 4: team reveal panel overlay */}
 {phase===4&&(<div style={{position:"fixed",inset:0,zIndex:9050,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:isTabletSA?24:16,opacity:Math.min(1,(t-T.p4)/0.3)}}>
 <div style={{display:isTabletSA&&nTeams>=3?"grid":"flex",gridTemplateColumns:isTabletSA&&nTeams>=3?"1fr 1fr":undefined,gap:isTabletSA?20:12,justifyContent:"center",flexWrap:"wrap",maxWidth:"100%",width:isTabletSA?"90%":undefined}}>
