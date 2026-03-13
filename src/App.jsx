@@ -736,7 +736,7 @@ const availW=vwSA-margin*2;const availH2=cardAreaBot-cardAreaTop;
 const colW2=availW/nTeams;const cardGap=isTabletSA?8:4;
 const maxCW=colW2-cardGap*2;const maxCH=(availH2-(maxPT-1)*cardGap-40)/maxPT;
 const rawW=Math.min(maxCW,maxCH/1.375);
-const cardW=isTabletSA?Math.max(60,Math.min(220,Math.floor(rawW))):75;
+const cardW=isTabletSA?Math.max(60,Math.min(220,Math.floor(rawW*0.9))):75;
 const cardH=isTabletSA?Math.round(cardW*1.375):103;
 const cx=vwSA/2;const deckCx=isTabletSA?margin+colW2*(nTeams-1)+colW2/2:cx;const cy=viewH*(isTabletSA?0.20:0.18);
 /* Timing */
@@ -832,7 +832,7 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*over
 {names.map((name,idx)=>{const ct=getCardTeam(idx);const ac=C[ct.teamIdx]?C[ct.teamIdx].ac:"#888";const suit=SUITS[ct.teamIdx]||SUITS[0];const orderNum=ct.inTeamIdx+1;
 const outer=getCardOuter(idx);const flipDeg=getFlipDeg(idx);const br=isTabletSA?16:12;
 const vName=name.length>7?name.slice(0,7):name;const nl=vName.length;
-const vFs=isTabletSA?(nl<=2?34:nl<=3?30:nl<=4?28:nl<=5?24:nl<=6?22:20):(nl<=2?19:nl<=3?16:nl<=4?14:nl<=5?13:nl<=6?12:11);
+const vFs=isTabletSA?(nl<=2?41:nl<=3?36:nl<=4?34:nl<=5?29:nl<=6?26:24):(nl<=2?19:nl<=3?16:nl<=4?14:nl<=5?13:nl<=6?12:11);
 const vLs=nl<=2?"6px":nl<=3?"4px":"2px";
 const cardDealTime2=T.p3+revealPos[idx]*perCard;const holdStart2=cardDealTime2+0.8;const holdEnd2=holdStart2+1.0;
 const isHolding=phase===3&&t>=holdStart2&&t<holdEnd2;const holdProg2=isHolding?(t-holdStart2)/1.0:0;
