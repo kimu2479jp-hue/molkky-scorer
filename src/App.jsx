@@ -738,7 +738,7 @@ const maxCW=colW2-cardGap*2;const maxCH=(availH2-(maxPT-1)*cardGap-40)/maxPT;
 const rawW=Math.min(maxCW,maxCH/1.375);
 const cardW=isTabletSA?Math.max(60,Math.min(200,Math.floor(rawW))):75;
 const cardH=isTabletSA?Math.round(cardW*1.375):103;
-const cx=vwSA/2;const deckCx=isTabletSA?cx+vwSA*0.12:cx;const cy=viewH*(isTabletSA?0.15:0.18);
+const cx=vwSA/2;const deckCx=isTabletSA?margin+colW2*(nTeams-1)+colW2/2:cx;const cy=viewH*(isTabletSA?0.15:0.18);
 /* Timing */
 const T=skipIntro?{p0:0,p1:0,p1e:0,p2:0,p2e:0,p3:0,p3e:dealDur,p4:dealDur}:{p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur};
 const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(null);const frameRef=useRef(null);
@@ -785,14 +785,14 @@ return{left:cx-cardW/2+offX,top:cy-cardH/2+offY,scale:1,opacity:1,zIndex:9001+id
 if(phase===3){const cardDealTime=T.p3+deckPos*perCard;const tLocal=t-cardDealTime;
 const liftD=0.3,flipD=0.5,holdD=1.0,moveD=0.5,landD=0.5;
 if(t<cardDealTime){const stackIdx=deckPos-Math.max(0,currentDealOrd+1);const sOff=Math.min(Math.max(0,stackIdx),10);
-return{left:cx-cardW/2+sOff,top:cy-cardH/2+sOff,scale:1,opacity:1,zIndex:9010+nCards-deckPos,rotate:0};}
+return{left:deckCx-cardW/2+sOff,top:cy-cardH/2+sOff,scale:1,opacity:1,zIndex:9010+nCards-deckPos,rotate:0};}
 if(tLocal<liftD){const prog=tLocal/liftD;
-return{left:cx-cardW/2,top:cy-cardH/2-prog*30,scale:1,opacity:1,zIndex:9100,rotate:0};}
-if(tLocal<liftD+flipD){return{left:cx-cardW/2,top:cy-cardH/2-30,scale:1,opacity:1,zIndex:9100,rotate:0};}
+return{left:deckCx-cardW/2,top:cy-cardH/2-prog*30,scale:1,opacity:1,zIndex:9100,rotate:0};}
+if(tLocal<liftD+flipD){return{left:deckCx-cardW/2,top:cy-cardH/2-30,scale:1,opacity:1,zIndex:9100,rotate:0};}
 if(tLocal<liftD+flipD+holdD){const hp=(tLocal-liftD-flipD)/holdD;const sc=1+0.12*Math.sin(hp*Math.PI);
-return{left:cx-cardW/2,top:cy-cardH/2-30,scale:sc,opacity:1,zIndex:9100,rotate:0};}
+return{left:deckCx-cardW/2,top:cy-cardH/2-30,scale:sc,opacity:1,zIndex:9100,rotate:0};}
 if(tLocal<liftD+flipD+holdD+moveD){const prog=(tLocal-liftD-flipD-holdD)/moveD;const ease=1-Math.pow(1-prog,3);
-const fromX=cx-cardW/2,fromY=cy-cardH/2-30;const sc=1-0.7*ease;
+const fromX=deckCx-cardW/2,fromY=cy-cardH/2-30;const sc=1-0.7*ease;
 return{left:fromX+(targetX-fromX)*ease,top:fromY+(targetY-fromY)*ease,scale:sc,opacity:1,zIndex:9100-Math.floor(prog*50),rotate:0};}
 if(tLocal<perCard){const prog=(tLocal-liftD-flipD-holdD-moveD)/landD;
 const sc=prog<0.6?0.3+0.75*(prog/0.6):1.05-0.05*((prog-0.6)/0.4);
