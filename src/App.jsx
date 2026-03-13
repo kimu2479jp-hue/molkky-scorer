@@ -741,7 +741,7 @@ const cardH=isTabletSA?Math.round(cardW*1.375):124;
 const cx=vwSA/2;const cy=viewH*(isTabletSA?0.18:0.30);
 /* Timing */
 const T=skipIntro?{p0:0,p1:0,p1e:0,p2:0,p2e:0,p3:0,p3e:dealDur,p4:dealDur}:{p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur};
-const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(Date.now());const frameRef=useRef(null);
+const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(null);const frameRef=useRef(null);
 const[flash,setFlash]=useState(false);const dealIdxRef=useRef(-1);const revealTeamRef=useRef(-1);
 const[closing,setClosing]=useState(false);const closeTRef=useRef(null);const[skipConfirm,setSkipConfirm]=useState(false);
 const revealPos=useRef(shuf(names.map((_,i)=>i))).current;
@@ -752,7 +752,7 @@ const teamSlots=teams.map((_,i)=>({x:margin+colW2*i+colW2/2,yStart:cardAreaTop+2
 const spreadX=isTabletSA?240:130;const spreadY=isTabletSA?180:80;
 const initPos=useRef(names.map((_,i)=>({x:cx-cardW/2+((i%3)-1)*spreadX,y:(isTabletSA?40:30)+Math.floor(i/3)*spreadY}))).current;
 /* Animation loop */
-useEffect(()=>{const animate=()=>{const el=(Date.now()-startRef.current)/1000;setT(el);
+useEffect(()=>{const animate=()=>{if(!startRef.current)startRef.current=Date.now();const el=(Date.now()-startRef.current)/1000;setT(el);
 if(el<T.p1)setPhase(0);
 else if(el<T.p1e)setPhase(1);
 else if(el<T.p2e){setPhase(2);const shufT=el-T.p2;if(shufT>0.3&&shufT<shufDur-0.3&&Math.random()<0.04)setFlash(true);}
