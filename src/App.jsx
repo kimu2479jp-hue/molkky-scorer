@@ -38,7 +38,7 @@ return[];
 function _saveFavsRaw(l){try{localStorage.setItem(LS_KEY,JSON.stringify(l));localStorage.setItem(LS_FAV_BK,JSON.stringify(l));}catch(e){}}
 function saveFavs(l){_saveFavsRaw(l);_debouncedSync();}
 const MAX_FAV=99;
-function useFavs(){const[f,sF]=useState(()=>loadFavs());return{favs:f,addF:n=>{const x=n.trim().slice(0,MAX_NAME);if(x&&!f.includes(x)&&f.length<MAX_FAV){const u=[...f,x];sF(u);saveFavs(u);}},rmF:n=>{const u=f.filter(v=>v!==n);sF(u);saveFavs(u);}};}
+function useFavs(){const[f,sF]=useState(()=>loadFavs());return{favs:f,addF:n=>{const x=n.trim().slice(0,MAX_NAME);if(x&&!f.includes(x)&&f.length<MAX_FAV){const u=[...f,x];sF(u);saveFavs(u);}},rmF:n=>{const u=f.filter(v=>v!==n);sF(u);saveFavs(u);},editF:(oldName,newName)=>{const x=newName.trim().slice(0,MAX_NAME);if(!x||x===oldName||!f.includes(oldName))return false;if(f.includes(x))return false;const u=f.map(v=>v===oldName?x:v);sF(u);saveFavs(u);renamePlayerData(oldName,x);return true;}};}
 
 /* ═══ Stats Storage — IndexedDB with in-memory cache (100K games) ═══ */
 const STATS_KEY="mk-player-stats";
@@ -195,6 +195,42 @@ _persistStats();
 /* Also clean replays in the same period */
 const replays=_cache.replays;
 for(const key in replays){if(new Date(key)>=start)delete replays[key];}
+_persistReplays();
+_debouncedSync();
+}
+
+function renamePlayerData(oldName,newName){
+/* スタッツデータのキー名変更 */
+const stats=_cache.stats;
+if(stats[oldName]){
+if(stats[newName]){
+/* 万が一新名前のデータが既に存在する場合はマージ */
+stats[newName]=[...stats[newName],...stats[oldName]];
+}else{
+stats[newName]=stats[oldName];
+}
+delete stats[oldName];
+_persistStats();
+}
+/* リプレイデータ内のプレイヤー名変更 */
+const replays=_cache.replays;
+for(const key in replays){
+const rp=replays[key];
+if(rp&&rp.teams){
+rp.teams.forEach(t=>{
+if(t.players){
+t.players.forEach(p=>{
+if(typeof p==="object"&&p.name===oldName)p.name=newName;
+});
+}
+});
+}
+if(rp&&rp.history){
+rp.history.forEach(h=>{
+if(h.playerName===oldName)h.playerName=newName;
+});
+}
+}
 _persistReplays();
 _debouncedSync();
 }
@@ -626,8 +662,8 @@ return(<div style={SS.ov}><div className="mk-fade-scale-in" style={{background:"
   </div></div>);
 }
 
-function FavDropdown({favs,addF,rmF,onPick,usedNames,isAdmin:isAdminProp}){
-const[open,setOpen]=useState(false);const[newN,setNewN]=useState("");const[delTarget,setDelTarget]=useState(null);const[delConf,setDelConf]=useState(null);
+function FavDropdown({favs,addF,rmF,editF,onPick,usedNames,isAdmin:isAdminProp}){
+const[open,setOpen]=useState(false);const[newN,setNewN]=useState("");const[delTarget,setDelTarget]=useState(null);const[delConf,setDelConf]=useState(null);const[editTarget,setEditTarget]=useState(null);const[editName,setEditName]=useState("");
 const longRef=useRef(null);const wrapRef=useRef(null);
 const available=favs.filter(f=>!(usedNames||[]).includes(f));
 const startLP=name=>{if(!isAdminProp)return;longRef.current=setTimeout(()=>setDelTarget(name),600);};const cancelLP=()=>{if(longRef.current)clearTimeout(longRef.current);};
@@ -637,7 +673,10 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 <div className="mk-fade-scale-in" style={{...SS.mod,maxWidth:360}} onClick={e=>e.stopPropagation()}>
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}><span style={{fontSize:18,fontWeight:800,color:"var(--text-primary)"}}>お気に入り</span><button onClick={()=>{setOpen(false);setDelTarget(null);}} style={SS.clsB}>✕</button></div>
 {available.length===0&&<div style={{padding:12,textAlign:"center",color:"var(--text-muted)",fontSize:16}}>{favs.length===0?"登録なし":"全員配置済み"}</div>}
-<div style={{maxHeight:300,overflow:"auto",WebkitOverflowScrolling:"touch"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid var(--border-lighter)",background:delTarget===f?"#fde8e8":"transparent",fontSize:18,fontWeight:600,color:"var(--text-primary)",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<span onClick={e=>{e.stopPropagation();setDelConf(f);}} style={{padding:"5px 12px",background:"#e74c3c",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700}}>削除</span>}</button></div>))}</div>
+<div style={{maxHeight:300,overflow:"auto",WebkitOverflowScrolling:"touch"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid var(--border-lighter)",background:delTarget===f?"#fde8e8":"transparent",fontSize:18,fontWeight:600,color:"var(--text-primary)",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<div style={{display:"flex",gap:4}} onClick={e=>e.stopPropagation()}>
+<span onClick={()=>{setEditTarget(f);setEditName(f);setDelTarget(null);}} style={{padding:"5px 10px",background:"var(--accent-blue)",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>編集</span>
+<span onClick={()=>{setDelConf(f);}} style={{padding:"5px 10px",background:"#e74c3c",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>削除</span>
+</div>}</button></div>))}</div>
 <div style={{borderTop:"1px solid var(--border-lighter)",paddingTop:10,marginTop:4,flexShrink:0}}><div style={{display:"flex",gap:6}}>
 <input value={newN} onChange={e=>setNewN(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder={"新規("+MAX_NAME+"文字)"} style={{flex:1,padding:"10px 12px",border:"1px solid var(--border-input)",borderRadius:8,fontSize:16,outline:"none"}}/>
 <button onClick={()=>{if(newN.trim()&&favs.length<MAX_FAV){addF(newN.trim());setNewN("");}}} style={{padding:"10px 16px",border:"none",borderRadius:8,background:"var(--accent-blue)",color:"var(--text-inverse)",fontWeight:700,fontSize:15,cursor:"pointer",opacity:newN.trim()?1:0.3}}>登録</button>
@@ -647,6 +686,16 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 <div style={{fontSize:18,fontWeight:800,color:"var(--text-danger)",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}><AlertTriangle size={18}/> お気に入り削除</div>
 <div style={{fontSize:16,marginBottom:16}}>「{delConf}」をお気に入りから削除しますか？</div>
 <div style={{display:"flex",gap:8}}><button onClick={()=>{rmF(delConf);setDelConf(null);setDelTarget(null);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>削除する</button><button onClick={()=>setDelConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
+</div></div>}
+{editTarget&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setEditTarget(null)}><div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%"}} onClick={e=>e.stopPropagation()}>
+<div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:12}}>名前を編集</div>
+<div style={{fontSize:14,color:"var(--text-muted)",marginBottom:8}}>{"\u300C"}{editTarget}{"\u300D\u2192"}</div>
+<input value={editName} onChange={e=>setEditName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} style={{width:"100%",padding:"12px",border:"1px solid var(--border-input)",borderRadius:8,fontSize:18,outline:"none",marginBottom:12,boxSizing:"border-box"}} autoFocus/>
+{editName.trim()&&editName.trim()!==editTarget&&favs.includes(editName.trim())&&<div style={{fontSize:13,color:"var(--text-danger)",marginBottom:8}}>この名前は既に登録されています</div>}
+<div style={{display:"flex",gap:8}}>
+<button onClick={()=>{const ok=editF(editTarget,editName);if(ok){setEditTarget(null);setDelTarget(null);}}} disabled={!editName.trim()||editName.trim()===editTarget||favs.includes(editName.trim())} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--accent-blue)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer",opacity:(!editName.trim()||editName.trim()===editTarget||favs.includes(editName.trim()))?0.3:1}}>変更する</button>
+<button onClick={()=>setEditTarget(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
+</div>
 </div></div>}
 
   </div>);
@@ -1163,7 +1212,7 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 }
 
 function SetupScreen({onStart,savedTeams,isAdmin,onAdminToggle,aiEnabled,onAIToggle,shufAnim,onShufAnimToggle,courtAllocation,onClearCourtAllocation,setupDraft,onClearSetupDraft,autoReshuffleMode,onClearAutoReshuffle}){
-const{favs,addF,rmF}=useFavs();
+const{favs,addF,rmF,editF}=useFavs();
 const[mode,setMode]=useState("shuffle");const[tc,setTc]=useState(savedTeams?savedTeams.length:2);
 const[courtCount,setCourtCount]=useState(1);const[courtTeamCounts,setCourtTeamCounts]=useState({1:2,2:2,3:2});const[activeCourt,setActiveCourt]=useState(1);
 const[courtTeams,setCourtTeams]=useState(()=>{const init={};for(let c=1;c<=3;c++){init[c]=Array.from({length:4},(_,i)=>({name:"チーム"+(i+1),players:[""]}));}return init;});
@@ -1455,7 +1504,7 @@ return(
 <div style={{paddingLeft:editMode?28:44}}>{team.players.map((p,pi)=>{const delKey="m"+ti+"_"+pi;const isExp=expandedDel===delKey;return(<div key={pi} style={{display:"flex",alignItems:"center",gap:6,marginBottom:7,overflow:"hidden"}}>
 {editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#e74c3c",color:"#fff",fontSize:18,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"−"}</button>}
 <span style={{width:20,fontSize:16,color:"var(--text-muted)",fontWeight:700,textAlign:"center"}}>{pi+1}</span><input value={p} onChange={e=>uP(ti,pi,e.target.value)} maxLength={MAX_NAME} style={{...PIN,flex:isExp?"0 1 auto":"1"}} placeholder={"名前("+MAX_NAME+"文字)"}/>
-{!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uP(ti,pi,name)} usedNames={used} isAdmin={isAdmin}/>}
+{!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} editF={editF} onPick={name=>uP(ti,pi,name)} usedNames={used} isAdmin={isAdmin}/>}
 {editMode&&isExp&&team.players.length>1&&<button onClick={()=>{rP(ti,pi);setExpandedDel(null);}} style={{padding:"6px 16px",border:"none",borderRadius:8,background:"#e74c3c",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
 </div>);})}
 {!editMode&&team.players.length<MAX_PL&&<button style={{width:"100%",padding:10,border:"2px dashed var(--border-input)",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer"}} onClick={()=>aP(ti)}>＋ 追加</button>}
@@ -1471,7 +1520,7 @@ return(
 <div style={{paddingLeft:editMode?28:44}}>{team.players.map((p,pi)=>{const delKey="c"+activeCourt+"_"+ti+"_"+pi;const isExp=expandedDel===delKey;return(<div key={pi} style={{display:"flex",alignItems:"center",gap:6,marginBottom:7,overflow:"hidden"}}>
 {editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:26,height:26,borderRadius:13,border:"none",background:"#e74c3c",color:"#fff",fontSize:18,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"−"}</button>}
 <span style={{width:20,fontSize:16,color:"var(--text-muted)",fontWeight:700,textAlign:"center"}}>{pi+1}</span><input value={p} onChange={e=>ctUp(activeCourt,ti,pi,e.target.value)} maxLength={MAX_NAME} style={{...PIN,flex:isExp?"0 1 auto":"1"}} placeholder={"名前("+MAX_NAME+"文字)"}/>
-{!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>ctUp(activeCourt,ti,pi,name)} usedNames={used} isAdmin={isAdmin}/>}
+{!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} editF={editF} onPick={name=>ctUp(activeCourt,ti,pi,name)} usedNames={used} isAdmin={isAdmin}/>}
 {editMode&&isExp&&team.players.length>1&&<button onClick={()=>{ctRp(activeCourt,ti,pi);setExpandedDel(null);}} style={{padding:"6px 16px",border:"none",borderRadius:8,background:"#e74c3c",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
 </div>);})}
 {!editMode&&team.players.length<MAX_PL&&<button style={{width:"100%",padding:10,border:"2px dashed var(--border-input)",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer"}} onClick={()=>ctAp(activeCourt,ti)}>＋ 追加</button>}
@@ -1484,7 +1533,7 @@ return(
 <div style={{display:"grid",gridTemplateColumns:editMode?"1fr":"1fr 1fr",gap:7}}>{mems.map((m,i)=>{const delKey="s"+i;const isExp=expandedDel===delKey;return(<div key={i} style={{display:"flex",alignItems:"center",gap:4}}>
 {editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:24,height:24,borderRadius:12,border:"none",background:"#e74c3c",color:"#fff",fontSize:16,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"−"}</button>}
 <span style={{width:20,fontSize:14,color:"var(--text-muted)",fontWeight:700,textAlign:"right",flexShrink:0}}>{i+1}</span><input value={m} onChange={e=>uM(i,e.target.value)} maxLength={MAX_NAME} style={{...PIN,padding:"10px 12px",fontSize:18,flex:isExp?"0 1 auto":"1",minWidth:0}} placeholder="メンバー"/>
-{!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={name=>uM(i,name)} usedNames={used} isAdmin={isAdmin}/>}
+{!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} editF={editF} onPick={name=>uM(i,name)} usedNames={used} isAdmin={isAdmin}/>}
 {editMode&&isExp&&mems.length>2&&<button onClick={()=>{rM(i);setExpandedDel(null);}} style={{padding:"4px 14px",border:"none",borderRadius:8,background:"#e74c3c",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
 </div>);})}</div>
 {!editMode&&mems.length<maxShufForCourt&&<button style={{width:"100%",padding:10,border:"2px dashed var(--border-input)",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:6}} onClick={aM}>＋</button>}
@@ -1593,7 +1642,7 @@ return(
 
 /* ═══ Player Modal ═══ */
 function PlModal({teams,dispatch,onClose,isAdmin,courtCount,courtAllocation,onUpdateCourtAllocation}){
-const{favs,addF,rmF}=useFavs();const[name,setName]=useState("");
+const{favs,addF,rmF,editF}=useFavs();const[name,setName]=useState("");
 const sizes=teams.map(t=>t.players.filter(p=>p.active).length);const mi=sizes.indexOf(Math.min(...sizes));const[sel,setSel]=useState(mi);
 const[addConf,setAddConf]=useState(null);const[delConf,setDelConf]=useState(null);
 const[activeCourt,setActiveCourt]=useState(1);
@@ -1698,7 +1747,7 @@ return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" st
 <input value={name} onChange={e=>setName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder="名前" style={{flex:1,minWidth:80,padding:8,borderRadius:8,border:"1px solid var(--border-input)",fontSize:16}}/>
 <button onClick={()=>doAdd()} style={{minWidth:80,padding:"8px 14px",borderRadius:8,border:"none",background:"var(--accent-blue)",color:"var(--text-inverse)",fontWeight:700,fontSize:15,cursor:"pointer",opacity:name.trim()?1:0.3}}>追加</button>
 <button onClick={()=>doAutoAdd()} style={{minWidth:80,padding:"8px 14px",borderRadius:8,border:"none",background:"#22b566",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",opacity:name.trim()?1:0.3}}>自動追加</button>
-<FavDropdown favs={favs} addF={addF} rmF={rmF} onPick={n=>doAdd(n)} usedNames={allUsed} isAdmin={isAdmin}/>
+<FavDropdown favs={favs} addF={addF} rmF={rmF} editF={editF} onPick={n=>doAdd(n)} usedNames={allUsed} isAdmin={isAdmin}/>
 </div>
 </div>
 </div>
