@@ -731,12 +731,13 @@ const vwSA=typeof window!=="undefined"?window.innerWidth:375;const isTabletSA=vw
 const viewH=typeof window!=="undefined"?window.innerHeight:700;
 const maxPT=Math.max(...teams.map(tm=>tm.players.length));
 /* Dynamic card sizing: ratio 1:1.375 (card_back.JPG aspect) */
-const margin=isTabletSA?32:16;const cardAreaTop=viewH*(isTabletSA?0.22:0.32);const cardAreaBot=viewH-30;
+const margin=isTabletSA?32:16;const cardAreaTop=viewH*(isTabletSA?0.24:0.32);const cardAreaBot=viewH-15;
 const availW=vwSA-margin*2;const availH2=cardAreaBot-cardAreaTop;
 const colW2=availW/nTeams;const cardGap=isTabletSA?8:4;
 const maxCW=colW2-cardGap*2;const maxCH=(availH2-(maxPT-1)*cardGap-40)/maxPT;
 const rawW=Math.min(maxCW,maxCH/1.375);
-const cardW=isTabletSA?Math.max(60,Math.min(220,Math.floor(rawW*0.9))):75;
+const shrink=isTabletSA?(maxPT>=4?0.9:0.84):1;
+const cardW=isTabletSA?Math.max(60,Math.min(220,Math.floor(rawW*shrink))):75;
 const cardH=isTabletSA?Math.round(cardW*1.375):103;
 const cx=vwSA/2;const deckCx=isTabletSA?margin+colW2*(nTeams-1)+colW2/2:cx;const cy=viewH*(isTabletSA?0.20:0.18);
 /* Timing */
