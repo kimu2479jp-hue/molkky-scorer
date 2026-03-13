@@ -1,6 +1,5 @@
 import React, { useState, useReducer, useRef, useEffect, useCallback } from "react";
-import { Target, BarChart3, Lock, Cloud, Settings, Bot, Upload, Camera, MessageCircle, RefreshCw, Trophy, Star, ClipboardList, ChevronLeft, Users, Undo2, AlertTriangle, Shield } from "lucide-react";
-import { RadarChart as RCRadar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { Target, BarChart3, Lock, Cloud, Settings, Bot, Upload, Camera, MessageCircle, RefreshCw, Trophy, Star, ClipboardList, ChevronLeft, Users, Undo2, AlertTriangle, Shield, Trash2 } from "lucide-react";
 
 const MAX_TEAMS=4,MAX_PL=4,MAX_SHUF=16,MAX_NAME=7,WIN=50,RST=25,PEN=37,MF=3;
 const C=[
@@ -197,6 +196,25 @@ const replays=_cache.replays;
 for(const key in replays){if(new Date(key)>=start)delete replays[key];}
 _persistReplays();
 _debouncedSync();
+}
+
+function deleteGameByKey(gameKey){
+const stats=_cache.stats;
+let deleted=false;
+for(const nm in stats){
+const before=stats[nm].length;
+stats[nm]=stats[nm].filter(g=>g.d!==gameKey);
+if(stats[nm].length<before)deleted=true;
+if(!stats[nm].length)delete stats[nm];
+}
+if(deleted)_persistStats();
+const replays=_cache.replays;
+if(replays[gameKey]){
+delete replays[gameKey];
+_persistReplays();
+}
+_debouncedSync();
+return deleted;
 }
 
 function renamePlayerData(oldName,newName){
@@ -1828,11 +1846,11 @@ const LB_ADJ=[{dx:0,dy:-20},{dx:30,dy:-8},{dx:30,dy:8},{dx:14,dy:20},{dx:-14,dy:
 const MX_ADJ=[{dx:0,dy:6},{dx:18,dy:0},{dx:18,dy:0},{dx:8,dy:-4},{dx:-8,dy:-4},{dx:-18,dy:0},{dx:-18,dy:0}];
 function RadarChart({playersData,size}){
 const isTablet=typeof window!=="undefined"&&window.innerWidth>=768;
-const S=isTablet?952:size||560;
+const S=isTablet?1200:size||600;
 const rRatio=0.28;
-const lbDist=isTablet?136:80;
-const mxDist=isTablet?37:22;
-const lbFS=isTablet?30:18;
+const lbDist=isTablet?160:72;
+const mxDist=isTablet?42:22;
+const lbFS=isTablet?30:16;
 const mxFS=isTablet?29:17;
 const lbDy=isTablet?34:21;
 const adjScale=isTablet?1.7:1;
@@ -1845,7 +1863,8 @@ const labels=RADAR_LABELS.map((l,i)=>{const p=pt(i,R+lbDist);return{x:p.x+LB_ADJ
 const maxPts=RADAR_MAX.map((m,i)=>{const p=pt(i,R+mxDist);return{x:p.x+MX_ADJ[i].dx*adjScale,y:p.y+MX_ADJ[i].dy*adjScale,t:m};});
 const mSize=R*1.4;
 const fnt="'Hiragino Kaku Gothic ProN','Noto Sans JP',system-ui,sans-serif";
-return(<svg width={S} height={S} viewBox={`0 0 ${S} ${S}`}>
+const pad=isTablet?40:30;
+return(<svg width="100%" viewBox={`${-pad} ${-pad} ${S+pad*2} ${S+pad*2}`} style={{display:"block",margin:"0 auto"}}>
 <image href={MASCOT_R} x={cx2-mSize/2} y={cy2-mSize/2} width={mSize} height={mSize} opacity={0.22}/>
 {grid.map((g,i)=><polygon key={i} points={g} fill="none" stroke="#ccd" strokeWidth={i===3?2:0.7}/>)}
 {axes.map((a,i)=><line key={i} x1={a.x1} y1={a.y1} x2={a.x2} y2={a.y2} stroke="#ccc" strokeWidth={0.7}/>)}
@@ -1856,33 +1875,7 @@ return <React.Fragment key={pi}><polygon points={poly} fill={pd.color+"33"} stro
 </svg>);
 }
 
-/* ═══ Recharts Dashboard Components ═══ */
-function RechartsRadar({playersData}){
-const axes=["勝率","上がり率","ミス率(反転)","平均得点","お邪魔成功率"];
-const rawFns=[m=>m.winRate*100,m=>m.finishRate*100,m=>(1-m.missRate)*100,m=>Math.min((m.avgPts/12)*100,100),m=>m.ojamaRate*100];
-const fmtFns=[m=>(m.winRate*100).toFixed(1)+"%",m=>(m.finishRate*100).toFixed(1)+"%",m=>(m.missRate*100).toFixed(1)+"%",m=>m.avgPts.toFixed(1)+"pt",m=>(m.ojamaRate*100).toFixed(1)+"%"];
-const data=axes.map((axis,i)=>({axis,...Object.fromEntries(playersData.map(pd=>{const m=pd.metrics;return[pd.name,Math.round(rawFns[i](m)*10)/10];}))}));
-const customTick=({payload,x,y,textAnchor})=>{const idx=axes.indexOf(payload.value);return(<g><text x={x} y={y} textAnchor={textAnchor} fontSize={12} fontWeight={700} fill="var(--text-primary)">{payload.value}</text>{playersData.map((pd,pi)=>(<text key={pd.name} x={x} y={y+14+pi*13} textAnchor={textAnchor} fontSize={11} fontWeight={700} fill={pd.color}>{fmtFns[idx](pd.metrics)}</text>))}</g>);};
-return(<div style={{background:"var(--bg-surface)",borderRadius:14,padding:14,marginBottom:14,border:"1px solid var(--border-input)"}}><div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",marginBottom:8,display:"flex",alignItems:"center",gap:4}}><Target size={16}/> 5軸レーダーチャート</div>
-<ResponsiveContainer width="100%" height={360}><RCRadar data={data} outerRadius="60%"><PolarGrid/><PolarAngleAxis dataKey="axis" tick={customTick}/><PolarRadiusAxis angle={90} domain={[0,100]} tick={false}/>
-{playersData.map((pd,i)=>(<Radar key={pd.name} name={pd.name} dataKey={pd.name} stroke={pd.color} fill={pd.color} fillOpacity={0.15} strokeWidth={2}/>))}
-<Legend wrapperStyle={{fontSize:13,fontWeight:700}}/></RCRadar></ResponsiveContainer></div>);
-}
 
-function RechartsLine({playersData,stats}){
-const hasData=playersData.some(pd=>{const games=stats[pd.name]||[];return games.length>=2;});
-if(!hasData)return null;
-const maxGames=10;
-const allDates=new Set();
-playersData.forEach(pd=>{const games=(stats[pd.name]||[]).slice(-maxGames);games.forEach(g=>allDates.add(g.d.slice(0,10)));});
-const sortedDates=[...allDates].sort();
-const data=sortedDates.map(date=>{const entry={date:date.slice(5)};playersData.forEach(pd=>{const games=(stats[pd.name]||[]).filter(g=>g.d.slice(0,10)===date);if(games.length>0){const avg=games.reduce((s,g)=>s+(g.t>0?g.s/g.t:0),0)/games.length;entry[pd.name]=Math.round(avg*100)/100;}});return entry;});
-if(data.length<2)return null;
-return(<div style={{background:"var(--bg-surface)",borderRadius:14,padding:14,marginBottom:14,border:"1px solid var(--border-input)"}}><div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",marginBottom:8,display:"flex",alignItems:"center",gap:4}}><BarChart3 size={16}/> 直近の平均得点推移</div>
-<ResponsiveContainer width="100%" height={220}><LineChart data={data}><XAxis dataKey="date" tick={{fontSize:11}} stroke="#ccc"/><YAxis tick={{fontSize:11}} stroke="#ccc" domain={[0,"auto"]}/><Tooltip contentStyle={{borderRadius:8,fontSize:13}} formatter={(v)=>v+"pt"}/>
-{playersData.map(pd=>(<Line key={pd.name} type="monotone" dataKey={pd.name} stroke={pd.color} strokeWidth={2} dot={{r:3,fill:pd.color}} connectNulls/>))}
-<Legend wrapperStyle={{fontSize:13,fontWeight:700}}/></LineChart></ResponsiveContainer></div>);
-}
 
 function fmtSec(s){if(s==null)return"-";return s<60?s.toFixed(1)+"秒":Math.floor(s/60)+"分"+Math.round(s%60)+"秒";}
 
@@ -2060,7 +2053,7 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
 }
 
 /* ═══ Game List Item ═══ */
-function GameListItem({game,checked,onToggle,isTab,onShowScore}){
+function GameListItem({game,checked,onToggle,isTab,onShowScore,onDelete,isAdmin}){
 const dt=new Date(game.d);
 const timeStr=fmtHM(dt);
 const dateStr=(dt.getMonth()+1)+"/"+dt.getDate();
@@ -2086,7 +2079,7 @@ return(<div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 
 {hasTeam&&<div style={{fontSize:isTab?13:11,color:"var(--accent-blue)",fontWeight:600,marginTop:1}}>勝利チームのメンバー: {game.winnerMembers.join(", ")}</div>}
 </div>
 {hasReplay&&<button onClick={e=>{e.stopPropagation();onShowScore&&onShowScore(game.d);}} style={{padding:"6px 10px",border:"1px solid #2b7de9",borderRadius:8,background:"#f0f6ff",color:"var(--accent-blue)",fontSize:isTab?14:12,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}><ClipboardList size={14}/></button>}
-
+{isAdmin&&onDelete&&<button onClick={e=>{e.stopPropagation();onDelete(game.d,game);}} style={{padding:"6px 10px",border:"1px solid #e74c3c",borderRadius:8,background:"#fef2f2",color:"#e74c3c",fontSize:isTab?14:12,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}><Trash2 size={14}/></button>}
   </div>);
 }
 
@@ -2108,6 +2101,10 @@ const[recentPage,setRecentPage]=useState(0);
 const RECENT_TOTAL=30;const PAGE_SIZE=10;
 /* Score table modal (stores game date key) */
 const[scoreGame,setScoreGame]=useState(null);
+/* A: Game delete confirmation */
+const[deleteConf,setDeleteConf]=useState(null);
+/* E: Calendar pagination */
+const[calPage,setCalPage]=useState(0);
 
 const currentNames=(currentGameRecords||[]).map(r=>r.nm);
 const allNames=favs.filter(n=>(stats[n]&&stats[n].length>0)||currentNames.includes(n));
@@ -2126,6 +2123,7 @@ const gameDateSet=getGameDates(stats,names);
 
 /* Calendar date selection */
 const handleCalSelect=(dt)=>{
+setCalPage(0);
 if(calMode==="single"){setCalStart(dt);setCalEnd(dt);
 const ds=dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
 const dayGames=allGames.filter(g=>g.d.startsWith(ds));
@@ -2143,6 +2141,7 @@ setSelectedGameKeys(new Set(rangeGames.map(g=>g.d)));
 
 /* D: Month tap to select/deselect entire month */
 const handleMonthSelect=(monthStart,monthEnd)=>{
+setCalPage(0);
 const monthGames=filterGamesByDates(allGames,monthStart,monthEnd);
 if(monthGames.length===0)return;
 const monthKeys=new Set(monthGames.map(g=>g.d));
@@ -2158,6 +2157,7 @@ setCalStart(monthStart);setCalEnd(monthEnd);
 
 /* 3: Year tap to select/deselect entire year (period mode only, exclude future) */
 const handleYearSelect=(yearStart,yearEnd)=>{
+setCalPage(0);
 const yearGames=filterGamesByDates(allGames,yearStart,yearEnd);
 if(yearGames.length===0)return;
 const yearKeys=new Set(yearGames.map(g=>g.d));
@@ -2218,7 +2218,7 @@ return(<div className="mk-fade-scale-in" style={{position:"fixed",inset:0,backgr
 {/* Calendar Tab */}
 {viewMode==="cumulative"&&tab==="calendar"&&(<>
 <div style={{display:"flex",gap:6,marginBottom:8}}>
-{[["single","単一日付"],["range","期間選択"]].map(([k,l])=>(<button key={k} onClick={()=>{setCalMode(k);setCalStart(null);setCalEnd(null);setSelectedGameKeys(new Set());}} style={{flex:1,padding:"8px 0",border:"2px solid "+(calMode===k?"var(--accent-blue)":"var(--border-input)"),borderRadius:8,background:calMode===k?"var(--accent-blue)":"var(--bg-surface)",color:calMode===k?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{l}</button>))}
+{[["single","単一日付"],["range","期間選択"]].map(([k,l])=>(<button key={k} onClick={()=>{setCalMode(k);setCalStart(null);setCalEnd(null);setSelectedGameKeys(new Set());setCalPage(0);}} style={{flex:1,padding:"8px 0",border:"2px solid "+(calMode===k?"var(--accent-blue)":"var(--border-input)"),borderRadius:8,background:calMode===k?"var(--accent-blue)":"var(--bg-surface)",color:calMode===k?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{l}</button>))}
 </div>
 <CalendarPicker gameDates={gameDateSet} onSelect={handleCalSelect} onSelectMonth={handleMonthSelect} onSelectYear={handleYearSelect} mode={calMode} selectedStart={calStart} selectedEnd={calEnd}/>
 {calFilteredGames.length>0&&(<div style={{marginBottom:10}}>
@@ -2229,7 +2229,12 @@ return(<div className="mk-fade-scale-in" style={{position:"fixed",inset:0,backgr
 <button onClick={()=>setSelectedGameKeys(new Set())} style={{padding:"4px 12px",border:"1px solid var(--border-input)",borderRadius:6,background:"var(--bg-surface)",color:"var(--text-secondary)",fontSize:12,fontWeight:700,cursor:"pointer"}}>全解除</button>
 </div>
 </div>
-{calFilteredGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab} onShowScore={setScoreGame}/>))}
+{(()=>{const CAL_PAGE_SIZE=10;const calTotalPages=Math.ceil(calFilteredGames.length/CAL_PAGE_SIZE);const calPagedGames=calFilteredGames.slice(calPage*CAL_PAGE_SIZE,(calPage+1)*CAL_PAGE_SIZE);return(<>
+{calPagedGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab} onShowScore={setScoreGame} onDelete={(key,game)=>setDeleteConf(game)} isAdmin={isAdmin}/>))}
+{calTotalPages>1&&<div style={{display:"flex",gap:6,justifyContent:"center",marginTop:8}}>
+{Array.from({length:calTotalPages},(_,i)=>(<button key={i} onClick={()=>setCalPage(i)} style={{width:36,height:36,border:calPage===i?"2px solid var(--accent-blue)":"1px solid var(--border-input)",borderRadius:8,background:calPage===i?"var(--accent-blue)":"var(--bg-surface)",color:calPage===i?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{i+1}</button>))}
+</div>}
+</>);})()}
 </div>)}
 </>)}
 {/* Recent Tab */}
@@ -2254,7 +2259,7 @@ setSelectedGameKeys(new Set(matched.map(g=>g.d)));
 return(<button key={k} onClick={applyPreset} style={{padding:"6px 12px",border:"1px solid #2b7de9",borderRadius:8,background:"#f0f6ff",color:"var(--accent-blue)",fontSize:13,fontWeight:700,cursor:"pointer"}}>{label}</button>);
 })}
 </div>
-{recentGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab} onShowScore={setScoreGame}/>))}
+{recentGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab} onShowScore={setScoreGame} onDelete={(key,game)=>setDeleteConf(game)} isAdmin={isAdmin}/>))}
 {/* F: Pagination */}
 {totalPages>1&&(<div style={{display:"flex",justifyContent:"center",gap:8,marginTop:10}}>
 {Array.from({length:totalPages},(_,i)=>(<button key={i} onClick={()=>setRecentPage(i)} style={{width:36,height:36,border:recentPage===i?"2px solid var(--accent-blue)":"1px solid var(--border-input)",borderRadius:8,background:recentPage===i?"var(--accent-blue)":"var(--bg-surface)",color:recentPage===i?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{i+1}</button>))}
@@ -2272,18 +2277,11 @@ return(<button key={k} onClick={applyPreset} style={{padding:"6px 12px",border:"
 </button>);})}</div>
 </div>):(<div style={{display:"flex",gap:isTab?12:6,marginBottom:10,flexWrap:"wrap",marginTop:6}}>{names.map(nm=>{const isSel=effectiveSelected.includes(nm);const ci=isSel?effectiveSelected.indexOf(nm)%PC.length:0;return(<button key={nm} onClick={()=>toggleSel(nm)} style={{padding:isTab?"12px 28px":"6px 14px",border:"2px solid "+(isSel?PC[ci]:"var(--border-input)"),borderRadius:isTab?36:20,background:isSel?PC[ci]+"22":"#fff",color:isSel?PC[ci]:"#888",fontSize:isTab?28:14,fontWeight:700,cursor:"pointer"}}>{nm}</button>);})}</div>)}
 {playersData.length>0&&(<>
-{/* Dashboard grid */}
-<div style={{display:"grid",gridTemplateColumns:isTab?"1fr 1fr":"1fr",gap:14,marginBottom:14}}>
-{/* SVG Radar (7-axis) */}
-<div style={{background:"var(--bg-surface)",borderRadius:14,padding:14,border:"1px solid var(--border-input)"}}>
-<div style={{display:"flex",justifyContent:"center"}}><RadarChart playersData={playersData} size={isTab?420:320}/></div>
+{/* SVG Radar (7-axis) - full width */}
+<div style={{background:"var(--bg-surface)",borderRadius:14,padding:14,border:"1px solid var(--border-input)",marginBottom:14}}>
+<div style={{display:"flex",justifyContent:"center",width:"100%"}}><RadarChart playersData={playersData} size={isTab?600:340}/></div>
 <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap",marginTop:4}}>{playersData.map(pd=>(<div key={pd.name} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:5,background:pd.color}}/><span style={{fontSize:12,fontWeight:700,color:"#333"}}>{pd.name}</span></div>))}</div>
 </div>
-{/* Recharts Radar (5-axis) */}
-<RechartsRadar playersData={playersData}/>
-</div>
-{/* Line chart: recent avg points trend */}
-<RechartsLine playersData={playersData} stats={stats}/>
 {/* Summary table */}
 <div style={{background:"var(--bg-surface)",borderRadius:14,padding:14,marginBottom:14,border:"1px solid var(--border-input)"}}>
 <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}><thead><tr style={{background:"var(--bg-secondary)",color:"var(--text-inverse)"}}><th style={{padding:"8px",textAlign:"left"}}>プレイヤー</th><th style={{padding:"8px"}}>試合</th><th style={{padding:"8px"}}>勝利</th><th style={{padding:"8px"}}>ターン</th><th style={{padding:"8px"}}>ミス</th><th style={{padding:"8px"}}>ミス率</th><th style={{padding:"8px"}}>上がり率</th><th style={{padding:"8px"}}>お邪魔</th></tr></thead>
@@ -2334,6 +2332,19 @@ return(<div key={pd.name} style={{marginBottom:12}}>
 {delStep===2&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:400,width:"90%",textAlign:"center"}}>
 <div style={{fontSize:18,fontWeight:800,color:"var(--text-danger)",marginBottom:12}}>削除する期間を選択</div>
 <div style={{display:"flex",flexDirection:"column",gap:6}}>{[["day","今日"],["week","今週"],["month","今月"],["year","今年"],["all","全期間"]].map(([k,l])=>(<button key={k} onClick={()=>doDelete(k)} style={{padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>{l}のデータを削除</button>))}<button onClick={()=>setDelStep(0)} style={{padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
+</div></div>}
+{deleteConf&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setDeleteConf(null)}><div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:400,width:"90%"}} onClick={e=>e.stopPropagation()}>
+<div style={{fontSize:18,fontWeight:800,color:"var(--text-danger)",marginBottom:8,display:"flex",alignItems:"center",gap:6}}><AlertTriangle size={18}/> 試合データを削除</div>
+<div style={{fontSize:15,color:"var(--text-primary)",marginBottom:6}}>以下の試合データを完全に削除しますか?</div>
+<div style={{background:"rgba(0,0,0,0.04)",borderRadius:8,padding:10,marginBottom:6,fontSize:14}}>
+<div style={{fontWeight:700}}>{new Date(deleteConf.d).toLocaleDateString("ja-JP")} {new Date(deleteConf.d).toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"})}</div>
+<div style={{color:"#555",marginTop:2}}>{deleteConf.players.length}人戦: {deleteConf.players.join(", ")}</div>
+</div>
+<div style={{fontSize:13,color:"var(--text-danger)",marginBottom:16}}>この操作は元に戻せません。参加者全員のスタッツとスコア表データが削除されます。</div>
+<div style={{display:"flex",gap:8}}>
+<button onClick={()=>{deleteGameByKey(deleteConf.d);setStats({...loadStats()});setDeleteConf(null);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>削除する</button>
+<button onClick={()=>setDeleteConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
+</div>
 </div></div>}
 
   </div>);
