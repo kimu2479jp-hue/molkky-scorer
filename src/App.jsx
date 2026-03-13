@@ -739,7 +739,8 @@ const rawW=Math.min(maxCW,maxCH/1.375);
 const shrink=isTabletSA?(maxPT>=4?0.9:0.84):1;
 const cardW=isTabletSA?Math.max(60,Math.min(220,Math.floor(rawW*shrink))):75;
 const cardH=isTabletSA?Math.round(cardW*1.375):103;
-const cx=vwSA/2;const deckCx=isTabletSA?margin+colW2*(nTeams-1)+colW2/2:cx;const cy=viewH*(isTabletSA?0.20:0.18);
+const cx=vwSA/2;const deckCx=isTabletSA?margin+colW2*(nTeams-1)+colW2/2:cx;const cy=viewH*(isTabletSA?0.20:0.18)-(isTabletSA?cardH/5:0);
+const actualCardHeight=maxPT*(cardH+cardGap)-cardGap+40;const availSpace=cardAreaBot-cardAreaTop;const bottomGap=availSpace-actualCardHeight;const cardAreaTopAdj=bottomGap>0?cardAreaTop+bottomGap*0.5:cardAreaTop;
 /* Timing */
 const T=skipIntro?{p0:0,p1:0,p1e:0,p2:0,p2e:0,p3:0,p3e:dealDur,p4:dealDur}:{p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur};
 const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(null);const frameRef=useRef(null);
@@ -748,7 +749,7 @@ const[closing,setClosing]=useState(false);const closeTRef=useRef(null);const[ski
 const revealPos=useRef(shuf(names.map((_,i)=>i))).current;
 const lastActivityRef=useRef(Date.now());
 /* Team slot positions: columns for dealt cards */
-const teamSlots=teams.map((_,i)=>({x:margin+colW2*i+colW2/2,yStart:cardAreaTop+24}));
+const teamSlots=teams.map((_,i)=>({x:margin+colW2*i+colW2/2,yStart:cardAreaTopAdj+24}));
 /* Initial card positions: scattered */
 const spreadX=isTabletSA?240:130;const spreadY=isTabletSA?180:80;
 const initPos=useRef(names.map((_,i)=>({x:cx-cardW/2+((i%3)-1)*spreadX,y:(isTabletSA?40:30)+Math.floor(i/3)*spreadY}))).current;
