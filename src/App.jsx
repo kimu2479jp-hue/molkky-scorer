@@ -813,19 +813,14 @@ if(tLocal<liftD)return 0;if(tLocal<liftD+flipD){return((tLocal-liftD)/flipD)*180
 const dealerY=phase>=3?viewH*0.08:viewH*0.15;
 const dealerScale=phase===0?1+Math.min(t/2,1)*0.8:1.8;
 const dealerOp=phase>=4?0.4:Math.min(t*2,1);
-const headSz=isTabletSA?100:50;const bodW=isTabletSA?120:60;const bodH=isTabletSA?140:70;
 const overlayOp=closing?0:1;
 /* Corner number/suit font sizes proportional to card */
 const cornerNum=isTabletSA?Math.round(cardH*0.18):20;const cornerSuit=isTabletSA?Math.round(cardH*0.16):18;
 try{
 return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*overlayOp)+")",zIndex:9000,pointerEvents:"auto",transition:closing?"opacity 0.4s ease":"none",opacity:closing?0:1}}>
-{/* Dealer CSS figure */}
-<div style={{position:"fixed",left:cx-(isTabletSA?60:40),top:dealerY-(isTabletSA?130:80),opacity:dealerOp*0.7,transform:"scale("+dealerScale+")",transformOrigin:"50% 80%",transition:"none",willChange:"transform",zIndex:9000}}>
-<div style={{width:headSz,height:headSz,borderRadius:headSz/2,background:"#555",margin:"0 auto"}}/>
-<div style={{width:bodW,height:bodH,borderRadius:"8px 8px 0 0",background:"#333",margin:"-5px auto 0",display:"flex",alignItems:"flex-end",justifyContent:"center",paddingBottom:isTabletSA?12:8}}>
-<div style={{width:isTabletSA?30:20,height:isTabletSA?21:14,borderRadius:isTabletSA?5:3,background:"#e74c3c",border:(isTabletSA?3:2)+"px solid #fff",transform:"rotate(-10deg)"}}/>
-<div style={{width:isTabletSA?30:20,height:isTabletSA?21:14,borderRadius:isTabletSA?5:3,background:"#2b7de9",border:(isTabletSA?3:2)+"px solid #fff",marginLeft:isTabletSA?-9:-6,transform:"rotate(10deg)"}}/>
-</div>
+{/* Dealer character image */}
+<div style={{position:"fixed",left:cx-(isTabletSA?80:50),top:dealerY-(isTabletSA?180:110),opacity:dealerOp,transform:"scale("+dealerScale+")",transformOrigin:"50% 80%",transition:"none",willChange:"transform",zIndex:9000,pointerEvents:"none"}}>
+<img src="/dealer-character.png" alt="" style={{width:isTabletSA?160:100,height:isTabletSA?160:100,objectFit:"contain",pointerEvents:"none",filter:"drop-shadow(0 4px 12px rgba(0,0,0,0.5))"}}/>
 </div>
 {/* Flash effect */}
 {flash&&<div style={{position:"fixed",inset:0,background:"rgba(255,255,255,0.2)",zIndex:9050,pointerEvents:"none"}}/>}
