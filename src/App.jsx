@@ -1846,10 +1846,10 @@ const LB_ADJ=[{dx:0,dy:-20},{dx:30,dy:-8},{dx:30,dy:8},{dx:14,dy:20},{dx:-14,dy:
 const MX_ADJ=[{dx:0,dy:6},{dx:18,dy:0},{dx:18,dy:0},{dx:8,dy:-4},{dx:-8,dy:-4},{dx:-18,dy:0},{dx:-18,dy:0}];
 function RadarChart({playersData,size}){
 const isTablet=typeof window!=="undefined"&&window.innerWidth>=768;
-const S=isTablet?952:size||600;
+const S=isTablet?1200:size||600;
 const rRatio=0.28;
-const lbDist=isTablet?136:72;
-const mxDist=isTablet?37:22;
+const lbDist=isTablet?160:72;
+const mxDist=isTablet?42:22;
 const lbFS=isTablet?30:16;
 const mxFS=isTablet?29:17;
 const lbDy=isTablet?34:21;
@@ -2281,7 +2281,7 @@ return(<button key={k} onClick={applyPreset} style={{padding:"6px 12px",border:"
 <div style={{display:"grid",gridTemplateColumns:isTab?"1fr 1fr":"1fr",gap:14,marginBottom:14}}>
 {/* SVG Radar (7-axis) */}
 <div style={{background:"var(--bg-surface)",borderRadius:14,padding:14,border:"1px solid var(--border-input)"}}>
-<div style={{display:"flex",justifyContent:"center"}}><RadarChart playersData={playersData} size={isTab?420:320}/></div>
+<div style={{display:"flex",justifyContent:"center"}}><RadarChart playersData={playersData} size={isTab?600:340}/></div>
 <div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap",marginTop:4}}>{playersData.map(pd=>(<div key={pd.name} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:10,height:10,borderRadius:5,background:pd.color}}/><span style={{fontSize:12,fontWeight:700,color:"#333"}}>{pd.name}</span></div>))}</div>
 </div>
 </div>
