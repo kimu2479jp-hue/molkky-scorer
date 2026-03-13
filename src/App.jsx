@@ -731,14 +731,14 @@ const vwSA=typeof window!=="undefined"?window.innerWidth:375;const isTabletSA=vw
 const viewH=typeof window!=="undefined"?window.innerHeight:700;
 const maxPT=Math.max(...teams.map(tm=>tm.players.length));
 /* Dynamic card sizing: ratio 1:1.375 (card_back.JPG aspect) */
-const margin=isTabletSA?32:16;const cardAreaTop=viewH*(isTabletSA?0.28:0.32);const cardAreaBot=viewH-30;
+const margin=isTabletSA?32:16;const cardAreaTop=viewH*(isTabletSA?0.25:0.32);const cardAreaBot=viewH-30;
 const availW=vwSA-margin*2;const availH2=cardAreaBot-cardAreaTop;
 const colW2=availW/nTeams;const cardGap=isTabletSA?8:4;
 const maxCW=colW2-cardGap*2;const maxCH=(availH2-(maxPT-1)*cardGap-40)/maxPT;
 const rawW=Math.min(maxCW,maxCH/1.375);
-const cardW=isTabletSA?Math.max(60,Math.min(200,Math.floor(rawW))):75;
+const cardW=isTabletSA?Math.max(60,Math.min(220,Math.floor(rawW))):75;
 const cardH=isTabletSA?Math.round(cardW*1.375):103;
-const cx=vwSA/2;const deckCx=isTabletSA?margin+colW2*(nTeams-1)+colW2/2:cx;const cy=viewH*(isTabletSA?0.15:0.18);
+const cx=vwSA/2;const deckCx=isTabletSA?margin+colW2*(nTeams-1)+colW2/2:cx;const cy=viewH*(isTabletSA?0.17:0.18);
 /* Timing */
 const T=skipIntro?{p0:0,p1:0,p1e:0,p2:0,p2e:0,p3:0,p3e:dealDur,p4:dealDur}:{p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur};
 const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(null);const frameRef=useRef(null);
@@ -810,7 +810,7 @@ const liftD=0.3,flipD=0.5;
 if(tLocal<liftD)return 0;if(tLocal<liftD+flipD){return((tLocal-liftD)/flipD)*180;}return 180;
 };
 /* Dealer position and size */
-const dealerY=phase>=3?viewH*0.05:viewH*0.10;
+const dealerY=phase>=3?viewH*(isTabletSA?0.12:0.05):viewH*(isTabletSA?0.12:0.10);
 const dealerScale=phase===0?1+Math.min(t/2,1)*0.8:1.8;
 const dealerOp=phase>=4?0.4:Math.min(t*2,1);
 const overlayOp=closing?0:1;
