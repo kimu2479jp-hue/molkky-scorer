@@ -198,7 +198,7 @@ _persistReplays();
 _debouncedSync();
 }
 
-function deleteGameByKey(gameKey){
+async function deleteGameByKey(gameKey){
 const stats=_cache.stats;
 let deleted=false;
 for(const nm in stats){
@@ -213,7 +213,8 @@ if(replays[gameKey]){
 delete replays[gameKey];
 _persistReplays();
 }
-_debouncedSync();
+/* 即時pushでサーバーのデータを更新（削除データの復活を防止） */
+await pushToServer().catch(e=>console.error("delete sync error",e));
 return deleted;
 }
 
@@ -291,6 +292,20 @@ const ws=scoreOf(history,winner);
 if(ws===WIN)return"50finish";
 return"dq";
 })();
+/* Game-wide info: all player names, winner name, winner team members */
+const allPlayerNames=[];
+teams.forEach(t=>{t.players.forEach(p=>{const nm=typeof p==="object"?p.name:p;if(!allPlayerNames.includes(nm))allPlayerNames.push(nm);});});
+let gameWinnerName=null;
+const gameWinnerMembers=[];
+if(winner!==null){
+const wTeam=teams[winner];
+if(wTeam){
+wTeam.players.forEach(p=>{const nm=typeof p==="object"?p.name:p;gameWinnerMembers.push(nm);});
+const wturns=history.filter(h=>h.teamIndex===winner);
+const lastThrow=wturns.length>0?wturns[wturns.length-1]:null;
+if(lastThrow){const wp=wTeam.players[lastThrow.playerIndex];gameWinnerName=wp?(typeof wp==="object"?wp.name:wp):null;}
+}
+}
 teams.forEach((t,ti)=>{t.players.forEach(p=>{
 const nm=typeof p==="object"?p.name:p;
 if(!favs.includes(nm))return;
@@ -325,7 +340,7 @@ const tMax=times.length>0?Math.max(...times):null;
 const tAvg=times.length>0?times.reduce((a,b)=>a+b,0)/times.length:null;
 /* winner name for display */
 const winnerName=winner!==null?teams[winner].players.map(p2=>typeof p2==="object"?p2.name:p2).find((_,pi)=>{const wturns=history.filter(h=>h.teamIndex===winner);const last=wturns[wturns.length-1];return last&&last.playerIndex===pi;})||"":null;
-records.push({nm,data:{d,de:gameEnd,t:turns.length,s:totalPts,m:misses,f:faults,w:won?1:0,o:ojama.success,oa:ojama.attempts,fa:finA,fs:finS,hs:highScores,rc:rec,br:breakScore,tMin,tMax,tAvg,ft:finishType,sv:scoreValues,fo:isFirstOrder?1:0,tv:turnValues}});
+records.push({nm,data:{d,de:gameEnd,t:turns.length,s:totalPts,m:misses,f:faults,w:won?1:0,o:ojama.success,oa:ojama.attempts,fa:finA,fs:finS,hs:highScores,rc:rec,br:breakScore,tMin,tMax,tAvg,ft:finishType,sv:scoreValues,fo:isFirstOrder?1:0,tv:turnValues,ap:allPlayerNames,wn:gameWinnerName,wm:gameWinnerMembers}});
 });});
 return records;
 }
@@ -574,9 +589,14 @@ names.forEach(nm=>{(stats[nm]||[]).forEach(g=>{
 const key=g.d;
 if(!gameMap.has(key)){gameMap.set(key,{d:g.d,de:g.de,players:[],records:[],ft:g.ft||"unknown",winnerMembers:[],hasReplay:!!replays[g.d]});}
 const gm=gameMap.get(key);
-if(!gm.players.includes(nm))gm.players.push(nm);
+/* Use ap (all players) field if available, otherwise fallback to fav name */
+if(g.ap&&g.ap.length>0){g.ap.forEach(p=>{if(!gm.players.includes(p))gm.players.push(p);});}
+else{if(!gm.players.includes(nm))gm.players.push(nm);}
 gm.records.push({nm,data:g});
-if(g.w===1){
+/* Use wn/wm fields if available, otherwise fallback to fav-based detection */
+if(g.wn&&!gm.winnerName)gm.winnerName=g.wn;
+if(g.wm&&g.wm.length>0){g.wm.forEach(m=>{if(!gm.winnerMembers.includes(m))gm.winnerMembers.push(m);});}
+else if(g.w===1){
 if(!gm.winnerName)gm.winnerName=nm;
 if(!gm.winnerMembers.includes(nm))gm.winnerMembers.push(nm);
 }
@@ -2339,7 +2359,7 @@ return(<div key={pd.name} style={{marginBottom:12}}>
 </div>
 <div style={{fontSize:13,color:"var(--text-danger)",marginBottom:16}}>この操作は元に戻せません。参加者全員のスタッツとスコア表データが削除されます。</div>
 <div style={{display:"flex",gap:8}}>
-<button onClick={()=>{deleteGameByKey(deleteConf.d);setStats({...loadStats()});setDeleteConf(null);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>削除する</button>
+<button onClick={async()=>{await deleteGameByKey(deleteConf.d);setStats({...loadStats()});setDeleteConf(null);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>削除する</button>
 <button onClick={()=>setDeleteConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
 </div>
 </div></div>}
