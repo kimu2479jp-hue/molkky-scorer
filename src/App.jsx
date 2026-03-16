@@ -1,25 +1,12 @@
 import React, { useState, useReducer, useRef, useEffect, useCallback } from "react";
 import { Target, BarChart3, Lock, Cloud, Settings, Bot, Upload, Camera, MessageCircle, RefreshCw, Trophy, Star, ClipboardList, ChevronLeft, Users, Undo2, AlertTriangle, Shield, Trash2 } from "lucide-react";
 
-const MAX_TEAMS=4,MAX_PL=4,MAX_SHUF=16,MAX_NAME=7,WIN=50,RST=25,PEN=37,MF=3;
-const C=[
-{bg:"#14365a",lt:"#e6f0fb",ac:"#2b7de9",tx:"#14365a",nm:"#c8dfff"},
-{bg:"#6b1d30",lt:"#fbe6ec",ac:"#d93a5e",tx:"#6b1d30",nm:"#ffc8d6"},
-{bg:"#1a5c3a",lt:"#e6faf0",ac:"#22b566",tx:"#1a5c3a",nm:"#b8ffd8"},
-{bg:"#6b5a1d",lt:"#fbf5e6",ac:"#d9a83a",tx:"#6b5a1d",nm:"#ffe8a0"},
-];
-const PC=["#2b7de9","#d93a5e","#22b566","#d9a83a","#9b59b6","#e67e22","#1abc9c","#e74c3c"];
-const H1=30;
-const BLINK_ID="mk-blink-style";
-const MASCOT_S = "/molkky_mascot_transparent.png";
-const MASCOT_R = "/molkky_mascot_transparent.png";
+import { MAX_TEAMS,MAX_PL,MAX_SHUF,MAX_NAME,WIN,RST,PEN,MF,C,PC,H1,BLINK_ID,MASCOT_S,MASCOT_R,LS_KEY,LS_FAV_BK,MAX_FAV,STATS_KEY,PROGRESS_KEY,SYNC_CODE_KEY,PIN_LOCKOUT_KEY,PIN_AUTH_TS_KEY,AI_ENABLED_KEY,ANALYSIS_TOTAL_KEY,ANALYSIS_LIMIT_KEY,ANALYSIS_DAILY_MAX,ANALYSIS_CACHE_DAYS,REPLAY_KEY,IDB_NAME,IDB_VER,MAX_GAMES,MAX_REPLAYS,MAX_SYNC_CODES,SHUF_ANIM_KEY,DEV_MASTER_LIST } from "./constants.js";
 function ensureBlink(){if(document.getElementById(BLINK_ID))return;const s=document.createElement("style");s.id=BLINK_ID;s.textContent="@keyframes mk-blink{0%,100%{background:rgba(43,125,233,0.12)}50%{background:rgba(43,125,233,0.45)}}";document.head.appendChild(s);}
 /* C: Prevent iOS context menu on buttons */
 if(typeof document!=="undefined"){document.addEventListener("contextmenu",e=>{if(e.target&&!e.target.matches("input,textarea,a[href]"))e.preventDefault();},{passive:false});}
 
 /* ═══ Favorites ═══ */
-const LS_KEY="mk-fav";
-const LS_FAV_BK="mk-fav-bk";
 function loadFavs(){
 try{
 let f=JSON.parse(localStorage.getItem(LS_KEY));
@@ -36,27 +23,9 @@ return[];
 }
 function _saveFavsRaw(l){try{localStorage.setItem(LS_KEY,JSON.stringify(l));localStorage.setItem(LS_FAV_BK,JSON.stringify(l));}catch(e){}}
 function saveFavs(l){_saveFavsRaw(l);_debouncedSync();}
-const MAX_FAV=99;
 function useFavs(){const[f,sF]=useState(()=>loadFavs());return{favs:f,addF:n=>{const x=n.trim().slice(0,MAX_NAME);if(x&&!f.includes(x)&&f.length<MAX_FAV){const u=[...f,x];sF(u);saveFavs(u);}},rmF:n=>{const u=f.filter(v=>v!==n);sF(u);saveFavs(u);},editF:(oldName,newName)=>{const x=newName.trim().slice(0,MAX_NAME);if(!x||x===oldName||!f.includes(oldName))return false;if(f.includes(x))return false;const u=f.map(v=>v===oldName?x:v);sF(u);saveFavs(u);renamePlayerData(oldName,x);return true;}};}
 
 /* ═══ Stats Storage — IndexedDB with in-memory cache (100K games) ═══ */
-const STATS_KEY="mk-player-stats";
-const PROGRESS_KEY="mk-game-progress";
-const SYNC_CODE_KEY="mk-sync-code";
-const PIN_LOCKOUT_KEY="mk-pin-lockout";
-const PIN_AUTH_TS_KEY="mk-pin-auth-ts";
-const AI_ENABLED_KEY="mk-ai-enabled";
-const ANALYSIS_TOTAL_KEY="mk-analysis-total";
-const ANALYSIS_LIMIT_KEY="mk-analysis-daily";
-const ANALYSIS_DAILY_MAX=20;
-const ANALYSIS_CACHE_DAYS=32;
-const REPLAY_KEY="mk-game-replays";
-const IDB_NAME="mk-molkky-db";
-const IDB_VER=2;
-const MAX_GAMES=100000;
-const MAX_REPLAYS=100000;
-const MAX_SYNC_CODES=1;
-const SHUF_ANIM_KEY="mk-shuffle-anim";
 function getShufAnim(){try{const v=localStorage.getItem(SHUF_ANIM_KEY);return v===null?true:v==="true";}catch(e){return true;}}
 function setShufAnimLS(v){try{localStorage.setItem(SHUF_ANIM_KEY,v?"true":"false");}catch(e){}}
 
@@ -936,7 +905,6 @@ boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+glowSh,display:"flex",alignItems:"center"
 }catch(e){console.error("ShuffleAnimation error:",e);try{onDone();}catch(e2){}return null;}
 }
 
-const DEV_MASTER_LIST=["キムラ"];
 function SmartFavPicker({favs,stats,usedNames,onAdd,onClose,maxMembers,currentCount,minMembers}){
 const usedSet=new Set(Array.isArray(usedNames)?usedNames:[]);
 const[selected,setSelected]=useState(()=>{const s=new Set();const showDev=(()=>{try{if(localStorage.getItem("mk-dev-master")==="1")return true;const params=new URLSearchParams(window.location.search);if(params.get("dev")==="1")return true;return false;}catch(e){return false;}})();if(showDev){DEV_MASTER_LIST.forEach(n=>{if(favs.includes(n)&&!usedSet.has(n))s.add(n);});}return s;});
