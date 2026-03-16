@@ -742,7 +742,7 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 function CSSConfetti(){const colors=["#2b7de9","#d93a5e","#22b566","#d9a83a","#9b59b6","#e67e22","#1abc9c","#e74c3c","#ffd700","#ff69b4"];const pieces=Array.from({length:50},(_,i)=>({id:i,left:Math.random()*100,delay:Math.random()*2,color:colors[i%colors.length],size:6+Math.random()*8,shape:Math.random()>0.5?"50%":"0"}));return(<div className="mk-confetti-container">{pieces.map(p=>(<div key={p.id} className="mk-confetti-piece" style={{left:p.left+"%",width:p.size,height:p.size,background:p.color,borderRadius:p.shape,animationDelay:p.delay+"s"}}/>))}</div>);}
 
 /* ═══ Shuffle Card Animation ═══ */
-function ShuffleAnimation({names,teams,onDone,skipIntro,remainingDeck,isLastCourt,courtLabel,isMultiCourt,onSkipThisCourt,onSkipAll}){
+function ShuffleAnimation({names,teams,onDone,skipIntro,remainingDeck,isLastCourt,courtLabel,isMultiCourt,onSkipThisCourt,onSkipAll,onStartGame,onReshuffle}){
 const nCards=names.length;const nTeams=teams.length;
 const shufDur=nCards<=4?2:nCards<=6?3:nCards<=8?3.5:4;
 const perCard=2.8;const dealDur=nCards*perCard;
@@ -765,7 +765,7 @@ const actualCardHeight=maxPT*(cardH+cardGap)-cardGap+40;const availSpace=cardAre
 const T=skipIntro?{p0:0,p1:0,p1e:0,p2:0,p2e:0,p3:0,p3e:dealDur,p4:dealDur}:{p0:0,p1:2,p1e:2.5,p2:2.5,p2e:2.5+shufDur,p3:2.5+shufDur,p3e:2.5+shufDur+dealDur,p4:2.5+shufDur+dealDur};
 const[phase,setPhase]=useState(0);const[t,setT]=useState(0);const startRef=useRef(null);const frameRef=useRef(null);
 const[flash,setFlash]=useState(false);const dealIdxRef=useRef(-1);const revealTeamRef=useRef(-1);
-const[closing,setClosing]=useState(false);const closeTRef=useRef(null);const[skipConfirm,setSkipConfirm]=useState(false);
+const[closing,setClosing]=useState(false);const closingActionRef=useRef(null);const closeTRef=useRef(null);const[skipConfirm,setSkipConfirm]=useState(false);
 const revealPos=useRef(shuf(names.map((_,i)=>i))).current;
 const lastActivityRef=useRef(Date.now());
 /* Team slot positions: columns for dealt cards */
@@ -779,13 +779,13 @@ if(el<T.p1)setPhase(0);
 else if(el<T.p1e)setPhase(1);
 else if(el<T.p2e){setPhase(2);const shufT=el-T.p2;if(shufT>0.3&&shufT<shufDur-0.3&&Math.random()<0.04)setFlash(true);}
 else if(el<T.p3e){setPhase(3);const dT=el-T.p3;const di=Math.floor(dT/perCard);if(di!==dealIdxRef.current&&di<nCards){dealIdxRef.current=di;lastActivityRef.current=Date.now();}}
-else if(isLastCourt){setPhase(5);if(el>=T.p3e+1.0&&!closing){setClosing(true);}}else{setPhase(4);lastActivityRef.current=Date.now();const rT=el-T.p4;const ri=Math.floor(rT/(0.8/nTeams));if(ri!==revealTeamRef.current&&ri<nTeams){revealTeamRef.current=ri;}}
+else{setPhase(4);lastActivityRef.current=Date.now();const rT=el-T.p4;const ri=Math.floor(rT/(0.8/nTeams));if(ri!==revealTeamRef.current&&ri<nTeams){revealTeamRef.current=ri;}}
 frameRef.current=requestAnimationFrame(animate);};
 frameRef.current=requestAnimationFrame(animate);
 return()=>{if(frameRef.current)cancelAnimationFrame(frameRef.current);};
 },[]);
 useEffect(()=>{if(flash){const tid=setTimeout(()=>setFlash(false),100);return()=>clearTimeout(tid);}},[flash]);
-useEffect(()=>{if(closing){closeTRef.current=setTimeout(()=>onDone(),400);return()=>clearTimeout(closeTRef.current);}},[closing]);
+useEffect(()=>{if(closing){closeTRef.current=setTimeout(()=>{const action=closingActionRef.current;if(action==="start"&&onStartGame)onStartGame();else if(action==="reshuffle"&&onReshuffle)onReshuffle();else onDone();},400);return()=>clearTimeout(closeTRef.current);}},[closing]);
 /* Safety valve: update activity on phase change + timeout based on total duration */
 useEffect(()=>{lastActivityRef.current=Date.now();},[phase]);
 useEffect(()=>{const totalDuration=(T.p4+5)*1000;const safetyId=setInterval(()=>{if(Date.now()-lastActivityRef.current>Math.max(totalDuration,15000)&&!closing){try{onDone();}catch(e){}}},3000);return()=>clearInterval(safetyId);},[closing]);
@@ -820,13 +820,12 @@ if(tLocal<perCard){const prog=(tLocal-liftD-flipD-holdD-moveD)/landD;
 const sc=prog<0.6?0.3+0.75*(prog/0.6):1.05-0.05*((prog-0.6)/0.4);
 return{left:targetX,top:targetY,scale:sc,opacity:1,zIndex:9001+idx,rotate:0};}
 return{left:targetX,top:targetY,scale:1,opacity:1,zIndex:9001+idx,rotate:0};}
-if(phase===5){return{left:targetX,top:targetY,scale:1,opacity:1,zIndex:9001+idx,rotate:0};}
 if(phase===4){return{left:targetX,top:targetY,scale:1,opacity:0,zIndex:9001+idx,rotate:0};}
 return{left:cx-cardW/2,top:cy-cardH/2,scale:1,opacity:0,zIndex:9001,rotate:0};
 };
 /* Compute flip degree for CSS 3D card rotation */
 const getFlipDeg=(idx)=>{
-if(phase<=2)return 0;if(phase>=4||phase===5)return 180;
+if(phase<=2)return 0;if(phase>=4)return 180;
 const cardDealTime=T.p3+revealPos[idx]*perCard;const tLocal=t-cardDealTime;
 const liftD=0.3,flipD=0.5;
 if(tLocal<liftD)return 0;if(tLocal<liftD+flipD){return((tLocal-liftD)/flipD)*180;}return 180;
@@ -903,7 +902,17 @@ boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+glowSh,display:"flex",alignItems:"center"
 </div>
 </div>))}
 </div>
-<button onClick={()=>setClosing(true)} style={{marginTop:isTabletSA?28:20,padding:isTabletSA?"16px 40px":"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?28:18,fontWeight:800,cursor:"pointer",opacity:Math.min(1,Math.max(0,(t-T.p4-0.5)/0.3)),transition:"opacity 0.2s"}}>{isMultiCourt&&!isLastCourt?"次のコートへ ▶":"閉じる"}</button>
+{!isMultiCourt&&onStartGame&&onReshuffle?(
+<div style={{display:"flex",flexDirection:"column",gap:isTabletSA?12:8,marginTop:isTabletSA?28:20,width:"100%",maxWidth:isTabletSA?400:280,alignItems:"center"}}>
+<button onClick={()=>{closingActionRef.current="start";setClosing(true);}} style={{width:"100%",padding:isTabletSA?"16px 0":"14px 0",border:"none",borderRadius:isTabletSA?14:12,background:"linear-gradient(135deg,#2b7de9,#22b566)",color:"#fff",fontSize:isTabletSA?24:18,fontWeight:900,cursor:"pointer",letterSpacing:2}}>試合開始</button>
+<div style={{display:"flex",gap:isTabletSA?12:8,width:"100%"}}>
+<button onClick={()=>{closingActionRef.current="reshuffle";setClosing(true);}} style={{flex:1,padding:isTabletSA?"14px 0":"12px 0",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?20:15,fontWeight:800,cursor:"pointer"}}>再シャッフル</button>
+<button onClick={()=>{closingActionRef.current=null;setClosing(true);}} style={{flex:1,padding:isTabletSA?"14px 0":"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:isTabletSA?14:12,background:"transparent",color:"rgba(255,255,255,0.7)",fontSize:isTabletSA?20:15,fontWeight:700,cursor:"pointer"}}>戻る</button>
+</div>
+</div>
+):(
+<button onClick={()=>{closingActionRef.current=null;setClosing(true);}} style={{marginTop:isTabletSA?28:20,padding:isTabletSA?"16px 40px":"14px 48px",border:"2px solid rgba(255,255,255,0.5)",borderRadius:isTabletSA?14:12,background:"transparent",color:"#fff",fontSize:isTabletSA?28:18,fontWeight:800,cursor:"pointer",opacity:Math.min(1,Math.max(0,(t-T.p4-0.5)/0.3)),transition:"opacity 0.2s"}}>{isMultiCourt&&!isLastCourt?"次のコートへ ▶":isMultiCourt&&isLastCourt?"コート一覧へ ▶":"閉じる"}</button>
+)}
 </div>)}
 {/* Court label for multi-court */}
 {courtLabel&&<div style={{position:"fixed",top:"calc(16px + env(safe-area-inset-top, 0px))",left:isTabletSA?32:16,zIndex:9200,pointerEvents:"none"}}><span style={{fontSize:isTabletSA?22:16,fontWeight:900,color:"rgba(255,255,255,0.9)",background:"rgba(0,0,0,0.5)",padding:isTabletSA?"8px 24px":"6px 16px",borderRadius:12,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>{courtLabel}</span></div>}
@@ -1585,7 +1594,7 @@ return(
 {showSetupStats&&<StatsModal onClose={()=>setShowSetupStats(false)} source="setup" isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
 {showSmartFav&&<SmartFavPicker favs={favs} stats={_cache.stats} usedNames={used} maxMembers={maxShufForCourt} currentCount={used.length} minMembers={courtCount===1?tc:totalTeamsMulti} onAdd={({toAdd,toRemove})=>{setMems(prev=>{let updated=[...prev];if(toRemove&&toRemove.length>0){updated=updated.filter(m=>!toRemove.includes(m));}let ai=0;for(let i=0;i<updated.length&&ai<toAdd.length;i++){if(!updated[i].trim()){updated[i]=toAdd[ai++];}}while(ai<toAdd.length&&updated.length<maxShufForCourt){updated.push(toAdd[ai++]);}const filled=updated.filter(m=>m.trim()).length;const minReq=courtCount===1?tc:totalTeamsMulti;if(filled<minReq){window.alert("最低"+minReq+"人必要です");return prev;}return updated;});setSp(null);setAllCourtData(null);}} onClose={()=>setShowSmartFav(false)}/>}
 {showSettings&&<SettingsPage onClose={()=>setShowSettings(false)} isAdmin={isAdmin} onAdminToggle={onAdminToggle} aiEnabled={aiEnabled} onAIToggle={onAIToggle} shufAnim={shufAnim} onShufAnimToggle={onShufAnimToggle}/>}
-{shufAnimData&&<ShuffleAnimation names={shufAnimData.names} teams={shufAnimData.teams} onDone={()=>{if(shufAnimData.goData){const{ft,ord}=shufAnimData.goData;setShufAnimData(null);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats,courtCount,courtCount>=2&&allCourtData?{courtCount,courtTeamCounts,courtData:allCourtData}:null);}else{setSp(shufAnimData.teams);setShufAnimData(null);}}}/>}
+{shufAnimData&&<ShuffleAnimation names={shufAnimData.names} teams={shufAnimData.teams} onDone={()=>{if(shufAnimData.goData){const{ft,ord}=shufAnimData.goData;setShufAnimData(null);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats,courtCount,courtCount>=2&&allCourtData?{courtCount,courtTeamCounts,courtData:allCourtData}:null);}else{setSp(shufAnimData.teams);setShufAnimData(null);}}} onStartGame={shufAnimData.goData?null:()=>{const ft=shufAnimData.teams;const ord=Array.from({length:ft.length},(_,i)=>i);setShufAnimData(null);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats,courtCount,null);}} onReshuffle={shufAnimData.goData?null:()=>{setShufAnimData(null);setTimeout(()=>doShuf(),100);}}/>}
 {multiCourtShufData&&<MultiCourtShuffleManager courtData={multiCourtShufData.courtData} courtCount={courtCount} courtOrder={multiCourtShufData.courtOrder} onAllDone={(data)=>{setMultiCourtShufData(null);setAllCourtData(data);setSp(data[1]);setShowCourtOverview(true);if(_db&&courtCount>=2)idbSet(_db,"court-allocation",{courtCount,courtTeamCounts,courtData:data,numGames,bestOf,dqEnd,saveToStats,savedAt:new Date().toISOString()}).then(()=>{if(_db)idbDel(_db,"setup-draft").catch(e=>{});}).catch(e=>console.error("court-allocation save error",e));}} onSkipAll={(data)=>{setMultiCourtShufData(null);setAllCourtData(data);setSp(data[1]);setShowCourtOverview(true);if(_db&&courtCount>=2)idbSet(_db,"court-allocation",{courtCount,courtTeamCounts,courtData:data,numGames,bestOf,dqEnd,saveToStats,savedAt:new Date().toISOString()}).then(()=>{if(_db)idbDel(_db,"setup-draft").catch(e=>{});}).catch(e=>console.error("court-allocation save error",e));}}/>}
 {showCourtOverview&&allCourtData&&<CourtOverview courtData={allCourtData} courtCount={courtCount} courtTeamCounts={courtTeamCounts} numGames={numGames} bestOf={bestOf} dqEnd={dqEnd} saveToStats={saveToStats} onStartGame={(teams,order)=>{setShowCourtOverview(false);onStart(teams,order,numGames,bestOf,dqEnd,saveToStats,courtCount,{courtCount,courtTeamCounts,courtData:allCourtData});}} onBack={()=>{setShowCourtOverview(false);if(allCourtData){const allNames=[];for(let c=1;c<=courtCount;c++){const teams=allCourtData[c]||[];teams.forEach(t=>t.players.forEach(p=>{const nm=typeof p==="string"?p:(typeof p==="object"?(p.name||""):String(p));if(nm.trim())allNames.push(nm);}));}if(allNames.length>0)setMems(allNames);}}}/>}
 {trimConfirm&&(<div style={{position:"fixed",inset:0,zIndex:9300,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
