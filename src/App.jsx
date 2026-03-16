@@ -2,22 +2,17 @@ import React, { useState, useEffect } from "react";
 import { Target, RefreshCw, Trophy } from "lucide-react";
 
 import { PROGRESS_KEY } from "./constants.js";
-import { _db, _cache, idbGet, idbSet, idbDel, initDB, getShufAnim, setShufAnimLS, _saveFavsRaw } from "./db.js";
-import { getSyncCode, _debouncedSync, pullFromServer } from "./sync.js";
+import { _db, _cache, idbGet, idbSet, idbDel, initDB, getShufAnim, setShufAnimLS } from "./db.js";
+import { getSyncCode, pullFromServer } from "./sync.js";
 import { getAIEnabled, setAIEnabledLS } from "./analysis.js";
 import { SetupScreen } from "./components/SetupScreen.jsx";
-import { GameScreen, OrderPicker, useFavs } from "./components/GameScreen.jsx";
+import { GameScreen, useFavs } from "./components/GameScreen.jsx";
 import { GameResult } from "./components/GameResult.jsx";
 import { StatsModal } from "./components/StatsModal.jsx";
 /* C: Prevent iOS context menu on buttons */
 if(typeof document!=="undefined"){document.addEventListener("contextmenu",e=>{if(e.target&&!e.target.matches("input,textarea,a[href]"))e.preventDefault();},{passive:false});}
 
-/* ═══ Favorites ═══ */
-function saveFavs(l){_saveFavsRaw(l);_debouncedSync();}
-
-
-
-/* ═══ Game Screen — with timing ═══ */
+/* ═══ App ═══ */
 export default function App(){
 const{favs,addF,rmF,editF}=useFavs();
 const[dbReady,setDbReady]=useState(_cache.ready);
