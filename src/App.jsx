@@ -759,7 +759,7 @@ if(el<T.p1)setPhase(0);
 else if(el<T.p1e)setPhase(1);
 else if(el<T.p2e){setPhase(2);const shufT=el-T.p2;if(shufT>0.3&&shufT<shufDur-0.3&&Math.random()<0.04)setFlash(true);}
 else if(el<T.p3e){setPhase(3);const dT=el-T.p3;const di=Math.floor(dT/perCard);if(di!==dealIdxRef.current&&di<nCards){dealIdxRef.current=di;lastActivityRef.current=Date.now();}}
-else if(isLastCourt){setPhase(5);if(el>=T.p3e+1.0&&!closing){setClosing(true);}}else{setPhase(4);const rT=el-T.p4;const ri=Math.floor(rT/(0.8/nTeams));if(ri!==revealTeamRef.current&&ri<nTeams){revealTeamRef.current=ri;lastActivityRef.current=Date.now();}}
+else if(isLastCourt){setPhase(5);if(el>=T.p3e+1.0&&!closing){setClosing(true);}}else{setPhase(4);lastActivityRef.current=Date.now();const rT=el-T.p4;const ri=Math.floor(rT/(0.8/nTeams));if(ri!==revealTeamRef.current&&ri<nTeams){revealTeamRef.current=ri;}}
 frameRef.current=requestAnimationFrame(animate);};
 frameRef.current=requestAnimationFrame(animate);
 return()=>{if(frameRef.current)cancelAnimationFrame(frameRef.current);};
