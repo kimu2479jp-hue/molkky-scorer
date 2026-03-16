@@ -5,6 +5,7 @@ import { MAX_TEAMS,MAX_PL,MAX_SHUF,MAX_NAME,WIN,RST,PEN,MF,C,PC,H1,BLINK_ID,MASC
 import { _db, _cache, idbGet, idbSet, idbDel, initDB, loadStats, loadReplays, _persistStats, _persistReplays, saveStats, getShufAnim, setShufAnimLS, loadFavs, _saveFavsRaw } from "./db.js";
 import { getSyncCode, setSyncCodeLS, getPinLockout, incPinAttempt, clearPinLockout, getPinAuthTs, setPinAuthTs, verifyPinOnServer, createPinOnServer, checkServerHasPin, maskSyncCode, _debouncedSync, pushToServer, pullFromServer } from "./sync.js";
 import { saveGameStatsToDB, deleteStatsByPeriod, deleteGameByKey, renamePlayerData, calcOjama, buildGameRecord, saveReplay, getMondayOfWeek, fmtMD, fmtHM, getAvailableSessions, getAvailableWeeks, getAvailableMonths, filterGames, calcMetrics, getAvailableGames, getGameDates, filterGamesByDates, filterGamesByKeys, getGamesForNames } from "./stats.js";
+import { getAIEnabled, setAIEnabledLS, getPlayerAnalysisCount, incPlayerAnalysisCount, getAnalysisTotal, incAnalysisTotal, _persistAnalysis, getAnalysisCached, setAnalysisCached, makeAnalysisKey, fetchPlayerAnalysis } from "./analysis.js";
 function ensureBlink(){if(document.getElementById(BLINK_ID))return;const s=document.createElement("style");s.id=BLINK_ID;s.textContent="@keyframes mk-blink{0%,100%{background:rgba(43,125,233,0.12)}50%{background:rgba(43,125,233,0.45)}}";document.head.appendChild(s);}
 /* C: Prevent iOS context menu on buttons */
 if(typeof document!=="undefined"){document.addEventListener("contextmenu",e=>{if(e.target&&!e.target.matches("input,textarea,a[href]"))e.preventDefault();},{passive:false});}
@@ -12,36 +13,6 @@ if(typeof document!=="undefined"){document.addEventListener("contextmenu",e=>{if
 /* ═══ Favorites ═══ */
 function saveFavs(l){_saveFavsRaw(l);_debouncedSync();}
 function useFavs(){const[f,sF]=useState(()=>loadFavs());return{favs:f,addF:n=>{const x=n.trim().slice(0,MAX_NAME);if(x&&!f.includes(x)&&f.length<MAX_FAV){const u=[...f,x];sF(u);saveFavs(u);}},rmF:n=>{const u=f.filter(v=>v!==n);sF(u);saveFavs(u);},editF:(oldName,newName)=>{const x=newName.trim().slice(0,MAX_NAME);if(!x||x===oldName||!f.includes(oldName))return false;if(f.includes(x))return false;const u=f.map(v=>v===oldName?x:v);sF(u);saveFavs(u);renamePlayerData(oldName,x);return true;}};}
-
-/* ═══ AI Enabled Setting ═══ */
-function getAIEnabled(){try{const v=localStorage.getItem(AI_ENABLED_KEY);return v===null?true:v==="true";}catch(e){return true;}}
-function setAIEnabledLS(v){try{localStorage.setItem(AI_ENABLED_KEY,v?"true":"false");}catch(e){}}
-
-/* ═══ Analysis Rate Limit (per-player per-day) ═══ */
-function getPlayerAnalysisCount(name){
-try{const d=JSON.parse(localStorage.getItem(ANALYSIS_LIMIT_KEY)||"{}");
-const today=new Date().toISOString().slice(0,10);
-if(d.date!==today)return 0;return(d.players&&d.players[name])||0;}catch(e){return 0;}
-}
-function incPlayerAnalysisCount(name){
-try{const today=new Date().toISOString().slice(0,10);
-const d=JSON.parse(localStorage.getItem(ANALYSIS_LIMIT_KEY)||"{}");
-if(d.date!==today){d.date=today;d.players={};}
-if(!d.players)d.players={};
-d.players[name]=(d.players[name]||0)+1;
-localStorage.setItem(ANALYSIS_LIMIT_KEY,JSON.stringify(d));
-return d.players[name];}catch(e){return 999;}
-}
-
-/* ═══ Analysis Total Counter ═══ */
-function getAnalysisTotal(){try{return parseInt(localStorage.getItem(ANALYSIS_TOTAL_KEY)||"0",10);}catch(e){return 0;}}
-function incAnalysisTotal(){try{const c=getAnalysisTotal()+1;localStorage.setItem(ANALYSIS_TOTAL_KEY,String(c));return c;}catch(e){return 0;}}
-
-/* ═══ Analysis Persistent Cache (IndexedDB) ═══ */
-function _persistAnalysis(){if(_db)idbSet(_db,"analysisCache",_cache.analysis).catch(e=>console.error("analysis persist error",e));}
-function getAnalysisCached(key){const e=_cache.analysis[key];if(!e)return null;if(Date.now()-e.t>ANALYSIS_CACHE_DAYS*86400000){delete _cache.analysis[key];_persistAnalysis();return null;}return e.text;}
-function setAnalysisCached(key,text){_cache.analysis[key]={text,t:Date.now()};_persistAnalysis();}
-function makeAnalysisKey(name,gc,m){const sf=(v,d)=>(typeof v==="number"&&!isNaN(v))?v.toFixed(d):"0";return name+"|"+gc+"|"+sf(m.missRate,3)+"|"+sf(m.finishRate,3)+"|"+sf(m.ojamaRate,3)+"|"+sf(m.winRate,3)+"|"+sf(m.avgPts,2);}
 
 /* ═══ Helpers ═══ */
 const shuf=a=>{const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;};
@@ -1373,26 +1344,6 @@ return(<div key={i} onClick={()=>{if(!isFuture)handleClick(d);}} style={{textAli
 </div>)}
 
   </div>);
-}
-
-/* ═══ AI Player Analysis — manual trigger only ═══ */
-const _analysisPending=new Set();
-async function fetchPlayerAnalysis(name,m,isAdminMode){
-const gc=m?m.gameCount:0;
-if(!m||gc<3)return{text:null,error:"3試合以上必要"};
-/* Rate limit (per-player per-day, admin exempt) */
-if(!isAdminMode){const used=getPlayerAnalysisCount(name);if(used>=ANALYSIS_DAILY_MAX)return{text:null,error:"本日の分析上限("+ANALYSIS_DAILY_MAX+"回/人)に達しました"};}
-const key=makeAnalysisKey(name,gc,m);
-if(_analysisPending.has(key))return{text:null,error:"分析中..."};
-_analysisPending.add(key);
-try{
-const res=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({gameCount:gc,winRate:m.winRate||0,missRate:m.missRate||0,finishRate:m.finishRate||0,avgPts:m.avgPts||0,breakAvg:m.breakAvg||0,ojamaRate:m.ojamaRate||0,ojamaAttempts:m.ojamaAttempts||0,recAvg:m.recAvg||0,firstWinRate:m.firstWinRate!=null?m.firstWinRate:null,lastWinRate:m.lastWinRate!=null?m.lastWinRate:null})});
-if(!res.ok){let errMsg="API "+res.status;try{const raw=await res.text();try{const ej=JSON.parse(raw);if(ej.error)errMsg=typeof ej.error==="string"?ej.error:ej.error.message||errMsg;}catch(_){if(raw)errMsg+=": "+raw.slice(0,120);}}catch(_2){}return{text:null,error:errMsg};}
-const data=await res.json();
-if(data.text){setAnalysisCached(key,data.text);incPlayerAnalysisCount(name);incAnalysisTotal();return{text:data.text,error:null};}
-return{text:null,error:data.error||"空のレスポンス"};
-}catch(e){return{text:null,error:e.message||"通信エラー"};}
-finally{_analysisPending.delete(key);}
 }
 
 /* ═══ Score Distribution Component ═══ */
