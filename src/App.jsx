@@ -2,6 +2,7 @@ import React, { useState, useReducer, useRef, useEffect, useCallback } from "rea
 import { Target, BarChart3, Lock, Cloud, Settings, Bot, Upload, Camera, MessageCircle, RefreshCw, Trophy, Star, ClipboardList, ChevronLeft, Users, Undo2, AlertTriangle, Shield, Trash2 } from "lucide-react";
 
 import { MAX_TEAMS,MAX_PL,MAX_SHUF,MAX_NAME,WIN,RST,PEN,MF,C,PC,H1,BLINK_ID,MASCOT_S,MASCOT_R,LS_KEY,LS_FAV_BK,MAX_FAV,STATS_KEY,PROGRESS_KEY,SYNC_CODE_KEY,PIN_LOCKOUT_KEY,PIN_AUTH_TS_KEY,AI_ENABLED_KEY,ANALYSIS_TOTAL_KEY,ANALYSIS_LIMIT_KEY,ANALYSIS_DAILY_MAX,ANALYSIS_CACHE_DAYS,REPLAY_KEY,IDB_NAME,IDB_VER,MAX_GAMES,MAX_REPLAYS,MAX_SYNC_CODES,SHUF_ANIM_KEY,DEV_MASTER_LIST } from "./constants.js";
+import { _db, _cache, idbGet, idbSet, idbDel, initDB, loadStats, loadReplays, _persistStats, _persistReplays, saveStats, getShufAnim, setShufAnimLS } from "./db.js";
 function ensureBlink(){if(document.getElementById(BLINK_ID))return;const s=document.createElement("style");s.id=BLINK_ID;s.textContent="@keyframes mk-blink{0%,100%{background:rgba(43,125,233,0.12)}50%{background:rgba(43,125,233,0.45)}}";document.head.appendChild(s);}
 /* C: Prevent iOS context menu on buttons */
 if(typeof document!=="undefined"){document.addEventListener("contextmenu",e=>{if(e.target&&!e.target.matches("input,textarea,a[href]"))e.preventDefault();},{passive:false});}
@@ -24,102 +25,6 @@ return[];
 function _saveFavsRaw(l){try{localStorage.setItem(LS_KEY,JSON.stringify(l));localStorage.setItem(LS_FAV_BK,JSON.stringify(l));}catch(e){}}
 function saveFavs(l){_saveFavsRaw(l);_debouncedSync();}
 function useFavs(){const[f,sF]=useState(()=>loadFavs());return{favs:f,addF:n=>{const x=n.trim().slice(0,MAX_NAME);if(x&&!f.includes(x)&&f.length<MAX_FAV){const u=[...f,x];sF(u);saveFavs(u);}},rmF:n=>{const u=f.filter(v=>v!==n);sF(u);saveFavs(u);},editF:(oldName,newName)=>{const x=newName.trim().slice(0,MAX_NAME);if(!x||x===oldName||!f.includes(oldName))return false;if(f.includes(x))return false;const u=f.map(v=>v===oldName?x:v);sF(u);saveFavs(u);renamePlayerData(oldName,x);return true;}};}
-
-/* ═══ Stats Storage — IndexedDB with in-memory cache (100K games) ═══ */
-function getShufAnim(){try{const v=localStorage.getItem(SHUF_ANIM_KEY);return v===null?true:v==="true";}catch(e){return true;}}
-function setShufAnimLS(v){try{localStorage.setItem(SHUF_ANIM_KEY,v?"true":"false");}catch(e){}}
-
-/* In-memory cache — loaded from IndexedDB at startup */
-const _cache={stats:{},replays:{},analysis:{},ready:false};
-
-function openIDB(){
-return new Promise((res,rej)=>{
-const req=indexedDB.open(IDB_NAME,IDB_VER);
-req.onupgradeneeded=e=>{
-const db=e.target.result;
-if(!db.objectStoreNames.contains("kv"))db.createObjectStore("kv");
-if(!db.objectStoreNames.contains("analysis"))db.createObjectStore("analysis");
-};
-req.onsuccess=()=>res(req.result);
-req.onerror=()=>rej(req.error);
-});
-}
-function idbGet(db,key){
-return new Promise((res,rej)=>{
-const tx=db.transaction("kv","readonly");
-const req=tx.objectStore("kv").get(key);
-req.onsuccess=()=>res(req.result);
-req.onerror=()=>rej(req.error);
-});
-}
-function idbSet(db,key,val){
-return new Promise((res,rej)=>{
-const tx=db.transaction("kv","readwrite");
-const req=tx.objectStore("kv").put(val,key);
-req.onsuccess=()=>res();
-req.onerror=()=>rej(req.error);
-});
-}
-function idbDel(db,key){
-return new Promise((res,rej)=>{
-const tx=db.transaction("kv","readwrite");
-const req=tx.objectStore("kv").delete(key);
-req.onsuccess=()=>res();
-req.onerror=()=>rej(req.error);
-});
-}
-
-let _db=null;
-async function initDB(){
-try{
-_db=await openIDB();
-/* Load from IndexedDB */
-let stats=await idbGet(_db,"stats");
-let replays=await idbGet(_db,"replays");
-/* Migrate from localStorage if IDB is empty */
-if(!stats){
-try{const ls=JSON.parse(localStorage.getItem(STATS_KEY));if(ls&&Object.keys(ls).length>0){stats=ls;await idbSet(_db,"stats",stats);localStorage.removeItem(STATS_KEY);}}catch(e){}
-}
-if(!replays){
-try{const lr=JSON.parse(localStorage.getItem(REPLAY_KEY));if(lr&&Object.keys(lr).length>0){replays=lr;await idbSet(_db,"replays",replays);localStorage.removeItem(REPLAY_KEY);}}catch(e){}
-}
-/* Also try to migrate favs backup from stats if needed */
-if(stats){
-try{const existingFavs=JSON.parse(localStorage.getItem("mk-fav"));if(!existingFavs||existingFavs.length===0){const names=Object.keys(stats);if(names.length>0){localStorage.setItem("mk-fav",JSON.stringify(names));localStorage.setItem("mk-fav-bk",JSON.stringify(names));}}}catch(e){}
-}
-_cache.stats=stats||{};
-_cache.replays=replays||{};
-/* Load analysis cache + prune expired */
-try{
-const ac=await idbGet(_db,"analysisCache");
-if(ac&&typeof ac==="object"){
-const now=Date.now();const maxAge=ANALYSIS_CACHE_DAYS*86400000;
-const pruned={};let changed=false;
-for(const k in ac){if(ac[k].t&&(now-ac[k].t)<maxAge)pruned[k]=ac[k];else changed=true;}
-_cache.analysis=pruned;
-if(changed)idbSet(_db,"analysisCache",pruned).catch(()=>{});
-}
-}catch(e){_cache.analysis={};}
-}catch(e){
-console.error("IDB init failed, falling back to localStorage",e);
-try{_cache.stats=JSON.parse(localStorage.getItem(STATS_KEY))||{};}catch(e2){_cache.stats={};}
-try{_cache.replays=JSON.parse(localStorage.getItem(REPLAY_KEY))||{};}catch(e2){_cache.replays={};}
-}
-_cache.ready=true;
-}
-
-/* Sync reads from cache */
-function loadStats(){return _cache.stats;}
-function loadReplays(){return _cache.replays;}
-
-/* Async-persist writes (fire-and-forget) */
-function _persistStats(){if(_db)idbSet(_db,"stats",_cache.stats).catch(e=>console.error("stats persist error",e));}
-function _persistReplays(){if(_db)idbSet(_db,"replays",_cache.replays).catch(e=>console.error("replays persist error",e));}
-
-function saveStats(d){
-_cache.stats=d;
-_persistStats();
-}
 
 function _countTotalGames(stats){
 let c=0;for(const nm in stats)c+=stats[nm].length;return c;
