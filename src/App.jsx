@@ -1782,7 +1782,7 @@ return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" st
 <input value={name} onChange={e=>setName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder="名前" style={{flex:1,minWidth:80,padding:8,borderRadius:8,border:"1px solid var(--border-input)",fontSize:16}}/>
 <button onClick={()=>doAdd()} style={{minWidth:80,padding:"8px 14px",borderRadius:8,border:"none",background:"var(--accent-blue)",color:"var(--text-inverse)",fontWeight:700,fontSize:15,cursor:"pointer",opacity:name.trim()?1:0.3}}>追加</button>
 <button onClick={()=>doAutoAdd()} style={{minWidth:80,padding:"8px 14px",borderRadius:8,border:"none",background:"#22b566",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",opacity:name.trim()?1:0.3}}>自動追加</button>
-<FavDropdown favs={favs} addF={addF} rmF={rmF} editF={editF} onPick={n=>doAdd(n)} usedNames={allUsed} isAdmin={isAdmin}/>
+<FavDropdown favs={favs} addF={addF} rmF={rmF} editF={editF} onPick={n=>setName(n)} usedNames={allUsed} isAdmin={isAdmin}/>
 </div>
 </div>
 </div>
