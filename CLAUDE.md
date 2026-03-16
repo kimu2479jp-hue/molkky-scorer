@@ -195,3 +195,8 @@ The design goal of this project is "high quality comparable to a professional de
 - Avoid characteristics of generic AI-generated UI (uniform grays, Inter/Roboto-family fonts, characterless card layouts)
 - Make intentional design decisions tailored to each screen's personality
 - A design quality polishing phase is planned after completion of large-scale feature implementation
+
+## 鉄則
+- 直接依頼された変更だけを行う
+- 求められていないリファクタリング・改善・フォーマット変更はしない
+- 日本語テキストは直接文字で書く。Unicode escapeは絶対に使わない
