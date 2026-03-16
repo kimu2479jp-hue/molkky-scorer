@@ -1,4 +1,4 @@
-import { IDB_NAME, IDB_VER, STATS_KEY, REPLAY_KEY, ANALYSIS_CACHE_DAYS, SHUF_ANIM_KEY } from "./constants.js";
+import { IDB_NAME, IDB_VER, STATS_KEY, REPLAY_KEY, ANALYSIS_CACHE_DAYS, SHUF_ANIM_KEY, LS_KEY, LS_FAV_BK } from "./constants.js";
 
 // ═══ Shuffle Animation Setting ═══
 export function getShufAnim(){try{const v=localStorage.getItem(SHUF_ANIM_KEY);return v===null?true:v==="true";}catch(e){return true;}}
@@ -98,3 +98,20 @@ export function saveStats(d){
 _cache.stats=d;
 _persistStats();
 }
+
+// ═══ Favorites (raw access — no sync dependency) ═══
+export function loadFavs(){
+try{
+let f=JSON.parse(localStorage.getItem(LS_KEY));
+if(f&&f.length>0)return f;
+/* Backup 1: secondary key */
+f=JSON.parse(localStorage.getItem(LS_FAV_BK));
+if(f&&f.length>0){localStorage.setItem(LS_KEY,JSON.stringify(f));return f;}
+/* Backup 2: reconstruct from stats cache */
+if(_cache.ready){const names=Object.keys(_cache.stats);if(names.length>0){localStorage.setItem(LS_KEY,JSON.stringify(names));localStorage.setItem(LS_FAV_BK,JSON.stringify(names));return names;}}
+/* Backup 3: try localStorage stats (pre-migration) */
+try{const stats=JSON.parse(localStorage.getItem("mk-player-stats"));if(stats){const names=Object.keys(stats);if(names.length>0){localStorage.setItem(LS_KEY,JSON.stringify(names));localStorage.setItem(LS_FAV_BK,JSON.stringify(names));return names;}}}catch(e2){}
+return[];
+}catch(e){return[];}
+}
+export function _saveFavsRaw(l){try{localStorage.setItem(LS_KEY,JSON.stringify(l));localStorage.setItem(LS_FAV_BK,JSON.stringify(l));}catch(e){}}

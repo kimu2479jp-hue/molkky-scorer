@@ -2,27 +2,13 @@ import React, { useState, useReducer, useRef, useEffect, useCallback } from "rea
 import { Target, BarChart3, Lock, Cloud, Settings, Bot, Upload, Camera, MessageCircle, RefreshCw, Trophy, Star, ClipboardList, ChevronLeft, Users, Undo2, AlertTriangle, Shield, Trash2 } from "lucide-react";
 
 import { MAX_TEAMS,MAX_PL,MAX_SHUF,MAX_NAME,WIN,RST,PEN,MF,C,PC,H1,BLINK_ID,MASCOT_S,MASCOT_R,LS_KEY,LS_FAV_BK,MAX_FAV,STATS_KEY,PROGRESS_KEY,SYNC_CODE_KEY,PIN_LOCKOUT_KEY,PIN_AUTH_TS_KEY,AI_ENABLED_KEY,ANALYSIS_TOTAL_KEY,ANALYSIS_LIMIT_KEY,ANALYSIS_DAILY_MAX,ANALYSIS_CACHE_DAYS,REPLAY_KEY,IDB_NAME,IDB_VER,MAX_GAMES,MAX_REPLAYS,MAX_SYNC_CODES,SHUF_ANIM_KEY,DEV_MASTER_LIST } from "./constants.js";
-import { _db, _cache, idbGet, idbSet, idbDel, initDB, loadStats, loadReplays, _persistStats, _persistReplays, saveStats, getShufAnim, setShufAnimLS } from "./db.js";
+import { _db, _cache, idbGet, idbSet, idbDel, initDB, loadStats, loadReplays, _persistStats, _persistReplays, saveStats, getShufAnim, setShufAnimLS, loadFavs, _saveFavsRaw } from "./db.js";
+import { getSyncCode, setSyncCodeLS, getPinLockout, incPinAttempt, clearPinLockout, getPinAuthTs, setPinAuthTs, verifyPinOnServer, createPinOnServer, checkServerHasPin, maskSyncCode, _debouncedSync, pushToServer, pullFromServer } from "./sync.js";
 function ensureBlink(){if(document.getElementById(BLINK_ID))return;const s=document.createElement("style");s.id=BLINK_ID;s.textContent="@keyframes mk-blink{0%,100%{background:rgba(43,125,233,0.12)}50%{background:rgba(43,125,233,0.45)}}";document.head.appendChild(s);}
 /* C: Prevent iOS context menu on buttons */
 if(typeof document!=="undefined"){document.addEventListener("contextmenu",e=>{if(e.target&&!e.target.matches("input,textarea,a[href]"))e.preventDefault();},{passive:false});}
 
 /* ═══ Favorites ═══ */
-function loadFavs(){
-try{
-let f=JSON.parse(localStorage.getItem(LS_KEY));
-if(f&&f.length>0)return f;
-/* Backup 1: secondary key */
-f=JSON.parse(localStorage.getItem(LS_FAV_BK));
-if(f&&f.length>0){localStorage.setItem(LS_KEY,JSON.stringify(f));return f;}
-/* Backup 2: reconstruct from stats cache */
-if(_cache.ready){const names=Object.keys(_cache.stats);if(names.length>0){localStorage.setItem(LS_KEY,JSON.stringify(names));localStorage.setItem(LS_FAV_BK,JSON.stringify(names));return names;}}
-/* Backup 3: try localStorage stats (pre-migration) */
-try{const stats=JSON.parse(localStorage.getItem("mk-player-stats"));if(stats){const names=Object.keys(stats);if(names.length>0){localStorage.setItem(LS_KEY,JSON.stringify(names));localStorage.setItem(LS_FAV_BK,JSON.stringify(names));return names;}}}catch(e2){}
-return[];
-}catch(e){return[];}
-}
-function _saveFavsRaw(l){try{localStorage.setItem(LS_KEY,JSON.stringify(l));localStorage.setItem(LS_FAV_BK,JSON.stringify(l));}catch(e){}}
 function saveFavs(l){_saveFavsRaw(l);_debouncedSync();}
 function useFavs(){const[f,sF]=useState(()=>loadFavs());return{favs:f,addF:n=>{const x=n.trim().slice(0,MAX_NAME);if(x&&!f.includes(x)&&f.length<MAX_FAV){const u=[...f,x];sF(u);saveFavs(u);}},rmF:n=>{const u=f.filter(v=>v!==n);sF(u);saveFavs(u);},editF:(oldName,newName)=>{const x=newName.trim().slice(0,MAX_NAME);if(!x||x===oldName||!f.includes(oldName))return false;if(f.includes(x))return false;const u=f.map(v=>v===oldName?x:v);sF(u);saveFavs(u);renamePlayerData(oldName,x);return true;}};}
 
@@ -234,53 +220,6 @@ _debouncedSync();
 }catch(e){console.error("replay save error",e);}
 }
 
-/* ═══ Cloud Sync — Supabase via /api/sync ═══ */
-function getSyncCode(){try{return localStorage.getItem(SYNC_CODE_KEY)||"";}catch(e){return "";}}
-function setSyncCodeLS(c){try{localStorage.setItem(SYNC_CODE_KEY,c);}catch(e){}}
-
-/* ═══ Admin PIN — server-side only (Supabase) ═══ */
-/* PIN is NEVER stored in localStorage. Verification is done via /api/sync */
-function getPinLockout(){
-try{const d=JSON.parse(localStorage.getItem(PIN_LOCKOUT_KEY)||"{}");
-if(d.until&&Date.now()<d.until)return{locked:true,remaining:Math.ceil((d.until-Date.now())/1000),attempts:d.attempts||0};
-return{locked:false,remaining:0,attempts:d.until&&Date.now()>=d.until?0:(d.attempts||0)};
-}catch(e){return{locked:false,remaining:0,attempts:0};}
-}
-function incPinAttempt(){
-try{const d=JSON.parse(localStorage.getItem(PIN_LOCKOUT_KEY)||"{}");
-const attempts=(d.until&&Date.now()>=d.until)?1:((d.attempts||0)+1);
-const lockout=attempts>=5?{attempts,until:Date.now()+600000}:{attempts,until:null};
-localStorage.setItem(PIN_LOCKOUT_KEY,JSON.stringify(lockout));
-return lockout;
-}catch(e){return{attempts:99,until:Date.now()+600000};}
-}
-function clearPinLockout(){try{localStorage.removeItem(PIN_LOCKOUT_KEY);}catch(e){}}
-function getPinAuthTs(){try{return localStorage.getItem(PIN_AUTH_TS_KEY)||"";}catch(e){return "";}}
-function setPinAuthTs(ts){try{localStorage.setItem(PIN_AUTH_TS_KEY,ts||"");}catch(e){}}
-
-async function verifyPinOnServer(code,pin){
-if(!code)return{ok:false,reason:"no_code"};
-try{const r=await fetch("/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},
-body:JSON.stringify({code,action:"verify_pin",pin})});
-return await r.json();
-}catch(e){return{ok:false,reason:"network"};}
-}
-async function createPinOnServer(code,pin){
-if(!code)return{ok:false,error:"no_code"};
-try{const r=await fetch("/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},
-body:JSON.stringify({code,action:"create_pin",pin})});
-return await r.json();
-}catch(e){return{ok:false,error:"network"};}
-}
-async function checkServerHasPin(code){
-if(!code)return{has_pin:false,pin_updated_at:null,exists:false};
-try{const r=await fetch("/api/sync?code="+encodeURIComponent(code));
-if(!r.ok)return{has_pin:false,pin_updated_at:null,exists:false};
-const d=await r.json();return{has_pin:!!d.has_pin,pin_updated_at:d.pin_updated_at||null,exists:true};
-}catch(e){return{has_pin:false,pin_updated_at:null,exists:false};}
-}
-function maskSyncCode(code){if(!code||code.length<=2)return code?"***":"";return code.slice(0,2)+"•".repeat(Math.min(code.length-2,8));}
-
 /* ═══ AI Enabled Setting ═══ */
 function getAIEnabled(){try{const v=localStorage.getItem(AI_ENABLED_KEY);return v===null?true:v==="true";}catch(e){return true;}}
 function setAIEnabledLS(v){try{localStorage.setItem(AI_ENABLED_KEY,v?"true":"false");}catch(e){}}
@@ -310,71 +249,6 @@ function _persistAnalysis(){if(_db)idbSet(_db,"analysisCache",_cache.analysis).c
 function getAnalysisCached(key){const e=_cache.analysis[key];if(!e)return null;if(Date.now()-e.t>ANALYSIS_CACHE_DAYS*86400000){delete _cache.analysis[key];_persistAnalysis();return null;}return e.text;}
 function setAnalysisCached(key,text){_cache.analysis[key]={text,t:Date.now()};_persistAnalysis();}
 function makeAnalysisKey(name,gc,m){const sf=(v,d)=>(typeof v==="number"&&!isNaN(v))?v.toFixed(d):"0";return name+"|"+gc+"|"+sf(m.missRate,3)+"|"+sf(m.finishRate,3)+"|"+sf(m.ojamaRate,3)+"|"+sf(m.winRate,3)+"|"+sf(m.avgPts,2);}
-
-let _syncTimer=null;
-function _debouncedSync(){
-if(_syncTimer)clearTimeout(_syncTimer);
-_syncTimer=setTimeout(()=>{pushToServer().catch(e=>console.error("auto-sync error",e));},2000);
-}
-
-let _syncBusy=false;
-async function pushToServer(){
-const code=getSyncCode();
-if(!code||_syncBusy)return{ok:false};
-_syncBusy=true;
-try{
-const r=await fetch("/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},
-body:JSON.stringify({code,favorites:loadFavs(),stats:_cache.stats,replays:_cache.replays})});
-const d=await r.json();
-_syncBusy=false;
-return{ok:r.ok,error:d.error};
-}catch(e){_syncBusy=false;return{ok:false,error:e.message};}
-}
-
-async function pullFromServer(){
-const code=getSyncCode();
-if(!code||_syncBusy)return{merged:false,reason:"no_code"};
-_syncBusy=true;
-try{
-const r=await fetch("/api/sync?code="+encodeURIComponent(code));
-if(r.status===404){_syncBusy=false;try{const cr=await fetch("/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code,action:"count_codes"})});const cd=await cr.json();if(cd.ok&&cd.count>=MAX_SYNC_CODES){return{merged:false,reason:"limit",error:"既存の同期コードを使用してください"};}}catch(e){}await pushToServer();return{merged:true,reason:"new_pushed",added:0};}
-if(!r.ok){const e=await r.json().catch(()=>({}));_syncBusy=false;return{merged:false,reason:"error",error:e.error||"HTTP "+r.status};}
-const data=await r.json();
-
-/* Favorites: server wins (replace local with server) — enables deletion sync */
-const serverFavs=data.favorites||[];
-_saveFavsRaw(serverFavs);
-
-/* Merge stats (union by player x date) */
-const localStats=_cache.stats;
-const serverStats=data.stats||{};
-let added=0;
-const allNames=new Set([...Object.keys(localStats),...Object.keys(serverStats)]);
-for(const nm of allNames){
-  const local=localStats[nm]||[];
-  const server=serverStats[nm]||[];
-  const seen=new Set(local.map(g=>g.d));
-  const newG=server.filter(g=>!seen.has(g.d));
-  if(newG.length>0){added+=newG.length;localStats[nm]=[...local,...newG];}
-  else if(!localStats[nm])localStats[nm]=server;
-}
-_cache.stats=localStats;
-_persistStats();
-
-/* Merge replays (union by key) */
-const localReplays=_cache.replays;
-const serverReplays=data.replays||{};
-for(const key in serverReplays){if(!localReplays[key]){localReplays[key]=serverReplays[key];added++;}}
-_cache.replays=localReplays;
-_persistReplays();
-
-_syncBusy=false;
-/* Push merged data back so both sides are identical */
-await pushToServer();
-return{merged:true,added,favs:serverFavs};
-
-}catch(e){_syncBusy=false;return{merged:false,reason:"network",error:e.message};}
-}
 
 /* ═══ Period helpers ═══ */
 function getMondayOfWeek(d){const dt=new Date(d);const dow=dt.getDay();dt.setDate(dt.getDate()-(dow===0?6:dow-1));dt.setHours(0,0,0,0);return dt;}
