@@ -4,7 +4,7 @@ import { Target, BarChart3, Lock, Bot, RefreshCw, Star, ClipboardList, AlertTria
 import { PC, MASCOT_R, ANALYSIS_DAILY_MAX } from "../constants.js";
 import { loadStats, loadReplays, loadFavs } from "../db.js";
 import { deleteStatsByPeriod, deleteGameByKey, getAvailableGames, getGameDates, filterGamesByDates, calcMetrics, fmtMD, fmtHM } from "../stats.js";
-import { makeAnalysisKey, getAnalysisCached, fetchPlayerAnalysis, getPlayerAnalysisCount } from "../analysis.js";
+import { makeAnalysisKey, getAnalysisCached, fetchPlayerAnalysis, getPlayerAnalysisCount, calcNewIndicators } from "../analysis.js";
 import { ScoreTable } from "./common.jsx";
 
 /* ═══ Radar Chart SVG ═══ */
@@ -103,7 +103,7 @@ return(<div key={i} onClick={()=>{if(!isFuture)handleClick(d);}} style={{textAli
 }
 
 /* ═══ Score Distribution Component ═══ */
-function ScoreDistribution({playersData,favs,isAdmin,aiEnabled}){
+function ScoreDistribution({playersData,favs,isAdmin,aiEnabled,stats}){
 const hasSV=playersData.some(pd=>pd.metrics.scoreValues&&pd.metrics.scoreValues.length>0);
 const[analyzeAll,setAnalyzeAll]=useState(false);
 const[analyzeKey,setAnalyzeKey]=useState(0);
@@ -119,28 +119,29 @@ if(!hasSV)return(<div style={{background:"var(--bg-surface)",borderRadius:14,pad
     <div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)"}}><Target size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> スコア分布分析</div>
     {aiEnabled&&analyzablePlayers.length>1&&<button onClick={()=>{setAnalyzeAll(true);setAnalyzeKey(k=>k+1);}} style={{padding:"6px 14px",border:"none",borderRadius:8,background:"var(--accent-blue)",color:"var(--text-inverse)",fontSize:13,fontWeight:700,cursor:"pointer"}}><Bot size={13} style={{display:"inline",verticalAlign:"middle",marginRight:2}}/> 全員分析</button>}
     </div>
-    {playersData.map(pd=>(<ScoreDistPlayer key={pd.name} pd={pd} SCORE_COLORS={SCORE_COLORS} isFav={(favs||[]).includes(pd.name)} isAdmin={isAdmin} aiEnabled={aiEnabled} triggerAll={analyzeAll} analyzeKey={analyzeKey}/>))}
+    {playersData.map(pd=>(<ScoreDistPlayer key={pd.name} pd={pd} SCORE_COLORS={SCORE_COLORS} isFav={(favs||[]).includes(pd.name)} isAdmin={isAdmin} aiEnabled={aiEnabled} triggerAll={analyzeAll} analyzeKey={analyzeKey} playerGames={stats[pd.name]||[]}/>))}
   </div>);
 }
 
-function ScoreDistPlayer({pd,SCORE_COLORS,isFav,isAdmin,aiEnabled,triggerAll,analyzeKey}){
+function ScoreDistPlayer({pd,SCORE_COLORS,isFav,isAdmin,aiEnabled,triggerAll,analyzeKey,playerGames}){
 const sv=pd.metrics.scoreValues||[];
 const gc=pd.metrics.gameCount||0;
 const canAnalyze=isFav&&gc>=3;
-const[aiText,setAiText]=useState(()=>{if(!canAnalyze)return null;const key=makeAnalysisKey(pd.name,gc,pd.metrics);return getAnalysisCached(key);});
+const newInd=React.useMemo(()=>calcNewIndicators(playerGames||[]),[playerGames]);
+const[aiText,setAiText]=useState(()=>{if(!canAnalyze)return null;const key=makeAnalysisKey(pd.name,gc,pd.metrics,newInd);return getAnalysisCached(key);});
 const[aiLoading,setAiLoading]=useState(false);
 const[aiError,setAiError]=useState(null);
 const remaining=ANALYSIS_DAILY_MAX-getPlayerAnalysisCount(pd.name);
 
 const doAnalyze=useCallback(async(force)=>{
 if(!canAnalyze)return;
-const key=makeAnalysisKey(pd.name,gc,pd.metrics);
+const key=makeAnalysisKey(pd.name,gc,pd.metrics,newInd);
 if(!force){const cached=getAnalysisCached(key);if(cached){setAiText(cached);setAiError(null);return;}}
 setAiLoading(true);setAiError(null);
-const r=await fetchPlayerAnalysis(pd.name,pd.metrics,isAdmin);
+const r=await fetchPlayerAnalysis(pd.name,pd.metrics,isAdmin,newInd);
 setAiLoading(false);
 if(r.text){setAiText(r.text);setAiError(null);}else{setAiError(r.error);}
-},[pd.name,gc,isAdmin,canAnalyze]);
+},[pd.name,gc,isAdmin,canAnalyze,newInd]);
 
 /* Trigger from "全員分析" button */
 useEffect(()=>{if(triggerAll&&analyzeKey>0&&canAnalyze&&aiEnabled){doAnalyze(false);}},[analyzeKey]);
@@ -437,7 +438,7 @@ return(<button key={k} onClick={applyPreset} style={{padding:"6px 12px",border:"
 <tbody>{playersData.map(pd=>{const m=pd.metrics;return(<tr key={pd.name} style={{borderBottom:"1px solid var(--border-lighter)"}}><td style={{padding:"8px",fontWeight:700,color:pd.color}}>{pd.name}</td><td style={{padding:"8px",textAlign:"center"}}>{m.gameCount}</td><td style={{padding:"8px",textAlign:"center"}}>{m.winCount}</td><td style={{padding:"8px",textAlign:"center"}}>{m.turnCount}</td><td style={{padding:"8px",textAlign:"center",color:"var(--accent-orange)"}}>{m.missCount}</td><td style={{padding:"8px",textAlign:"center"}}>{(m.missRate*100).toFixed(1)}%</td><td style={{padding:"8px",textAlign:"center"}}>{(m.finishRate*100).toFixed(1)}%</td></tr>);})}</tbody></table>
 </div>
 {/* Score Distribution */}
-<ScoreDistribution playersData={playersData} favs={favs} isAdmin={isAdmin} aiEnabled={aiEnabled!==false}/>
+<ScoreDistribution playersData={playersData} favs={favs} isAdmin={isAdmin} aiEnabled={aiEnabled!==false} stats={stats}/>
 {/* Detailed metrics */}
 <div style={{background:"var(--bg-surface)",borderRadius:14,padding:14,border:"1px solid var(--border-input)",marginBottom:14}}>
 <div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",marginBottom:8}}><BarChart3 size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 詳細指標</div>
