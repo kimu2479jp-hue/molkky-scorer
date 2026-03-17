@@ -259,7 +259,7 @@ const currentNames=(currentGameRecords||[]).map(r=>r.nm);
 const allNames=favs.filter(n=>(stats[n]&&stats[n].length>0)||currentNames.includes(n));
 /* Fix 6: game source shows only participating fav members */
 const gameParticipants=source==="game"?allNames.filter(n=>currentNames.includes(n)):allNames;
-const names=viewMode==="current"?gameParticipants:source==="game"?gameParticipants:allNames;
+const names=viewMode==="current"?gameParticipants:allNames;
 const[selected,setSelected]=useState(()=>{
 if(source==="game"){const gp=favs.filter(n=>((stats[n]&&stats[n].length>0)||currentNames.includes(n))&&currentNames.includes(n));return gp.slice(0,6);}
 return allNames.slice(0,4);
