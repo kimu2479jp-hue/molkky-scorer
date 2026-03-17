@@ -291,7 +291,7 @@ return{
 missRate,finishRate,avgPts,recAvg,highRate,breakAvg,ojamaRate,throwMin,throwMax,throwAvg,
 missCount:tot.m,turnCount:tot.t,ojamaCount:tot.o,ojamaAttempts:tot.oa,winCount:tot.w,gameCount:games.length,
 scoreValues:tot.sv,winRate,firstWinRate,lastWinRate,firstGames:tot.foG,lastGames:tot.loG,
-r:[(1-missRate)*100,finishRate*100,(avgPts/12)*100,(recAvg/12)*100,ojamaRate*100,(breakAvg/12)*100,winRate*100]
+r:[(1-missRate)*100,finishRate*100,(avgPts/12)*100,(recAvg/12)*100,(breakAvg/12)*100,winRate*100]
 };
 }
 
