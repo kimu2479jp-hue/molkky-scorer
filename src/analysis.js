@@ -139,24 +139,36 @@ export function incAnalysisTotal(){try{const c=getAnalysisTotal()+1;localStorage
 export function _persistAnalysis(){if(_db)idbSet(_db,"analysisCache",_cache.analysis).catch(e=>console.error("analysis persist error",e));}
 export function getAnalysisCached(key){const e=_cache.analysis[key];if(!e)return null;if(Date.now()-e.t>ANALYSIS_CACHE_DAYS*86400000){delete _cache.analysis[key];_persistAnalysis();return null;}return e.text;}
 export function setAnalysisCached(key,text){_cache.analysis[key]={text,t:Date.now()};_persistAnalysis();}
-export function makeAnalysisKey(name,gc,m,newIndicators){const sf=(v,d)=>(typeof v==="number"&&!isNaN(v))?v.toFixed(d):"0";return name+"|"+gc+"|"+sf(m.missRate,3)+"|"+sf(m.finishRate,3)+"|"+sf(m.ojamaRate,3)+"|"+sf(m.winRate,3)+"|"+sf(m.avgPts,2)+"|b"+(newIndicators?.burstCount??"")+"|sd"+(newIndicators?.scoreStdDev!=null?newIndicators.scoreStdDev.toFixed(1):"")+"|fe"+(newIndicators?.finishEfficiency??"");}
+export function makeAnalysisKey(name,gc,m,newIndicators,recentScores){const sf=(v,d)=>(typeof v==="number"&&!isNaN(v))?v.toFixed(d):"0";const recentSuffix=recentScores&&recentScores.length>0?"|rs"+recentScores.length+"|"+(recentScores[0]?.date||""):"|rs0";return name+"|"+gc+"|"+sf(m.missRate,3)+"|"+sf(m.finishRate,3)+"|"+sf(m.ojamaRate,3)+"|"+sf(m.winRate,3)+"|"+sf(m.avgPts,2)+"|b"+(newIndicators?.burstCount??"")+"|sd"+(newIndicators?.scoreStdDev!=null?newIndicators.scoreStdDev.toFixed(1):"")+"|fe"+(newIndicators?.finishEfficiency??"")+recentSuffix;}
 
 // ═══ Analysis API ═══
 const _analysisPending=new Set();
-export async function fetchPlayerAnalysis(name,m,isAdminMode,newIndicators){
+export async function fetchPlayerAnalysis(name,m,isAdminMode,newIndicators,recentScores,playerName){
 const gc=m?m.gameCount:0;
 if(!m||gc<3)return{text:null,error:"3試合以上必要"};
 /* Rate limit (per-player per-day, admin exempt) */
 if(!isAdminMode){const used=getPlayerAnalysisCount(name);if(used>=ANALYSIS_DAILY_MAX)return{text:null,error:"本日の分析上限("+ANALYSIS_DAILY_MAX+"回/人)に達しました"};}
-const key=makeAnalysisKey(name,gc,m,newIndicators);
+const key=makeAnalysisKey(name,gc,m,newIndicators,recentScores);
 if(_analysisPending.has(key))return{text:null,error:"分析中..."};
 _analysisPending.add(key);
 try{
-const res=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({gameCount:gc,winRate:m.winRate||0,missRate:m.missRate||0,finishRate:m.finishRate||0,avgPts:m.avgPts||0,breakAvg:m.breakAvg||0,ojamaRate:m.ojamaRate||0,ojamaAttempts:m.ojamaAttempts||0,recAvg:m.recAvg||0,firstWinRate:m.firstWinRate!=null?m.firstWinRate:null,lastWinRate:m.lastWinRate!=null?m.lastWinRate:null,burstCount:newIndicators?.burstCount??null,burstPer10:newIndicators?.burstPer10??null,scoreStdDev:newIndicators?.scoreStdDev!=null?Math.round(newIndicators.scoreStdDev*100)/100:null,zoromeHits:newIndicators?.zoromeHits??null,finishEfficiency:newIndicators?.finishEfficiency??null})});
+const res=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerName:playerName||name,gameCount:gc,hitRate:m.missRate!=null?1-m.missRate:null,winRate:m.winRate??null,missRate:m.missRate??null,finishRate:m.finishRate??null,avgPts:m.avgPts??null,breakAvg:m.breakAvg??null,recAvg:m.recAvg??null,firstWinRate:m.firstWinRate??null,lastWinRate:m.lastWinRate??null,topScores:m.topScores||null,burstCount:newIndicators?.burstCount??null,scoreStdDev:newIndicators?.scoreStdDev!=null?Math.round(newIndicators.scoreStdDev*100)/100:null,zoromeHits:newIndicators?.zoromeHits??null,finishEfficiency:newIndicators?.finishEfficiency??null,recentScores:recentScores||null,level:null,levelSource:null,environment:null})});
 if(!res.ok){let errMsg="API "+res.status;try{const raw=await res.text();try{const ej=JSON.parse(raw);if(ej.error)errMsg=typeof ej.error==="string"?ej.error:ej.error.message||errMsg;}catch(_){if(raw)errMsg+=": "+raw.slice(0,120);}}catch(_2){}return{text:null,error:errMsg};}
 const data=await res.json();
 if(data.text){setAnalysisCached(key,data.text);incPlayerAnalysisCount(name);incAnalysisTotal();return{text:data.text,error:null};}
 return{text:null,error:data.error||"空のレスポンス"};
 }catch(e){return{text:null,error:e.message||"通信エラー"};}
 finally{_analysisPending.delete(key);}
+}
+
+// ═══ Top Scores Helper ═══
+export function getTopScores(scoreValues, top = 3) {
+  if (!scoreValues || scoreValues.length === 0) return null;
+  const freq = {};
+  scoreValues.forEach(v => { freq[v] = (freq[v] || 0) + 1; });
+  return Object.entries(freq)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, top)
+    .map(([score, count]) => `${score}点(${count}回)`)
+    .join(", ");
 }

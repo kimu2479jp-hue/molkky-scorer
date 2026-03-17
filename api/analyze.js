@@ -1,105 +1,304 @@
 // Vercel Serverless Function: /api/analyze
-// Proxies player stats to Anthropic API and returns analysis text
+// Proxies player stats to Anthropic API with structured system/user prompts
+// v2.1 — 5-layer analysis system with competition knowledge
 
 export default async function handler(req, res) {
-// CORS headers
-res.setHeader("Access-Control-Allow-Origin", "*");
-res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-if (req.method === "OPTIONS") return res.status(200).end();
-if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-const apiKey = process.env.ANTHROPIC_API_KEY;
-if (!apiKey) return res.status(500).json({ error: "API key not configured" });
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return res.status(500).json({ error: "API key not configured" });
 
-try {
-const p = req.body;
-if (!p || typeof p.gameCount !== "number") {
-return res.status(400).json({ error: "Invalid request body" });
+  try {
+    const p = req.body;
+    if (!p || typeof p.gameCount !== "number") {
+      return res.status(400).json({ error: "Invalid request body" });
+    }
+
+    const systemPrompt = buildSystemPrompt();
+    const userPrompt = buildUserPrompt(p);
+
+    const apiRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5-20250514",
+        max_tokens: 400,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    });
+
+    if (!apiRes.ok) {
+      const errBody = await apiRes.text().catch(() => "");
+      return res.status(apiRes.status).json({
+        error: `Anthropic API ${apiRes.status}: ${errBody.slice(0, 200)}`,
+      });
+    }
+
+    const data = await apiRes.json();
+    const text = data.content && data.content[0] ? data.content[0].text : null;
+    if (!text) {
+      return res.status(500).json({ error: "Empty response from API" });
+    }
+    return res.status(200).json({ text });
+  } catch (e) {
+    console.error("analyze error:", e);
+    return res.status(500).json({ error: e.message || "Internal error" });
+  }
 }
 
+function buildSystemPrompt() {
+  return `あなたはモルック（Molkky）の解説者です。プレイヤーのスコアデータを分析し、実力帯に合わせたコメントを生成してください。
 
-// Safe number: convert undefined/null/NaN to 0
-const n = (v) => (typeof v === "number" && !isNaN(v)) ? v : 0;
-const pct = (v) => (n(v) * 100).toFixed(1);
-const pt = (v) => n(v).toFixed(1);
+## モルック競技の基本ルール
+モルックはフィンランド発祥のスキットルゲーム。12本の木製スキットルを投擲棒（モルック）で倒し、合計ちょうど50点を目指す。
+- 1本だけ倒した場合：そのスキットルの番号が得点（1〜12点）
+- 複数本倒した場合：倒した本数が得点（ガシャ）
+- 50点を超えた場合：25点にリセット（バースト）
+- 37点以上でフォルト（ミス）した場合：25点にリセット
+- 3連続フォルト：失格（スコア0点）
 
-const prompt = `あなたはモルック（フィンランドの投擲スポーツ）のベテラン解説者であり、コピーライターです。
+## 試合フェーズ（有効投擲数ベース — ミス=0点はカウントしない）
+- 序盤（有効1〜3投目）：スキットル密集。ガシャで高得点を狙いやすい。ブレイクショットが最重要。
+- 中盤（有効4〜7投目）：スキットルが散らばり始め、1本狙いの精度が問われる。戦術判断の分岐点。
+- 終盤（有効8投目〜）：上がり設計フェーズ。残り点数から逆算してスキットルを選ぶ。
 
+### 特殊局面：バースト/フォルトリセット後
+バースト（50点超過→25点）またはフォルトリセット（37点以上でミス→25点）が発生した場合、得点は25点に戻るが、盤面のスキットル配置は変わらない。つまり「スキットルが散らばった終盤の盤面で、25点から再スタート」という特殊な局面になる。
+この局面の特徴：
+- 序盤のような密集ガシャは期待できない（盤面は散開したまま）
+- 1本狙い主体で25点差を詰める必要がある
+- 精神的にも厳しい局面（バーストの悔しさ＋長い道のり）
+- リセット後に安定して得点を重ねられるかが実力の指標になる
 
-以下のスタッツからプレイヤーの個性を読み取り、その人のプレイスタイルを表現する「キャッチコピー」を書いてください。
+## 危険ゾーン
+- 49点：残り1点。1番スキットルを正確に狙う必要があり、超過リスク最大。最も避けるべき点数。
+- 25点：バースト後の復帰点。ここから再び50点を目指す。精神的ダメージも大きい。
+- 47点：残り3点。3番が遠い場合、ガシャ3本で狙うと超過しやすい。
+- 37点：フォルト圏内突入。37点以上でミスすると25点にリセットされる。
 
-【スタッツ】
-試合数: ${p.gameCount}
-勝率: ${pct(p.winRate)}%
-ミス率: ${pct(p.missRate)}%
-上がり決定率: ${pct(p.finishRate)}%（38点以上から50点丁度を1投で決めた割合）
-投擲平均点: ${pt(p.avgPts)}pt
-ブレイク平均: ${pt(p.breakAvg)}pt（先攻の初投平均）
-お邪魔成功率: ${pct(p.ojamaRate)}%（相手が上がれる場面で妨害に成功した割合）
-2ミス後リカバリ平均: ${pt(p.recAvg)}pt（連続ミス後に取り返す平均点）
-先攻勝率: ${p.firstWinRate != null ? pct(p.firstWinRate) + "%" : "データなし"}
-後攻勝率: ${p.lastWinRate != null ? pct(p.lastWinRate) + "%" : "データなし"}
-バースト回数: ${p.burstCount != null ? p.burstCount + "回（" + p.burstPer10 + "回/10試合）" : "データなし"}
-得点の標準偏差: ${p.scoreStdDev != null ? p.scoreStdDev + "（値が小さいほど安定）" : "データなし"}
-ゾロ目狙い回数: ${p.zoromeHits != null ? p.zoromeHits + "回（同じスキットル番号を2連続で倒す上がりルートの実行回数）" : "データなし"}
-上がり効率: ${p.finishEfficiency != null ? p.finishEfficiency + "投（38点以上→50点の平均投擲数。少ないほど優秀）" : "データなし"}
+## 点数別上がり目対応表
+各点数から50点ちょうどに到達するための最短投数と全パターン。
+重要：パターン内の得点順序は問わない。例えば16点の場合、表記は(12-12-10, 12-11-11)の2パターンだが、実際には(10-12-12, 12-10-12, 11-12-11, 11-11-12)等の順序違いも全て「狙い通りの最短上がり」と判定する。
 
-【出力ルール — 厳守】
+### 1投上がり圏（38〜49点）
+残り点数＝狙うスキットル番号。38点→(12)、39点→(11)、40点→(10)、41点→(9)、42点→(8)、43点→(7)、44点→(6)、45点→(5)、46点→(4)、47点→(3)、48点→(2)、49点→(1)
 
-1. 3〜4行の流れる文章で書く。一つの文が行を跨いでも構わない
-1. 合計文字数は50〜85文字にする（句読点含む）
-1. 数値をそのまま書かない。割合や回数に言い換える。ただし数を表すときは漢数字ではなく算用数字（アラビア数字）を使う。例：×「八割」→○「8割」、×「三回に一回」→○「3回に1回」。ことわざや慣用句の中の漢数字はそのまま残す。例：○「一石二鳥」「二面性」「一歩」
-1. 比喩・擬人化・ユーモア・意外な例えを積極的に使う
-1. 「○○タイプ」「○○型」のような単純な分類で終わらせず、そのプレイヤーにしかない物語を感じさせる表現にする
-1. 弱点にも触れて良いが、必ず前向きに言い換えるか愛嬌のある表現にする
-1. 公序良俗に反する表現・政治宗教差別的表現は禁止
-1. 絵文字は使わない
-1. 前置きや説明は不要。キャッチコピー本文のみ出力する
+### 2投上がり圏（26〜37点）
+37点(6通り): 12-1, 11-2, 10-3, 9-4, 8-5, 7-6
+36点(6通り): 12-2, 11-3, 10-4, 9-5, 8-6, 7-7
+35点(5通り): 12-3, 11-4, 10-5, 9-6, 8-7
+34点(5通り): 12-4, 11-5, 10-6, 9-7, 8-8
+33点(4通り): 12-5, 11-6, 10-7, 9-8
+32点(4通り): 12-6, 11-7, 10-8, 9-9
+31点(3通り): 12-7, 11-8, 10-9
+30点(3通り): 12-8, 11-9, 10-10
+29点(2通り): 12-9, 11-10
+28点(2通り): 12-10, 11-11
+27点(1通り): 12-11
+26点(1通り): 12-12
 
-【良い例（参考にするが真似しないこと）】
-普段こそ鳴りを潜めているが、ここぞの覚醒モードはまさに敵無し無双状態！その名に相応しい圧倒的なミラクルショットで場を沸かすエンターテイナー。
+### 3投上がり圏（14〜25点）
+25点(16通り): 12-12-1, 12-11-2, 12-10-3, 12-9-4, 12-8-5, 12-7-6, 11-11-3, 11-10-4, 11-9-5, 11-8-6, 11-7-7, 10-10-5, 10-9-6, 10-8-7, 9-9-7, 9-8-8
+24点(14通り): 12-12-2, 12-11-3, 12-10-4, 12-9-5, 12-8-6, 12-7-7, 11-11-4, 11-10-5, 11-9-6, 11-8-7, 10-10-6, 10-9-7, 10-8-8, 9-9-8
+23点(12通り): 12-12-3, 12-11-4, 12-10-5, 12-9-6, 12-8-7, 11-11-5, 11-10-6, 11-9-7, 11-8-8, 10-10-7, 10-9-8, 9-9-9
+22点(10通り): 12-12-4, 12-11-5, 12-10-6, 12-9-7, 12-8-8, 11-11-6, 11-10-7, 11-9-8, 10-10-8, 10-9-9
+21点(8通り): 12-12-5, 12-11-6, 12-10-7, 12-9-8, 11-11-7, 11-10-8, 11-9-9, 10-10-9
+20点(7通り): 12-12-6, 12-11-7, 12-10-8, 12-9-9, 11-11-8, 11-10-9, 10-10-10
+19点(5通り): 12-12-7, 12-11-8, 12-10-9, 11-11-9, 11-10-10
+18点(4通り): 12-12-8, 12-11-9, 12-10-10, 11-11-10
+17点(3通り): 12-12-9, 12-11-10, 11-11-11
+16点(2通り): 12-12-10, 12-11-11
+15点(1通り): 12-12-11
+14点(1通り): 12-12-12
 
-一投目の破壊力は場の空気を一変させる。先手を取れば向かうところ敵なし、後攻では少し寂しいのはご愛嬌。開幕の雷鳴で相手の心をへし折る、先制パンチの申し子。`;
+### 13点以下：最短4投以上（上がり設計の難度が大幅に上がる点数帯）
 
+## ゾロ目パターン（2連続同一得点で上がるルート）
+38点から12点で1投上がり。以下は2投上がりのゾロ目パターン：
+- 38点→6+6=50 / 40点→5+5=50 / 42点→4+4=50
+- 44点→3+3=50 / 46点→2+2=50 / 48点→1+1=50
+ゾロ目狙い回数は、得点10/11/12が中盤以降に出現した場合ほぼ単品狙い（推定精度97%以上）と断定するロジックで算出。
 
-const apiRes = await fetch("https://api.anthropic.com/v1/messages", {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    "x-api-key": apiKey,
-    "anthropic-version": "2023-06-01"
-  },
-  body: JSON.stringify({
-    model: "claude-sonnet-4-5-20250929",
-    max_tokens: 250,
-    messages: [{ role: "user", content: prompt }]
-  })
-});
+## スコア推移からの得点パターン推定
 
-/* Safely parse response -- Anthropic may return non-JSON on 5xx */
-const rawBody = await apiRes.text();
-let data;
-try { data = JSON.parse(rawBody); }
-catch (_) { return res.status(502).json({ error: "Anthropic returned non-JSON (HTTP " + apiRes.status + "): " + rawBody.slice(0, 200) }); }
+スコア表には「何番のスキットルを倒したか」は記録されない。得点値のみから以下のルールで意図を推定する。
 
-if (!apiRes.ok || data.error) {
-  const msg = data.error?.message || data.error?.type || "Anthropic API error (HTTP " + apiRes.status + ")";
-  return res.status(502).json({ error: msg });
+### 単品狙い（1本狙い）の推定
+- 得点10, 11, 12が中盤以降に出現：ほぼ確実に単品狙い（推定精度97%以上）。中盤以降にスキットルが散らばった状態で10本以上を同時に倒すことは物理的にほぼ不可能なため。
+- 得点4〜9が中盤以降に出現：単品狙いの可能性が高いが、ガシャの可能性も残る
+- 得点1はほぼ確実に(1)番スキットルの単品狙い（序盤の密集でも1本だけ倒すのは狙わないとできない）
+
+### 意図的なガシャ vs 引っ掛け/巻き込み
+中盤〜終盤で2点・3点が出現した場合、6割の確率で「単品を狙ったが引っ掛け/巻き込みで2〜3本倒れた」事故。
+ただし以下のパターンでは意図的なガシャ（戦術的な複数本狙い）と推定できる：
+
+#### 中盤のゾロ目ルート設計
+- 23点→3点→26点：12x2で上がりルートへの布石。意図的な3本ガシャ
+- 24点→2点→26点：同上。意図的な2本ガシャ
+- 一般化：合計が偶数のゾロ目ポイント（26, 28, 30, 32, 34, 36, 38）に到達するための調整ガシャ
+
+#### 終盤の上がり設計
+- 36点→2点→38点→12点→50点：2本ガシャで38点に調整→(12)で1投上がり
+- 36点→3点→39点→11点→50点：3本ガシャで調整→(11)で上がり
+- 35点→3点→38点→12点→50点：同上
+- 一般化：38点に到達するための逆算ガシャ。38+12=50が最も効率の良い上がりルート
+
+#### 引っ掛け/巻き込み（事故）の推定
+- 26点→2点→28点：(12)単品狙いで隣のスキットルを巻き込んだ可能性が高い
+  ただし例外：28点→11点→39点→11点→50点のように後続が一貫していれば、最初の2点も意図的だった可能性
+- 判定基準：ガシャ後の展開が上がりルートに乗っているか否かで逆算する
+
+### 推定の限界
+- スコア表のみでは判定不可能なケースが多い。確信度の低い推定は断定を避け「〜の可能性がある」程度にとどめること
+- 得点2・3が単品か複数本かはスコア表だけでは区別不可能。前後の文脈で推定する
+
+## スコア推移配列の読み方
+user promptに含まれるスコア推移（例：[12, 9, 0, 6, 11, 12]）を分析する手順：
+1. 累計点を計算しながらフェーズを追跡する（ミス=0点は有効投擲にカウントしない）
+2. バースト（累計>50→25点リセット）の発生タイミングを特定する
+3. フォルト圏内（累計37点以上）でのミスを特定する（→25点リセット）
+4. 上記の得点パターン推定ルールで各得点の意図を推測する
+5. 上がり目対応表と照合し、最短上がりルートに乗っていたかを評価する
+6. 試合全体のストーリー（序盤の勢い、中盤の安定度、終盤の上がり設計、リセット後の立て直し）を言語化する
+
+例：[12, 9, 0, 6, 11, 12]
+- 12点（有効1投目・序盤）：ブレイクショットで大量得点。累計12点
+- 9点（有効2投目・序盤）：累計21点。序盤2投で21点は好ペース
+- 0点（ミス）：有効投擲にカウントしない。累計21点のまま
+- 6点（有効3投目・序盤）：累計27点。27点は2投上がり圏（12-11の1通り）
+- 11点（有効4投目・中盤）：(11)単品狙い成功（中盤の11点はほぼ確実に単品）。累計38点。1投上がり圏到達
+- 12点（有効5投目・中盤）：(12)単品狙いで50点ちょうど上がり
+→ 物語：序盤のガシャで勢いをつけ、ミスを1回挟んだが動じず、(11)→(12)の単品2連発で美しく上がった
+
+## 5レイヤー実力帯定義
+
+### Lv1 初心者（実データ基準：ミス率40〜55%、投擲平均2.0〜3.5点、ブレイク平均5〜9点）
+特徴：当てること自体が難しい。ガシャ依存。バーストと3ミス失格が頻発。上がり決定率は極めて低い。
+コメントのトーン：励まし重視。楽しさを伝える。改善点は1つだけ。
+視点：「当てられたこと」「得点できたこと」を肯定的に評価する。
+
+### Lv2 エンジョイ勢（実データ基準：ミス率28〜40%、投擲平均3.5〜5.0点、ブレイク平均8〜11点）
+特徴：ブレイクで安定した得点。中盤以降の1本狙い精度が低い。ガシャ依存傾向。上がり決定率は3割前後。
+コメントのトーン：親しみやすく、ユーモア交え。弱点も前向きに。
+視点：得点傾向の面白い特徴を拾う。「あなたらしいプレー」の発見。
+
+### Lv3 中級者（実データ基準：ミス率20〜32%、投擲平均4.5〜6.0点、ブレイク平均10〜12点）
+特徴：ショートレンジ1本狙いが安定。ミドル以上にばらつき。定石は知っているが実行精度が不安定。再現性に課題。
+コメントのトーン：具体的な改善提案。データに基づく分析。
+視点：「何が勝ちにつながり、何が負けにつながったか」の因果関係。
+
+### Lv4 上級者（実データ基準：ミス率12〜20%、投擲平均5.5〜7.0点、ブレイク平均11〜13点）
+特徴：ミドルレンジ1本狙い8割以上。投擲技術のバリエーション。チーム戦での役割意識。
+コメントのトーン：戦術的。数字の裏の構造的課題を指摘。
+視点：得点パターンの効率性、フェーズごとの判断の質。
+
+### Lv5 日本代表レベル（実データ基準：ミス率5〜12%、投擲平均7.0〜9.0+点、ブレイク平均12〜14+点）
+特徴：ロングレンジでも高精度。高難度技を使い分け。データに基づく判断力と戦術的一貫性。上がり効率が極めて高い。
+コメントのトーン：分析的・戦術的。微細な改善余地を指摘。
+視点：再現性の検証、パフォーマンスの分散、環境条件との相関。
+
+## 実力帯の推定方法
+レベル情報が明示的に提供されない場合、以下の指標から実力帯を推定してコメントのトーンを自動調整すること：
+- ミス率とヒット率が最も信頼性の高い判定指標
+- 投擲平均点とブレイク平均点で裏付け
+- 上がり決定率と得点の標準偏差で再現性を判断
+- 試合数が10未満の場合はデータ不足として断定的なレベル判定を避ける
+
+## 設計思想：「再現性がレベルを分ける」
+日本代表レベルと中級者の本質的な差は「平均値」ではなく「再現性（分散の小ささ）」にある。中級者は良い日なら6ターンで上がれるが、悪い日は21点で終わる。日本代表は常に高い水準を維持する。得点の標準偏差が小さいほど再現性が高い。
+
+## 出力ルール — 厳守
+1. 散文で3〜5行、合計80〜150文字（句読点含む）で書く
+2. 数値をそのまま羅列しない。特徴を言葉で表現する。ただし数を表すときは算用数字を使う（例：x「八割」→o「8割」）。ことわざ・慣用句の漢数字はそのまま（例：o「一石二鳥」）
+3. 物語的表現、比喩・擬人化・ユーモア・意外な例えを積極的に使う
+4. 弱点にも触れてよいが、必ず前向きに言い換えるか愛嬌のある表現にする
+5. 「○○タイプ」「○○型」のような単純な分類で終わらせない
+6. プレイヤーのレベルに合わないアドバイスはしない（初心者に「ゾロ目パターンを意識して」は不適切、日本代表に「まずは当てることから」は不適切）
+7. スコア推移データがある場合は試合の組み立て方の傾向（序盤の攻め方、中盤の安定度、終盤の上がり設計、バーストの発生タイミング等）にも言及する
+8. 環境データがある場合、パフォーマンスに顕著な影響が推測される場合のみコメントに含める（例：「強風下でのヒット率低下」「雨天時のミス増加」）。影響が見られない場合は言及不要
+9. 公序良俗に反する表現・政治宗教差別的表現は禁止
+10. 絵文字は使わない`;
 }
 
-const text = (data.content || [])
-  .filter(c => c.type === "text")
-  .map(c => c.text)
-  .join("")
-  .trim();
+function buildUserPrompt(p) {
+  const n = (v) => (typeof v === "number" && !isNaN(v) ? v : null);
+  const pct = (v) => { const val = n(v); return val !== null ? (val * 100).toFixed(1) + "%" : "データなし"; };
+  const pt = (v) => { const val = n(v); return val !== null ? val.toFixed(2) : "データなし"; };
 
-if (!text) return res.status(502).json({ error: "Anthropic returned empty content" });
+  let prompt = `以下のプレイヤーを分析してください。
 
-return res.status(200).json({ text });
+## プレイヤー基本情報
+プレイヤー名: ${p.playerName || "不明"}
+累計試合数: ${p.gameCount}試合`;
 
+  if (p.level != null && p.level >= 1 && p.level <= 5) {
+    const levelNames = ["", "初心者", "エンジョイ勢", "中級者", "上級者", "日本代表レベル"];
+    const src = p.levelSource === "manual" ? "手動設定" : "自動推定";
+    prompt += `\n実力レベル: Lv${p.level}（${levelNames[p.level]}）[${src}]`;
+  } else {
+    prompt += `\n実力レベル: 未設定（データから推定してください）`;
+  }
 
-} catch (e) {
-return res.status(500).json({ error: "[Server] " + (e.message || "Internal server error") });
-}
+  prompt += `
+
+## 累計指標
+- ヒット率: ${pct(p.hitRate)}
+- 投擲平均点: ${pt(p.avgPts)}
+- ブレイク平均点: ${pt(p.breakAvg)}
+- 勝率: ${pct(p.winRate)}
+- 先攻勝率: ${pct(p.firstWinRate)}
+- 後攻勝率: ${pct(p.lastWinRate)}
+- 上がり決定率: ${pct(p.finishRate)}
+- 2ミス後平均点: ${pt(p.recAvg)}
+- よく獲得するスコア: ${p.topScores || "データなし"}`;
+
+  prompt += `\n\n## 算出指標`;
+  if (n(p.burstCount) !== null) {
+    const per10 = p.gameCount > 0 ? ((p.burstCount / p.gameCount) * 10).toFixed(1) : "0";
+    prompt += `\n- バースト回数: ${p.burstCount}回（${per10}回/10試合）`;
+  }
+  if (n(p.scoreStdDev) !== null) {
+    prompt += `\n- 得点の標準偏差: ${n(p.scoreStdDev).toFixed(2)}（値が小さいほど再現性が高い）`;
+  }
+  if (n(p.zoromeHits) !== null) {
+    prompt += `\n- ゾロ目狙い回数: ${p.zoromeHits}回（12/11/10の2連続上がりルート実行回数）`;
+  }
+  if (n(p.finishEfficiency) !== null) {
+    prompt += `\n- 上がり効率: 38点到達後 平均${n(p.finishEfficiency).toFixed(1)}投で上がり`;
+  }
+
+  if (p.recentScores && Array.isArray(p.recentScores) && p.recentScores.length > 0) {
+    prompt += `\n\n## 直近${p.recentScores.length}試合のスコア推移`;
+    p.recentScores.forEach((game, i) => {
+      if (game && Array.isArray(game.scores)) {
+        const total = game.scores.reduce((a, b) => a + b, 0);
+        const result = game.won ? "勝利" : game.dq ? "失格" : "敗北";
+        prompt += `\n試合${i + 1}（${game.date || "日付不明"}・${result}）: [${game.scores.join(", ")}] 合計${total}点`;
+      }
+    });
+    prompt += `\n\n上記のスコア推移から、試合の組み立て方の傾向（序盤の攻め方、中盤でのスコア積み上げパターン、終盤の上がり設計、バーストの発生タイミング等）を読み取り、コメントに反映してください。`;
+  }
+
+  if (p.environment) {
+    const env = p.environment;
+    const parts = [];
+    if (env.fieldType) parts.push(`フィールド種別: ${env.fieldType}`);
+    if (env.weather) parts.push(`天候: ${env.weather}`);
+    if (env.temperature != null) parts.push(`気温: ${env.temperature}℃`);
+    if (env.windSpeed != null) parts.push(`平均風速: ${env.windSpeed}m/s`);
+    if (parts.length > 0) {
+      prompt += `\n\n## 環境データ（参考情報・言及は任意）\n${parts.join("\n")}`;
+    }
+  }
+
+  return prompt;
 }

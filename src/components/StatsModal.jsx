@@ -4,7 +4,7 @@ import { Target, BarChart3, Lock, Bot, RefreshCw, Star, ClipboardList, AlertTria
 import { PC, MASCOT_R, ANALYSIS_DAILY_MAX } from "../constants.js";
 import { loadStats, loadReplays, loadFavs } from "../db.js";
 import { deleteStatsByPeriod, deleteGameByKey, getAvailableGames, getGameDates, filterGamesByDates, calcMetrics, fmtMD, fmtHM } from "../stats.js";
-import { makeAnalysisKey, getAnalysisCached, fetchPlayerAnalysis, getPlayerAnalysisCount, calcNewIndicators } from "../analysis.js";
+import { makeAnalysisKey, getAnalysisCached, fetchPlayerAnalysis, getPlayerAnalysisCount, calcNewIndicators, getTopScores } from "../analysis.js";
 import { ScoreTable } from "./common.jsx";
 
 /* ═══ Radar Chart SVG ═══ */
@@ -128,20 +128,22 @@ const sv=pd.metrics.scoreValues||[];
 const gc=pd.metrics.gameCount||0;
 const canAnalyze=isFav&&gc>=3;
 const newInd=React.useMemo(()=>calcNewIndicators(playerGames||[]),[playerGames]);
-const[aiText,setAiText]=useState(()=>{if(!canAnalyze)return null;const key=makeAnalysisKey(pd.name,gc,pd.metrics,newInd);return getAnalysisCached(key);});
+const recentScores=React.useMemo(()=>{const games=playerGames||[];return games.slice().sort((a,b)=>new Date(b.d)-new Date(a.d)).slice(0,10).map(g=>({date:g.d?g.d.slice(0,10):null,scores:g.sv||[],won:g.w===1,dq:g.dq===true})).filter(g=>g.scores.length>0);},[playerGames]);
+if(pd.metrics&&pd.metrics.scoreValues&&!pd.metrics.topScores){pd.metrics.topScores=getTopScores(pd.metrics.scoreValues);}
+const[aiText,setAiText]=useState(()=>{if(!canAnalyze)return null;const key=makeAnalysisKey(pd.name,gc,pd.metrics,newInd,recentScores);return getAnalysisCached(key);});
 const[aiLoading,setAiLoading]=useState(false);
 const[aiError,setAiError]=useState(null);
 const remaining=ANALYSIS_DAILY_MAX-getPlayerAnalysisCount(pd.name);
 
 const doAnalyze=useCallback(async(force)=>{
 if(!canAnalyze)return;
-const key=makeAnalysisKey(pd.name,gc,pd.metrics,newInd);
+const key=makeAnalysisKey(pd.name,gc,pd.metrics,newInd,recentScores);
 if(!force){const cached=getAnalysisCached(key);if(cached){setAiText(cached);setAiError(null);return;}}
 setAiLoading(true);setAiError(null);
-const r=await fetchPlayerAnalysis(pd.name,pd.metrics,isAdmin,newInd);
+const r=await fetchPlayerAnalysis(pd.name,pd.metrics,isAdmin,newInd,recentScores,pd.name);
 setAiLoading(false);
 if(r.text){setAiText(r.text);setAiError(null);}else{setAiError(r.error);}
-},[pd.name,gc,isAdmin,canAnalyze,newInd]);
+},[pd.name,gc,isAdmin,canAnalyze,newInd,recentScores]);
 
 /* Trigger from "全員分析" button */
 useEffect(()=>{if(triggerAll&&analyzeKey>0&&canAnalyze&&aiEnabled){doAnalyze(false);}},[analyzeKey]);
