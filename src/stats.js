@@ -138,7 +138,7 @@ return{success,attempts};
 /* Build per-game stats record from history.
 timestamps = array of {teamIndex,playerIndex,ts} for throw timing
 teamOrder[0] = first thrower team for break definition */
-export function buildGameRecord(teams,history,teamOrder,winner,timestamps,favs,overrideD){
+export function buildGameRecord(teams,history,teamOrder,winner,timestamps,favs,overrideD,env){
 const records=[];const d=overrideD||new Date().toISOString();
 const gameStart=timestamps.length>0?timestamps[0].ts:null;
 const gameEnd=timestamps.length>0?timestamps[timestamps.length-1].ts:null;
@@ -197,18 +197,18 @@ const tMax=times.length>0?Math.max(...times):null;
 const tAvg=times.length>0?times.reduce((a,b)=>a+b,0)/times.length:null;
 /* winner name for display */
 const winnerName=winner!==null?teams[winner].players.map(p2=>typeof p2==="object"?p2.name:p2).find((_,pi)=>{const wturns=history.filter(h=>h.teamIndex===winner);const last=wturns[wturns.length-1];return last&&last.playerIndex===pi;})||"":null;
-records.push({nm,data:{d,de:gameEnd,t:turns.length,s:totalPts,m:misses,f:faults,w:won?1:0,o:ojama.success,oa:ojama.attempts,fa:finA,fs:finS,hs:highScores,rc:rec,br:breakScore,tMin,tMax,tAvg,ft:finishType,sv:scoreValues,fo:isFirstOrder?1:0,tv:turnValues,ap:allPlayerNames,wn:gameWinnerName,wm:gameWinnerMembers}});
+records.push({nm,data:{d,de:gameEnd,t:turns.length,s:totalPts,m:misses,f:faults,w:won?1:0,o:ojama.success,oa:ojama.attempts,fa:finA,fs:finS,hs:highScores,rc:rec,br:breakScore,tMin,tMax,tAvg,ft:finishType,sv:scoreValues,fo:isFirstOrder?1:0,tv:turnValues,ap:allPlayerNames,wn:gameWinnerName,wm:gameWinnerMembers,env:env?{fi:env.field||null,rf:env.roof||null,wc:env.weatherCode??null,wl:env.weather||null,tp:env.temp??null,ws:env.windSpeed??null}:null}});
 });});
 return records;
 }
 
 /* ═══ Game Replay Storage ═══ */
-export function saveReplay(d,teams,history,teamOrder,winner,autoEnd,dqEndGame){
+export function saveReplay(d,teams,history,teamOrder,winner,autoEnd,dqEndGame,env){
 try{
 const replays=_cache.replays;
 const slimTeams=teams.map(t=>({name:t.name,players:t.players.map(p=>({name:typeof p==="object"?p.name:p,active:typeof p==="object"?p.active:true}))}));
 const slimHistory=history.map(h=>({turn:h.turn,teamIndex:h.teamIndex,playerIndex:h.playerIndex,playerName:h.playerName,type:h.type,score:h.score,runningTotal:h.runningTotal,prevScore:h.prevScore,reset25:h.reset25,faultReset:h.faultReset,consecutiveFails:h.consecutiveFails}));
-replays[d]={teams:slimTeams,history:slimHistory,teamOrder,winner,autoEnd:!!autoEnd,dqEndGame:!!dqEndGame};
+replays[d]={teams:slimTeams,history:slimHistory,teamOrder,winner,autoEnd:!!autoEnd,dqEndGame:!!dqEndGame,env:env?{fi:env.field,rf:env.roof,wc:env.weatherCode,wl:env.weather,tp:env.temp,ws:env.windSpeed}:null};
 /* Keep max MAX_REPLAYS, remove oldest */
 const keys=Object.keys(replays).sort();
 while(keys.length>MAX_REPLAYS){delete replays[keys.shift()];}
@@ -303,12 +303,13 @@ const gameMap=new Map();
 const replays=loadReplays();
 names.forEach(nm=>{(stats[nm]||[]).forEach(g=>{
 const key=g.d;
-if(!gameMap.has(key)){gameMap.set(key,{d:g.d,de:g.de,players:[],records:[],ft:g.ft||"unknown",winnerMembers:[],hasReplay:!!replays[g.d]});}
+if(!gameMap.has(key)){gameMap.set(key,{d:g.d,de:g.de,players:[],records:[],ft:g.ft||"unknown",winnerMembers:[],hasReplay:!!replays[g.d],env:null});}
 const gm=gameMap.get(key);
 /* Use ap (all players) field if available, otherwise fallback to fav name */
 if(g.ap&&g.ap.length>0){g.ap.forEach(p=>{if(!gm.players.includes(p))gm.players.push(p);});}
 else{if(!gm.players.includes(nm))gm.players.push(nm);}
 gm.records.push({nm,data:g});
+if(g.env&&!gm.env)gm.env=g.env;
 /* Use wn/wm fields if available, otherwise fallback to fav-based detection */
 if(g.wn&&!gm.winnerName)gm.winnerName=g.wn;
 if(g.wm&&g.wm.length>0){g.wm.forEach(m=>{if(!gm.winnerMembers.includes(m))gm.winnerMembers.push(m);});}

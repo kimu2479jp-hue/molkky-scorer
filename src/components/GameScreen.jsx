@@ -1,13 +1,42 @@
 import React, { useState, useEffect, useRef, useCallback, useReducer } from "react";
 import { AlertTriangle, Bot, ChevronLeft, ClipboardList, RefreshCw, Target, Trash2, Users, Undo2 } from "lucide-react";
 
-import { C, MASCOT_R, MAX_NAME, MAX_PL, MAX_FAV, MF, PEN, SS, WIN, ANALYSIS_DAILY_MAX } from "../constants.js";
+import { C, MASCOT_R, MAX_NAME, MAX_PL, MAX_FAV, MF, PEN, SS, WIN, ANALYSIS_DAILY_MAX, FIELD_TYPE_KEY, ROOF_TYPE_KEY, getWeatherInfo } from "../constants.js";
 import { _db, idbSet, loadFavs, loadReplays, _saveFavsRaw } from "../db.js";
 import { _debouncedSync } from "../sync.js";
 import { buildGameRecord, fmtHM, fmtMD, saveGameStatsToDB, saveReplay, renamePlayerData } from "../stats.js";
 import { fetchPlayerAnalysis, getAnalysisCached, getPlayerAnalysisCount, makeAnalysisKey } from "../analysis.js";
 import { failsOf, getPI, reducer, scoreOf, shuf } from "../gameLogic.js";
 import { CSSConfetti, Confirm, FavDropdown, GameSheet, ScoreTable, ShuffleAnimation } from "./common.jsx";
+
+// ═══ Weather fetch via OpenMeteo API ═══
+async function fetchWeatherData() {
+  try {
+    const pos = await new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error("no geolocation"));
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 300000,
+      });
+    });
+    const lat = pos.coords.latitude.toFixed(2);
+    const lon = pos.coords.longitude.toFixed(2);
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&wind_speed_unit=ms&timezone=Asia%2FTokyo`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("API error " + res.status);
+    const data = await res.json();
+    const c = data.current;
+    return {
+      temp: Math.round(c.temperature_2m),
+      weatherCode: c.weather_code,
+      windSpeed: c.wind_speed_10m,
+    };
+  } catch (e) {
+    console.error("weather fetch failed:", e);
+    return null;
+  }
+}
 
 function saveFavs(l){_saveFavsRaw(l);_debouncedSync();}
 export function useFavs(){const[f,sF]=useState(()=>loadFavs());return{favs:f,addF:n=>{const x=n.trim().slice(0,MAX_NAME);if(x&&!f.includes(x)&&f.length<MAX_FAV){const u=[...f,x];sF(u);saveFavs(u);}},rmF:n=>{const u=f.filter(v=>v!==n);sF(u);saveFavs(u);},editF:(oldName,newName)=>{const x=newName.trim().slice(0,MAX_NAME);if(!x||x===oldName||!f.includes(oldName))return false;if(f.includes(x))return false;const u=f.map(v=>v===oldName?x:v);sF(u);saveFavs(u);renamePlayerData(oldName,x);return true;}};}
@@ -242,6 +271,8 @@ const ap=_ap;const cp=ap.length>0?ap[cpIdx]:null;
 const activeCell=winner===null?{teamIndex:ti,playerIndex:cpIdx,turn:currentTurn}:null;
 const _initSaved=(()=>{const m={};if(recoverData&&recoverData.winner!=null){m[((recoverData.gameNumber||1)+"-"+recoverData.history.length)]=true;}return m;})();
 const statsSavedRef=useRef(_initSaved);
+const weatherStartRef=useRef(null);
+const weatherEndRef=useRef(null);
 /* Record timestamp when score is entered */
 const prevHistLen=useRef(0);
 useEffect(()=>{
@@ -292,6 +323,8 @@ window.addEventListener("pagehide",saveNow);
 return()=>{document.removeEventListener("visibilitychange",onVisChange);window.removeEventListener("pagehide",saveNow);};
 },[history,eliminated,currentTurn,winner,teams,teamOrder,currentOrderIdx,gameNumber,plOffsets,gW,numGames,bestOf,autoEnd]);
 
+useEffect(()=>{fetchWeatherData().then(data=>{weatherStartRef.current=data;});},[]);
+
 useEffect(()=>{if(winner!==null&&!showRes){
 setGW(p=>{const n=[...p];n[winner]++;return n;});setShowRes(true);
 setAnimState(p=>({...p,confetti:true}));setTimeout(()=>setAnimState(p=>({...p,confetti:false})),3000);
@@ -300,15 +333,35 @@ if(!statsSavedRef.current[key]){
 statsSavedRef.current[key]=true;
 const d=new Date().toISOString();
 /* Save replay for score table viewing */
-saveReplay(d,teams,history,teamOrder,winner,autoEnd,dqEndGame);
+const fieldType=localStorage.getItem(FIELD_TYPE_KEY)||null;
+const roofType=localStorage.getItem(ROOF_TYPE_KEY)||null;
+saveReplay(d,teams,history,teamOrder,winner,autoEnd,dqEndGame,{field:fieldType,roof:roofType});
 /* Save stats */
-if(saveToStatsProp){const favs=loadFavs();const records=buildGameRecord(teams,history,teamOrder,winner,timestamps,favs,d);saveGameStatsToDB(records);}
+if(saveToStatsProp){
+const favs=loadFavs();
+const buildAndSave=async()=>{
+let env=null;
+try{
+const endData=await fetchWeatherData();
+weatherEndRef.current=endData;
+const startData=weatherStartRef.current;
+if(startData||endData||fieldType||roofType){
+const weatherSource=endData||startData;
+const avgWind=(startData&&endData)?Math.round((startData.windSpeed+endData.windSpeed)/2):weatherSource?Math.round(weatherSource.windSpeed):null;
+env={field:fieldType,roof:roofType,weatherCode:weatherSource?.weatherCode??null,weather:weatherSource?getWeatherInfo(weatherSource.weatherCode).label:null,temp:weatherSource?.temp??null,windSpeed:avgWind,windStart:startData?.windSpeed??null,windEnd:endData?.windSpeed??null};
+}
+}catch(e){console.error("env build error:",e);}
+const records=buildGameRecord(teams,history,teamOrder,winner,timestamps,favs,d,env);
+saveGameStatsToDB(records);
+};
+buildAndSave();
+}
 }
 }},[winner]);
 
 const execConf=()=>{if(!conf)return;if(conf.t==="score")dispatch({type:"SCORE",score:conf.s});else if(conf.t==="miss")dispatch({type:"MISS"});else dispatch({type:"FAULT"});setConf(null);};
-const handleNext=(order,newTeams)=>{if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);turnStartRef.current=Date.now();};
-const handleExtend=(type,order,newTeams)=>{if(type==="game")setNumGames(p=>p+1);else if(type==="set")setBestOf(p=>p+1);if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);turnStartRef.current=Date.now();};
+const handleNext=(order,newTeams)=>{if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);turnStartRef.current=Date.now();fetchWeatherData().then(data=>{weatherStartRef.current=data;});weatherEndRef.current=null;};
+const handleExtend=(type,order,newTeams)=>{if(type==="game")setNumGames(p=>p+1);else if(type==="set")setBestOf(p=>p+1);if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);turnStartRef.current=Date.now();fetchWeatherData().then(data=>{weatherStartRef.current=data;});weatherEndRef.current=null;};
 const extractTeamInfo=()=>teams.map(t=>({name:t.name,players:t.players.map(p=>p.name)}));
 const handleReshuffle=(type)=>{setShowRes(false);goBack(null,type);};
 const handleBack=()=>setSaveDialog(true);const[caKeepDialog,setCaKeepDialog]=useState(false);const[caKeepDiscard,setCaKeepDiscard]=useState(0);/* 0=none,1=first,2=second */
