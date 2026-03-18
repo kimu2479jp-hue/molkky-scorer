@@ -446,8 +446,8 @@ return(<button key={k} onClick={applyPreset} style={{padding:"6px 12px",border:"
 </button>);})}</div>
 </div>):(<div style={{display:"flex",gap:isTab?12:6,marginBottom:10,flexWrap:"wrap",marginTop:6}}>{names.map(nm=>{const isSel=effectiveSelected.includes(nm);const ci=isSel?effectiveSelected.indexOf(nm)%PC.length:0;return(<button key={nm} onClick={()=>toggleSel(nm)} style={{padding:isTab?"12px 28px":"6px 14px",border:"2px solid "+(isSel?PC[ci]:"var(--border-input)"),borderRadius:isTab?36:20,background:isSel?PC[ci]+"22":"#fff",color:isSel?PC[ci]:"#888",fontSize:isTab?28:14,fontWeight:700,cursor:"pointer"}}>{nm}</button>);})}</div>)}
 {playersData.length>0&&(<>
-{/* Level badges */}
-{viewMode!=="current"&&playersData.some(pd=>pd.levelInfo)&&(
+{/* Level badges - admin only */}
+{isAdmin&&viewMode!=="current"&&playersData.some(pd=>pd.levelInfo)&&(
 <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
 {playersData.map(pd=>{
 const li=pd.levelInfo;
