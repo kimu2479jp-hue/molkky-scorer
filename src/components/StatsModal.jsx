@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Target, BarChart3, Lock, Bot, RefreshCw, Star, ClipboardList, AlertTriangle, Trash2 } from "lucide-react";
 
-import { PC, MASCOT_R, ANALYSIS_DAILY_MAX, LEVEL_NAMES, CONFIDENCE_LEVELS, PERIOD_OPTIONS, DEFAULT_PERIOD_MS } from "../constants.js";
+import { PC, MASCOT_R, ANALYSIS_DAILY_MAX, LEVEL_NAMES, CONFIDENCE_LEVELS, PERIOD_OPTIONS, DEFAULT_PERIOD_MS, getWeatherInfo } from "../constants.js";
 import { loadStats, loadReplays, loadFavs, loadPlayerLevels } from "../db.js";
 import { deleteStatsByPeriod, deleteGameByKey, getAvailableGames, getGameDates, filterGamesByDates, filterGamesByPeriod, calcMetrics, fmtMD, fmtHM, estimatePlayerLevel } from "../stats.js";
 import { makeAnalysisKey, getAnalysisCached, fetchPlayerAnalysis, getPlayerAnalysisCount, calcNewIndicators, getTopScores } from "../analysis.js";
@@ -135,15 +135,22 @@ const[aiLoading,setAiLoading]=useState(false);
 const[aiError,setAiError]=useState(null);
 const remaining=ANALYSIS_DAILY_MAX-getPlayerAnalysisCount(pd.name);
 
+const latestEnv=React.useMemo(()=>{
+const games=playerGames||[];
+const latest=games.slice().sort((a,b)=>new Date(b.d)-new Date(a.d))[0];
+if(!latest||!latest.env)return null;
+const e=latest.env;
+return{field:e.fi,roof:e.rf,weather:e.wl,temp:e.tp,windSpeed:e.ws};
+},[playerGames]);
 const doAnalyze=useCallback(async(force)=>{
 if(!canAnalyze)return;
 const key=makeAnalysisKey(pd.name,gc,pd.metrics,newInd,recentScores);
 if(!force){const cached=getAnalysisCached(key);if(cached){setAiText(cached);setAiError(null);return;}}
 setAiLoading(true);setAiError(null);
-const r=await fetchPlayerAnalysis(pd.name,pd.metrics,isAdmin,newInd,recentScores,pd.name);
+const r=await fetchPlayerAnalysis(pd.name,pd.metrics,isAdmin,newInd,recentScores,pd.name,latestEnv);
 setAiLoading(false);
 if(r.text){setAiText(r.text);setAiError(null);}else{setAiError(r.error);}
-},[pd.name,gc,isAdmin,canAnalyze,newInd,recentScores]);
+},[pd.name,gc,isAdmin,canAnalyze,newInd,recentScores,latestEnv]);
 
 /* Trigger from "全員分析" button */
 useEffect(()=>{if(triggerAll&&analyzeKey>0&&canAnalyze&&aiEnabled){doAnalyze(false);}},[analyzeKey]);
@@ -223,6 +230,11 @@ return(<div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 
 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
 <span style={{fontSize:isTab?18:15,fontWeight:800,color:"var(--text-primary)"}}>{dateStr} {timeStr}</span>
 <span style={{fontSize:isTab?14:12,fontWeight:700,color:ftColor,background:ftColor+"18",padding:"2px 8px",borderRadius:4}}>{ftLabel}</span>
+{game.env&&(<span style={{fontSize:isTab?13:11,color:"var(--text-secondary)",display:"flex",alignItems:"center",gap:3}}>
+{game.env.wc!=null&&<span>{getWeatherInfo(game.env.wc).icon}</span>}
+{game.env.tp!=null&&<span>{game.env.tp}℃</span>}
+{game.env.ws!=null&&<span>{game.env.ws}m/s</span>}
+</span>)}
 </div>
 <div style={{fontSize:isTab?15:13,color:"#555",marginTop:3}}>
 {game.players.length}人戦　参加者: {game.players.join(", ")}

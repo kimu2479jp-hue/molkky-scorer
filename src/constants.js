@@ -84,6 +84,60 @@ NORMAL:{min:30,max:99,label:""},
 HIGH:{min:100,max:Infinity,label:"高精度"},
 };
 
+// ═══ Field Type ═══
+export const FIELD_TYPES = [
+  { value: "grass", label: "芝" },
+  { value: "dirt", label: "土" },
+  { value: "sand", label: "砂" },
+  { value: "turf", label: "人工芝" },
+  { value: "other", label: "その他" },
+];
+export const FIELD_TYPE_KEY = "mk-field-type";
+
+// ═══ Roof Type ═══
+export const ROOF_TYPES = [
+  { value: "none", label: "なし" },
+  { value: "roof", label: "屋根あり" },
+  { value: "indoor", label: "屋内" },
+];
+export const ROOF_TYPE_KEY = "mk-roof-type";
+
+// ═══ Weather Code Map (WMO) ═══
+export const WEATHER_MAP = {
+  0: { icon: "☀️", label: "快晴" },
+  1: { icon: "🌤", label: "晴れ" },
+  2: { icon: "⛅", label: "曇りがち" },
+  3: { icon: "☁️", label: "曇り" },
+  45: { icon: "🌫", label: "霧" },
+  48: { icon: "🌫", label: "着氷霧" },
+  51: { icon: "🌦", label: "小雨" },
+  53: { icon: "🌧", label: "雨" },
+  55: { icon: "🌧", label: "強い雨" },
+  56: { icon: "🌧", label: "着氷小雨" },
+  57: { icon: "🌧", label: "着氷雨" },
+  61: { icon: "🌧", label: "小雨" },
+  63: { icon: "🌧", label: "雨" },
+  65: { icon: "🌧", label: "大雨" },
+  66: { icon: "🌧", label: "着氷小雨" },
+  67: { icon: "🌧", label: "着氷大雨" },
+  71: { icon: "🌨", label: "小雪" },
+  73: { icon: "🌨", label: "雪" },
+  75: { icon: "🌨", label: "大雪" },
+  77: { icon: "🌨", label: "霧雪" },
+  80: { icon: "🌦", label: "にわか雨" },
+  81: { icon: "🌧", label: "にわか雨" },
+  82: { icon: "🌧", label: "激しいにわか雨" },
+  85: { icon: "🌨", label: "にわか雪" },
+  86: { icon: "🌨", label: "激しいにわか雪" },
+  95: { icon: "⛈", label: "雷雨" },
+  96: { icon: "⛈", label: "雹を伴う雷雨" },
+  99: { icon: "⛈", label: "激しい雹雷雨" },
+};
+
+export function getWeatherInfo(code) {
+  return WEATHER_MAP[code] || { icon: "❓", label: "不明" };
+}
+
 // ═══ Dev ═══
 export const DEV_MASTER_LIST=["キムラ"];
 

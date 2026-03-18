@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { AlertTriangle, Star, Lock, Settings, Cloud, Upload, BarChart3 } from "lucide-react";
 
-import { MAX_FAV, MAX_NAME, WIN, MF, H1, C, SS, DEV_MASTER_LIST, ANALYSIS_DAILY_MAX, LEVEL_NAMES } from "../constants.js";
+import { MAX_FAV, MAX_NAME, WIN, MF, H1, C, SS, DEV_MASTER_LIST, ANALYSIS_DAILY_MAX, LEVEL_NAMES, FIELD_TYPES, FIELD_TYPE_KEY, ROOF_TYPES, ROOF_TYPE_KEY } from "../constants.js";
 import { ensureBlink, shuf, getFA } from "../gameLogic.js";
 import { getSyncCode, setSyncCodeLS, maskSyncCode, pushToServer, pullFromServer, getPinLockout, incPinAttempt, clearPinLockout, setPinAuthTs, verifyPinOnServer, createPinOnServer, checkServerHasPin, getPinAuthTs } from "../sync.js";
 import { getAnalysisTotal } from "../analysis.js";
@@ -548,6 +548,27 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 {syncStatus&&<div style={{fontSize:14,color:syncStatus.startsWith("✅")?"var(--text-success)":syncStatus.startsWith("❌")?"var(--text-danger)":"var(--accent-blue)",fontWeight:600,marginTop:6}}>{syncStatus}</div>}
 </div>
 </div>
+{/* Field settings */}
+{(()=>{
+const[fieldType,setFieldType]=useState(()=>{try{return localStorage.getItem(FIELD_TYPE_KEY)||null;}catch{return null;}});
+const handleFieldChange=(val)=>{setFieldType(val);try{localStorage.setItem(FIELD_TYPE_KEY,val);}catch(e){}};
+const[roofType,setRoofType]=useState(()=>{try{return localStorage.getItem(ROOF_TYPE_KEY)||null;}catch{return null;}});
+const handleRoofChange=(val)=>{setRoofType(val);try{localStorage.setItem(ROOF_TYPE_KEY,val);}catch(e){}};
+return(<div style={{marginBottom:20}}>
+<div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>フィールド設定</div>
+<div style={{fontSize:12,color:"rgba(255,255,255,0.5)",marginBottom:6,fontWeight:600}}>地面</div>
+<div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
+{FIELD_TYPES.map(ft=>(<button key={ft.value} onClick={()=>handleFieldChange(ft.value)} style={{padding:"10px 18px",border:"2px solid "+(fieldType===ft.value?"var(--accent-green)":"rgba(255,255,255,0.15)"),borderRadius:10,background:fieldType===ft.value?"rgba(34,181,102,0.15)":"rgba(255,255,255,0.05)",color:fieldType===ft.value?"var(--accent-green)":"rgba(255,255,255,0.5)",fontSize:15,fontWeight:700,cursor:"pointer"}}>{ft.label}</button>))}
+</div>
+<div style={{fontSize:12,color:"rgba(255,255,255,0.5)",marginBottom:6,fontWeight:600}}>屋根</div>
+<div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+{ROOF_TYPES.map(rt=>(<button key={rt.value} onClick={()=>handleRoofChange(rt.value)} style={{padding:"10px 18px",border:"2px solid "+(roofType===rt.value?"var(--accent-blue)":"rgba(255,255,255,0.15)"),borderRadius:10,background:roofType===rt.value?"rgba(43,125,233,0.15)":"rgba(255,255,255,0.05)",color:roofType===rt.value?"var(--accent-blue)":"rgba(255,255,255,0.5)",fontSize:15,fontWeight:700,cursor:"pointer"}}>{rt.label}</button>))}
+</div>
+<div style={{fontSize:12,color:"rgba(255,255,255,0.35)",marginTop:6,paddingLeft:4}}>
+{fieldType||roofType?[fieldType&&FIELD_TYPES.find(f=>f.value===fieldType)?.label,roofType&&ROOF_TYPES.find(r=>r.value===roofType)?.label].filter(Boolean).join(" / ")+" を選択中":"未設定（試合データに反映されません）"}
+</div>
+</div>);
+})()}
 {/* Shuffle animation */}
 <div style={{marginBottom:20}}>
 <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>演出</div>

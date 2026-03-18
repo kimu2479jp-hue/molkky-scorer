@@ -292,9 +292,11 @@ function buildUserPrompt(p) {
     const env = p.environment;
     const parts = [];
     if (env.fieldType) parts.push(`フィールド種別: ${env.fieldType}`);
+    if (env.roofType) parts.push(`施設: ${env.roofType}`);
     if (env.weather) parts.push(`天候: ${env.weather}`);
     if (env.temperature != null) parts.push(`気温: ${env.temperature}℃`);
     if (env.windSpeed != null) parts.push(`平均風速: ${env.windSpeed}m/s`);
+    if (env.weatherNote) parts.push(`※ ${env.weatherNote}`);
     if (parts.length > 0) {
       prompt += `\n\n## 環境データ（参考情報・言及は任意）\n${parts.join("\n")}`;
     }
