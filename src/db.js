@@ -1,4 +1,4 @@
-import { IDB_NAME, IDB_VER, STATS_KEY, REPLAY_KEY, ANALYSIS_CACHE_DAYS, SHUF_ANIM_KEY, LS_KEY, LS_FAV_BK } from "./constants.js";
+import { IDB_NAME, IDB_VER, STATS_KEY, REPLAY_KEY, ANALYSIS_CACHE_DAYS, SHUF_ANIM_KEY, LS_KEY, LS_FAV_BK, LS_LEVEL_KEY } from "./constants.js";
 
 // ═══ Shuffle Animation Setting ═══
 export function getShufAnim(){try{const v=localStorage.getItem(SHUF_ANIM_KEY);return v===null?true:v==="true";}catch(e){return true;}}
@@ -115,3 +115,14 @@ return[];
 }catch(e){return[];}
 }
 export function _saveFavsRaw(l){try{localStorage.setItem(LS_KEY,JSON.stringify(l));localStorage.setItem(LS_FAV_BK,JSON.stringify(l));}catch(e){}}
+
+// ═══ Player Manual Level ═══
+export function loadPlayerLevels(){
+try{const d=JSON.parse(localStorage.getItem(LS_LEVEL_KEY));return d&&typeof d==="object"?d:{};}catch(e){return{};}
+}
+export function savePlayerLevel(name,level){
+try{const d=loadPlayerLevels();if(level===null||level===undefined){delete d[name];}else{d[name]=level;}localStorage.setItem(LS_LEVEL_KEY,JSON.stringify(d));}catch(e){}
+}
+export function renamePlayerLevel(oldName,newName){
+try{const d=loadPlayerLevels();if(d[oldName]!==undefined){d[newName]=d[oldName];delete d[oldName];localStorage.setItem(LS_LEVEL_KEY,JSON.stringify(d));}}catch(e){}
+}
