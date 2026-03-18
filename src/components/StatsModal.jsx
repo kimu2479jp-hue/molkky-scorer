@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Target, BarChart3, Lock, Bot, RefreshCw, Star, ClipboardList, AlertTriangle, Trash2 } from "lucide-react";
 
-import { PC, MASCOT_R, ANALYSIS_DAILY_MAX } from "../constants.js";
-import { loadStats, loadReplays, loadFavs } from "../db.js";
-import { deleteStatsByPeriod, deleteGameByKey, getAvailableGames, getGameDates, filterGamesByDates, calcMetrics, fmtMD, fmtHM } from "../stats.js";
+import { PC, MASCOT_R, ANALYSIS_DAILY_MAX, LEVEL_NAMES, CONFIDENCE_LEVELS, PERIOD_OPTIONS, DEFAULT_PERIOD_MS } from "../constants.js";
+import { loadStats, loadReplays, loadFavs, loadPlayerLevels } from "../db.js";
+import { deleteStatsByPeriod, deleteGameByKey, getAvailableGames, getGameDates, filterGamesByDates, filterGamesByPeriod, calcMetrics, fmtMD, fmtHM, estimatePlayerLevel } from "../stats.js";
 import { makeAnalysisKey, getAnalysisCached, fetchPlayerAnalysis, getPlayerAnalysisCount, calcNewIndicators, getTopScores } from "../analysis.js";
 import { ScoreTable } from "./common.jsx";
 
@@ -103,7 +103,7 @@ return(<div key={i} onClick={()=>{if(!isFuture)handleClick(d);}} style={{textAli
 }
 
 /* ═══ Score Distribution Component ═══ */
-function ScoreDistribution({playersData,favs,isAdmin,aiEnabled,stats}){
+function ScoreDistribution({playersData,favs,isAdmin,aiEnabled,getGames}){
 const hasSV=playersData.some(pd=>pd.metrics.scoreValues&&pd.metrics.scoreValues.length>0);
 const[analyzeAll,setAnalyzeAll]=useState(false);
 const[analyzeKey,setAnalyzeKey]=useState(0);
@@ -119,7 +119,7 @@ if(!hasSV)return(<div style={{background:"var(--bg-surface)",borderRadius:14,pad
     <div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)"}}><Target size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> スコア分布分析</div>
     {aiEnabled&&analyzablePlayers.length>1&&<button onClick={()=>{setAnalyzeAll(true);setAnalyzeKey(k=>k+1);}} style={{padding:"6px 14px",border:"none",borderRadius:8,background:"var(--accent-blue)",color:"var(--text-inverse)",fontSize:13,fontWeight:700,cursor:"pointer"}}><Bot size={13} style={{display:"inline",verticalAlign:"middle",marginRight:2}}/> 全員分析</button>}
     </div>
-    {playersData.map(pd=>(<ScoreDistPlayer key={pd.name} pd={pd} SCORE_COLORS={SCORE_COLORS} isFav={(favs||[]).includes(pd.name)} isAdmin={isAdmin} aiEnabled={aiEnabled} triggerAll={analyzeAll} analyzeKey={analyzeKey} playerGames={stats[pd.name]||[]}/>))}
+    {playersData.map(pd=>(<ScoreDistPlayer key={pd.name} pd={pd} SCORE_COLORS={SCORE_COLORS} isFav={(favs||[]).includes(pd.name)} isAdmin={isAdmin} aiEnabled={aiEnabled} triggerAll={analyzeAll} analyzeKey={analyzeKey} playerGames={getGames(pd.name)}/>))}
   </div>);
 }
 
@@ -257,6 +257,8 @@ const[scoreGame,setScoreGame]=useState(null);
 const[deleteConf,setDeleteConf]=useState(null);
 /* E: Calendar pagination */
 const[calPage,setCalPage]=useState(0);
+/* Period filter state (cumulative "all" tab) */
+const[selectedPeriod,setSelectedPeriod]=useState(DEFAULT_PERIOD_MS);
 
 const currentNames=(currentGameRecords||[]).map(r=>r.nm);
 const allNames=favs.filter(n=>(stats[n]&&stats[n].length>0)||currentNames.includes(n));
@@ -335,11 +337,18 @@ const deselectAllRecent=()=>{setSelectedGameKeys(p=>{const n=new Set(p);recentGa
 /* Compute player data based on tab + selection */
 const getPlayerGames=(nm)=>{
 if(viewMode==="current"){const r=(currentGameRecords||[]).find(r2=>r2.nm===nm);return r?[r.data]:[];}
-if(tab==="all")return stats[nm]||[];
+if(tab==="all")return filterGamesByPeriod(stats[nm]||[],selectedPeriod);
 const playerGames=stats[nm]||[];
 return playerGames.filter(g=>selectedGameKeys.has(g.d));
 };
-const playersData=effectiveSelected.map((nm,i)=>{const g=getPlayerGames(nm);const m=calcMetrics(g);return{name:nm,color:PC[i%PC.length],metrics:m,r:m?m.r:[0,0,0,0,0,0]};}).filter(p=>p.metrics);
+const manualLevels=loadPlayerLevels();
+const playersData=effectiveSelected.map((nm,i)=>{const g=getPlayerGames(nm);const m=calcMetrics(g);
+/* Level estimation */
+let levelInfo=null;
+const ml=manualLevels[nm]||null;
+if(ml!==null){levelInfo={level:ml,rawLevel:ml,confidence:"",gameCount:m?m.gameCount:0,source:"manual"};}
+else if(viewMode!=="current"){const est=estimatePlayerLevel(nm,stats[nm]||[],stats,tab==="all"?selectedPeriod:null);levelInfo={...est,source:"auto"};}
+return{name:nm,color:PC[i%PC.length],metrics:m,r:m?m.r:[0,0,0,0,0,0],levelInfo};}).filter(p=>p.metrics);
 
 const doDelete=(p)=>{deleteStatsByPeriod(p);setStats(loadStats());setDelStep(0);};
 
@@ -365,6 +374,14 @@ return(<div className="mk-fade-scale-in" style={{position:"fixed",inset:0,backgr
 <button onClick={()=>{setTab("calendar");setSelectedGameKeys(new Set());}} style={tabBtnStyle("calendar")}>カレンダー</button>
 <button onClick={()=>{setTab("recent");setSelectedGameKeys(new Set());}} style={tabBtnStyle("recent")}>直近の試合</button>
 <button onClick={()=>{setTab("all");}} style={tabBtnStyle("all")}>累計</button>
+</div>
+)}
+{/* Period switcher (cumulative "all" tab only) */}
+{viewMode==="cumulative"&&tab==="all"&&(
+<div style={{display:"flex",gap:4,marginBottom:10,flexWrap:"wrap"}}>
+{PERIOD_OPTIONS.map(opt=>{const active=(selectedPeriod===opt.value);return(
+<button key={opt.label} onClick={()=>setSelectedPeriod(opt.value)} style={{padding:isTab?"8px 16px":"6px 10px",border:active?"2px solid var(--accent-blue)":"1px solid var(--border-input)",borderRadius:8,background:active?"var(--accent-blue)":"var(--bg-surface)",color:active?"var(--text-inverse)":"var(--text-secondary)",fontSize:isTab?15:12,fontWeight:active?800:600,cursor:"pointer"}}>{opt.label}</button>
+);})}
 </div>
 )}
 {/* Calendar Tab */}
@@ -429,6 +446,36 @@ return(<button key={k} onClick={applyPreset} style={{padding:"6px 12px",border:"
 </button>);})}</div>
 </div>):(<div style={{display:"flex",gap:isTab?12:6,marginBottom:10,flexWrap:"wrap",marginTop:6}}>{names.map(nm=>{const isSel=effectiveSelected.includes(nm);const ci=isSel?effectiveSelected.indexOf(nm)%PC.length:0;return(<button key={nm} onClick={()=>toggleSel(nm)} style={{padding:isTab?"12px 28px":"6px 14px",border:"2px solid "+(isSel?PC[ci]:"var(--border-input)"),borderRadius:isTab?36:20,background:isSel?PC[ci]+"22":"#fff",color:isSel?PC[ci]:"#888",fontSize:isTab?28:14,fontWeight:700,cursor:"pointer"}}>{nm}</button>);})}</div>)}
 {playersData.length>0&&(<>
+{/* Level badges - admin only */}
+{isAdmin&&viewMode!=="current"&&playersData.some(pd=>pd.levelInfo)&&(
+<div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:10}}>
+{playersData.map(pd=>{
+const li=pd.levelInfo;
+if(!li)return null;
+let label,color;
+if(li.source==="manual"){
+label="Lv"+li.level+" "+LEVEL_NAMES[li.level]+"(手動設定)";
+color=pd.color;
+}else if(li.level===null){
+label="データ蓄積中";
+color="#999";
+}else if(li.confidence===CONFIDENCE_LEVELS.PROVISIONAL.label){
+label="推定 Lv"+li.level+" "+LEVEL_NAMES[li.level]+"(暫定)";
+color=pd.color;
+}else if(li.confidence===CONFIDENCE_LEVELS.HIGH.label){
+label="Lv"+li.level+" "+LEVEL_NAMES[li.level];
+color=pd.color;
+}else{
+label="推定 Lv"+li.level+" "+LEVEL_NAMES[li.level];
+color=pd.color;
+}
+return(<div key={pd.name} style={{display:"flex",alignItems:"center",gap:6,padding:"6px 12px",background:color+"12",border:"1px solid "+color+"33",borderRadius:8}}>
+<span style={{fontSize:13,fontWeight:800,color:pd.color}}>{pd.name}</span>
+<span style={{fontSize:12,fontWeight:600,color:li.level===null?"#999":color}}>{label}</span>
+</div>);
+})}
+</div>
+)}
 {/* SVG Radar (7-axis) - full width */}
 <div style={{background:"var(--bg-surface)",borderRadius:14,padding:14,border:"1px solid var(--border-input)",marginBottom:14}}>
 <div style={{display:"flex",justifyContent:"center",width:"100%"}}><RadarChart playersData={playersData} size={isTab?600:340}/></div>
@@ -440,7 +487,7 @@ return(<button key={k} onClick={applyPreset} style={{padding:"6px 12px",border:"
 <tbody>{playersData.map(pd=>{const m=pd.metrics;return(<tr key={pd.name} style={{borderBottom:"1px solid var(--border-lighter)"}}><td style={{padding:"8px",fontWeight:700,color:pd.color}}>{pd.name}</td><td style={{padding:"8px",textAlign:"center"}}>{m.gameCount}</td><td style={{padding:"8px",textAlign:"center"}}>{m.winCount}</td><td style={{padding:"8px",textAlign:"center"}}>{m.turnCount}</td><td style={{padding:"8px",textAlign:"center",color:"var(--accent-orange)"}}>{m.missCount}</td><td style={{padding:"8px",textAlign:"center"}}>{(m.missRate*100).toFixed(1)}%</td><td style={{padding:"8px",textAlign:"center"}}>{(m.finishRate*100).toFixed(1)}%</td></tr>);})}</tbody></table>
 </div>
 {/* Score Distribution */}
-<ScoreDistribution playersData={playersData} favs={favs} isAdmin={isAdmin} aiEnabled={aiEnabled!==false} stats={stats}/>
+<ScoreDistribution playersData={playersData} favs={favs} isAdmin={isAdmin} aiEnabled={aiEnabled!==false} getGames={getPlayerGames}/>
 {/* Detailed metrics */}
 <div style={{background:"var(--bg-surface)",borderRadius:14,padding:14,border:"1px solid var(--border-input)",marginBottom:14}}>
 <div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)",marginBottom:8}}><BarChart3 size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 詳細指標</div>

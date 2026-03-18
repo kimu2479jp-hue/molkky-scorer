@@ -38,6 +38,52 @@ export const MAX_REPLAYS=100000;
 export const MAX_SYNC_CODES=1;
 export const SHUF_ANIM_KEY="mk-shuffle-anim";
 
+// ═══ Player Level Storage ═══
+export const LS_LEVEL_KEY="mk-player-levels";
+
+// ═══ Level Estimation Constants ═══
+export const LEVEL_NAMES=["","初心者","エンジョイ勢","中級者","上級者","日本代表レベル"];
+
+export const LEVEL_WEIGHTS={
+hitRate:0.20,avgScore:0.20,finishRate:0.15,scoreStdDev:0.10,
+winRate:0.10,burstRate:0.10,finishEfficiency:0.10,afterDoubleMiss:0.05,
+};
+
+export const LEVEL_BENCHMARKS={
+hitRate:[54,70,72,83,92],
+avgScore:[3.1,4.5,5.2,6.5,8.0],
+finishRate:[0,33,41,60,80],
+winRate:[15,35,45,60,75],
+burstRate:[40,25,15,8,3],
+finishEfficiency:[8.0,5.5,4.0,2.5,1.5],
+afterDoubleMiss:[2.5,3.0,5.0,6.5,8.0],
+scoreStdDev:[4.5,3.8,3.2,2.5,1.8],
+};
+
+export const LEVEL_INVERTED={
+hitRate:false,avgScore:false,finishRate:false,winRate:false,
+burstRate:true,finishEfficiency:true,afterDoubleMiss:false,scoreStdDev:true,
+};
+
+export const SECOND_TURN_BONUS={low:1.3,high:1.5};
+export const DEFAULT_PERIOD_MS=6*30*24*60*60*1000;
+export const MIN_GAMES_FOR_LEVEL=10;
+
+export const PERIOD_OPTIONS=[
+{label:"3ヶ月",value:3*30*24*60*60*1000},
+{label:"6ヶ月",value:6*30*24*60*60*1000},
+{label:"1年",value:365*24*60*60*1000},
+{label:"3年",value:3*365*24*60*60*1000},
+{label:"全期間",value:null},
+];
+
+export const CONFIDENCE_LEVELS={
+NONE:{min:0,max:9,label:"データ蓄積中"},
+PROVISIONAL:{min:10,max:29,label:"暫定"},
+NORMAL:{min:30,max:99,label:""},
+HIGH:{min:100,max:Infinity,label:"高精度"},
+};
+
 // ═══ Dev ═══
 export const DEV_MASTER_LIST=["キムラ"];
 

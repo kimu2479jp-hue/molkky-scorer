@@ -1,5 +1,6 @@
 import { AI_ENABLED_KEY, ANALYSIS_LIMIT_KEY, ANALYSIS_TOTAL_KEY, ANALYSIS_CACHE_DAYS, ANALYSIS_DAILY_MAX } from "./constants.js";
-import { _db, _cache, idbSet } from "./db.js";
+import { _db, _cache, idbSet, loadPlayerLevels } from "./db.js";
+import { estimatePlayerLevel } from "./stats.js";
 
 /* ═══ 新規算出指標（スコア推移から動的計算） ═══ */
 
@@ -152,7 +153,14 @@ const key=makeAnalysisKey(name,gc,m,newIndicators,recentScores);
 if(_analysisPending.has(key))return{text:null,error:"分析中..."};
 _analysisPending.add(key);
 try{
-const res=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerName:playerName||name,gameCount:gc,hitRate:m.missRate!=null?1-m.missRate:null,winRate:m.winRate??null,missRate:m.missRate??null,finishRate:m.finishRate??null,avgPts:m.avgPts??null,breakAvg:m.breakAvg??null,recAvg:m.recAvg??null,firstWinRate:m.firstWinRate??null,lastWinRate:m.lastWinRate??null,topScores:m.topScores||null,burstCount:newIndicators?.burstCount??null,scoreStdDev:newIndicators?.scoreStdDev!=null?Math.round(newIndicators.scoreStdDev*100)/100:null,zoromeHits:newIndicators?.zoromeHits??null,finishEfficiency:newIndicators?.finishEfficiency??null,recentScores:recentScores||null,level:null,levelSource:null,environment:null})});
+/* Determine player level: manual > auto > null */
+const pn=playerName||name;
+const manualLevels=loadPlayerLevels();
+const manualLv=manualLevels[pn]||null;
+let lvl=null,lvlSrc=null;
+if(manualLv!==null){lvl=manualLv;lvlSrc="manual";}
+else{const est=estimatePlayerLevel(pn,(_cache.stats[pn]||[]),_cache.stats);if(est.level!==null){lvl=est.level;lvlSrc="auto";}}
+const res=await fetch("/api/analyze",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({playerName:pn,gameCount:gc,hitRate:m.missRate!=null?1-m.missRate:null,winRate:m.winRate??null,missRate:m.missRate??null,finishRate:m.finishRate??null,avgPts:m.avgPts??null,breakAvg:m.breakAvg??null,recAvg:m.recAvg??null,firstWinRate:m.firstWinRate??null,lastWinRate:m.lastWinRate??null,topScores:m.topScores||null,burstCount:newIndicators?.burstCount??null,scoreStdDev:newIndicators?.scoreStdDev!=null?Math.round(newIndicators.scoreStdDev*100)/100:null,zoromeHits:newIndicators?.zoromeHits??null,finishEfficiency:newIndicators?.finishEfficiency??null,recentScores:recentScores||null,level:lvl,levelSource:lvlSrc,environment:null})});
 if(!res.ok){let errMsg="API "+res.status;try{const raw=await res.text();try{const ej=JSON.parse(raw);if(ej.error)errMsg=typeof ej.error==="string"?ej.error:ej.error.message||errMsg;}catch(_){if(raw)errMsg+=": "+raw.slice(0,120);}}catch(_2){}return{text:null,error:errMsg};}
 const data=await res.json();
 if(data.text){setAnalysisCached(key,data.text);incPlayerAnalysisCount(name);incAnalysisTotal();return{text:data.text,error:null};}

@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from "react";
 import { AlertTriangle, Star, Lock, Settings, Cloud, Upload, BarChart3 } from "lucide-react";
 
-import { MAX_FAV, MAX_NAME, WIN, MF, H1, C, SS, DEV_MASTER_LIST, ANALYSIS_DAILY_MAX } from "../constants.js";
+import { MAX_FAV, MAX_NAME, WIN, MF, H1, C, SS, DEV_MASTER_LIST, ANALYSIS_DAILY_MAX, LEVEL_NAMES } from "../constants.js";
 import { ensureBlink, shuf, getFA } from "../gameLogic.js";
 import { getSyncCode, setSyncCodeLS, maskSyncCode, pushToServer, pullFromServer, getPinLockout, incPinAttempt, clearPinLockout, setPinAuthTs, verifyPinOnServer, createPinOnServer, checkServerHasPin, getPinAuthTs } from "../sync.js";
 import { getAnalysisTotal } from "../analysis.js";
+import { loadPlayerLevels, savePlayerLevel } from "../db.js";
 
 export function Confirm({msg,sub,okLabel,cancelLabel,thirdLabel,onOk,onCancel,onThird}){
 return(<div style={SS.ov}><div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:20,padding:"32px 28px",maxWidth:480,width:"100%",textAlign:"center",boxShadow:"var(--shadow-lg)"}}>
@@ -475,8 +476,9 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
 }
 
 /* ═══ Settings Page ═══ */
-export function SettingsPage({onClose,isAdmin,onAdminToggle,aiEnabled,onAIToggle,shufAnim,onShufAnimToggle}){
+export function SettingsPage({onClose,isAdmin,onAdminToggle,aiEnabled,onAIToggle,shufAnim,onShufAnimToggle,favs}){
 const[showAdminPin,setShowAdminPin]=useState(false);
+const[playerLevels,setPlayerLevels]=useState(()=>loadPlayerLevels());
 const[serverHasPin,setServerHasPin]=useState(null);
 const savedCode=getSyncCode();/* from localStorage — may be stale */
 const[syncInput,setSyncInput]=useState(savedCode);/* input field value */
@@ -568,6 +570,28 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 {isAdmin&&<a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",marginTop:10,padding:"8px 16px",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,background:"rgba(255,255,255,0.06)",color:"var(--accent-blue)",fontSize:13,fontWeight:700,textDecoration:"none"}}>🔗 Anthropicコンソールで残高確認</a>}
 </div>
 </div>
+{/* Player Level Setting (admin only) */}
+{isAdmin&&favs&&favs.length>0&&(
+<div style={{marginBottom:20}}>
+<div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>プレイヤーレベル設定</div>
+<div style={{background:"rgba(255,255,255,0.96)",borderRadius:14,padding:16}}>
+<div style={{fontSize:13,color:"var(--text-secondary)",marginBottom:12}}>AI分析に使用するプレイヤーの実力レベルを設定できます。未設定の場合はスタッツから自動推定されます。</div>
+{favs.map(name=>{
+const current=playerLevels[name]||null;
+const options=[{value:null,label:"自動推定"},...[1,2,3,4,5].map(v=>({value:v,label:"Lv"+v+" "+LEVEL_NAMES[v]}))];
+return(<div key={name} style={{marginBottom:10,paddingBottom:10,borderBottom:"1px solid #eee"}}>
+<div style={{fontSize:15,fontWeight:700,color:"var(--text-primary)",marginBottom:6}}>{name}</div>
+<div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+{options.map(opt=>{
+const isActive=(current===opt.value)||(current==null&&opt.value===null);
+return(<button key={opt.value===null?"auto":opt.value} onClick={()=>{savePlayerLevel(name,opt.value);setPlayerLevels(loadPlayerLevels());}} style={{padding:"5px 10px",border:"2px solid "+(isActive?"var(--accent-blue)":"#ddd"),borderRadius:8,background:isActive?"var(--accent-blue)":"var(--bg-surface)",color:isActive?"var(--text-inverse)":"var(--text-secondary)",fontSize:12,fontWeight:isActive?700:500,cursor:"pointer"}}>{opt.label}</button>);
+})}
+</div>
+</div>);
+})}
+</div>
+</div>
+)}
 </div>
 {showAdminPin&&<AdminPinModal mode={serverHasPin?"verify":"create"} syncCode={getSyncCode()} onSuccess={()=>{setShowAdminPin(false);onAdminToggle(true);setServerHasPin(true);}} onCancel={()=>setShowAdminPin(false)}/>}
 </div>);

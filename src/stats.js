@@ -1,5 +1,5 @@
-import { WIN, MAX_GAMES, MAX_REPLAYS } from "./constants.js";
-import { _cache, _persistStats, _persistReplays, loadReplays } from "./db.js";
+import { WIN, MAX_GAMES, MAX_REPLAYS, LEVEL_WEIGHTS, LEVEL_BENCHMARKS, LEVEL_INVERTED, SECOND_TURN_BONUS, DEFAULT_PERIOD_MS, MIN_GAMES_FOR_LEVEL, CONFIDENCE_LEVELS } from "./constants.js";
+import { _cache, _persistStats, _persistReplays, loadReplays, renamePlayerLevel } from "./db.js";
 import { _debouncedSync, pushToServer } from "./sync.js";
 
 // ═══ Stats Storage Helpers ═══
@@ -102,6 +102,8 @@ if(h.playerName===oldName)h.playerName=newName;
 }
 }
 _persistReplays();
+/* レベル設定のリネーム */
+renamePlayerLevel(oldName,newName);
 _debouncedSync();
 }
 
@@ -338,4 +340,212 @@ const all=stats[nm]||[];
 result[nm]=selectedKeys?all.filter(g=>selectedKeys.has(g.d)):all;
 });
 return result;
+}
+
+// ═══ Level Estimation ═══
+
+/**
+ * Filter games by time period.
+ * @param {Array} games - per-player game record array
+ * @param {number|null} periodMs - period in ms, null = all
+ */
+export function filterGamesByPeriod(games,periodMs){
+if(periodMs===null)return games;
+const cutoff=Date.now()-periodMs;
+return games.filter(g=>{
+const t=new Date(g.d).getTime();
+return t>=cutoff;
+});
+}
+
+/**
+ * Convert a single indicator value to 1.0-5.0 score via linear interpolation.
+ * @param {number} value - actual indicator value
+ * @param {number[]} benchmarks - [Lv1,Lv2,Lv3,Lv4,Lv5] typical values
+ * @param {boolean} inverted - true if lower value = higher level
+ */
+export function calcIndicatorScore(value,benchmarks,inverted){
+if(value==null||isNaN(value))return 3.0;
+if(!inverted){
+if(value<=benchmarks[0])return 1.0;
+if(value>=benchmarks[4])return 5.0;
+for(let i=0;i<4;i++){
+if(value<=benchmarks[i+1]){
+const ratio=(value-benchmarks[i])/(benchmarks[i+1]-benchmarks[i]);
+return(i+1)+ratio;
+}
+}
+return 5.0;
+}else{
+/* inverted: benchmarks are descending [Lv1(high),Lv2,...,Lv5(low)] */
+if(value>=benchmarks[0])return 1.0;
+if(value<=benchmarks[4])return 5.0;
+for(let i=0;i<4;i++){
+if(value>=benchmarks[i+1]){
+const ratio=(benchmarks[i]-value)/(benchmarks[i]-benchmarks[i+1]);
+return(i+1)+ratio;
+}
+}
+return 5.0;
+}
+}
+
+/**
+ * Estimate opponent level from same-game players' stats.
+ * Uses d (date key) to find opponent records in allStats.
+ */
+function estimateOpponentLevel(game,playerName,allStats){
+const opponents=(game.ap||[]).filter(n=>n!==playerName);
+if(opponents.length===0)return null;
+let totalScore=0,count=0;
+for(const opp of opponents){
+const oppGames=allStats[opp];
+if(!oppGames)continue;
+const oppGame=oppGames.find(g=>g.d===game.d);
+if(!oppGame)continue;
+const turns=oppGame.t||0;
+if(turns===0)continue;
+const hitRate=(1-oppGame.m/turns)*100;
+const avgScore=oppGame.s/turns;
+const hs=calcIndicatorScore(hitRate,LEVEL_BENCHMARKS.hitRate,false);
+const as=calcIndicatorScore(avgScore,LEVEL_BENCHMARKS.avgScore,false);
+totalScore+=(hs+as)/2;
+count++;
+}
+return count>0?Math.round(totalScore/count):null;
+}
+
+/**
+ * Calculate adjusted win rate with first/second turn bonus and opponent level consideration.
+ * @param {Array} games - player's game records (period-filtered)
+ * @param {string} playerName - player name
+ * @param {number} currentLevelEstimate - preliminary level (1-5)
+ * @param {object} allStats - full _cache.stats for opponent lookup
+ */
+export function calcAdjustedWinRate(games,playerName,currentLevelEstimate,allStats){
+const bonus=currentLevelEstimate>=4?SECOND_TURN_BONUS.high:SECOND_TURN_BONUS.low;
+let adjWins=0,adjTotal=0;
+for(const g of games){
+const isFirst=g.fo===1;
+const won=g.w===1;
+const opponentLevel=estimateOpponentLevel(g,playerName,allStats);
+let matchWeight=1.0;
+if(opponentLevel!==null){
+const levelDiff=opponentLevel-currentLevelEstimate;
+if(won){matchWeight=1.0+levelDiff*0.1;}
+else{matchWeight=1.0-levelDiff*0.1;}
+matchWeight=Math.max(0.5,Math.min(1.5,matchWeight));
+}
+if(isFirst){
+adjWins+=won?matchWeight:0;
+adjTotal+=matchWeight;
+}else{
+adjWins+=won?(matchWeight*bonus):0;
+adjTotal+=matchWeight*bonus;
+}
+}
+return adjTotal>0?(adjWins/adjTotal)*100:0;
+}
+
+/**
+ * Main level estimation function.
+ * @param {string} playerName
+ * @param {Array} playerGames - this player's game records
+ * @param {object} allStats - full _cache.stats for opponent lookup
+ * @param {number|null} periodMs - filter period in ms
+ */
+export function estimatePlayerLevel(playerName,playerGames,allStats,periodMs){
+if(periodMs===undefined)periodMs=DEFAULT_PERIOD_MS;
+const games=filterGamesByPeriod(playerGames,periodMs);
+const gameCount=games.length;
+if(gameCount<MIN_GAMES_FOR_LEVEL){
+return{level:null,rawLevel:null,confidence:CONFIDENCE_LEVELS.NONE.label,scores:null,indicators:null,adjWinRate:null,gameCount};
+}
+/* Compute metrics from filtered games */
+const m=calcMetrics(games);
+if(!m)return{level:null,rawLevel:null,confidence:CONFIDENCE_LEVELS.NONE.label,scores:null,indicators:null,adjWinRate:null,gameCount};
+
+/* Extract 8 indicators */
+const hitRate=(1-m.missRate)*100;
+const avgScore=m.avgPts;
+const finishRate=m.finishRate*100;
+const recAvg=m.recAvg;
+
+/* Burst rate: count bursts from sv arrays */
+let burstCount=0,gamesWithSv=0;
+const allScores=[];
+const efficiencies=[];
+for(const g of games){
+if(!g.sv||!Array.isArray(g.sv)||g.sv.length===0)continue;
+gamesWithSv++;
+let total=0;
+for(const s of g.sv){total+=s;if(total>50){burstCount++;total=25;}}
+allScores.push(...g.sv);
+/* finish efficiency per game */
+let inFP=false,fThrows=0;
+const eff=[];
+let t2=0;
+for(const s of g.sv){
+t2+=s;if(t2>50){t2=25;inFP=false;fThrows=0;}
+if(t2>=38&&!inFP){inFP=true;fThrows=0;}
+if(inFP){fThrows++;if(t2===50){eff.push(fThrows);inFP=false;fThrows=0;}}
+}
+if(eff.length>0)efficiencies.push(eff.reduce((a,b)=>a+b,0)/eff.length);
+}
+const burstRate=gamesWithSv>0?(burstCount/gamesWithSv)*100:0;
+const finishEfficiency=efficiencies.length>0?efficiencies.reduce((a,b)=>a+b,0)/efficiencies.length:null;
+/* Score std dev */
+let scoreStdDev=null;
+if(allScores.length>=2){
+const mean=allScores.reduce((a,b)=>a+b,0)/allScores.length;
+const variance=allScores.reduce((sum,s)=>sum+(s-mean)*(s-mean),0)/allScores.length;
+scoreStdDev=Math.sqrt(variance);
+}
+
+const values={hitRate,avgScore,finishRate,burstRate,finishEfficiency,afterDoubleMiss:recAvg,scoreStdDev};
+
+/* Preliminary level (without winRate) for win rate correction */
+const prelimKeys=["hitRate","avgScore","finishRate","burstRate","finishEfficiency","afterDoubleMiss","scoreStdDev"];
+const prelimScores={};
+let prelimSum=0,prelimWeightSum=0;
+for(const key of prelimKeys){
+const v=values[key];
+const score=calcIndicatorScore(v,LEVEL_BENCHMARKS[key],LEVEL_INVERTED[key]);
+prelimScores[key]=score;
+prelimSum+=score*LEVEL_WEIGHTS[key];
+prelimWeightSum+=LEVEL_WEIGHTS[key];
+}
+const prelimLevel=Math.max(1,Math.min(5,Math.round(prelimSum/prelimWeightSum)));
+
+/* Adjusted win rate */
+const adjWinRate=calcAdjustedWinRate(games,playerName,prelimLevel,allStats||{});
+
+/* All scores including winRate */
+const allIndicatorScores={...prelimScores};
+allIndicatorScores.winRate=calcIndicatorScore(adjWinRate,LEVEL_BENCHMARKS.winRate,false);
+
+/* Weighted average for final level */
+let totalWeighted=0;
+for(const[key,weight]of Object.entries(LEVEL_WEIGHTS)){
+totalWeighted+=allIndicatorScores[key]*weight;
+}
+const rawLevel=totalWeighted;
+const level=Math.max(1,Math.min(5,Math.round(rawLevel)));
+
+/* Confidence */
+let confidence="";
+if(gameCount<10)confidence=CONFIDENCE_LEVELS.NONE.label;
+else if(gameCount<30)confidence=CONFIDENCE_LEVELS.PROVISIONAL.label;
+else if(gameCount<100)confidence=CONFIDENCE_LEVELS.NORMAL.label;
+else confidence=CONFIDENCE_LEVELS.HIGH.label;
+
+return{
+level,
+rawLevel:Math.round(rawLevel*10)/10,
+confidence,
+scores:allIndicatorScores,
+indicators:values,
+adjWinRate,
+gameCount,
+};
 }
