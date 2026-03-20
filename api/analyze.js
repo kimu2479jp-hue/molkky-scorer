@@ -3,11 +3,42 @@
 // v2.1 — 5-layer analysis system with competition knowledge
 
 export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const allowedOrigins = [
+    process.env.ALLOWED_ORIGIN || "https://molkky-scorer.vercel.app",
+  ];
+  const origin = req.headers.origin || "";
+  const isAllowed = allowedOrigins.includes(origin) || origin.endsWith(".vercel.app");
+  res.setHeader("Access-Control-Allow-Origin", isAllowed ? origin : allowedOrigins[0]);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Vary", "Origin");
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  // --- Authentication: require valid sync_code ---
+  const syncCode = req.body?.syncCode;
+  if (!syncCode || typeof syncCode !== "string" || syncCode.length < 3) {
+    return res.status(401).json({ error: "Authentication required" });
+  }
+  try {
+    const { createClient } = await import("@supabase/supabase-js");
+    const sbUrl = process.env.SUPABASE_URL;
+    const sbKey = process.env.SUPABASE_ANON_KEY;
+    if (sbUrl && sbKey) {
+      const sb = createClient(sbUrl, sbKey);
+      const { data, error } = await sb
+        .from("sync_data")
+        .select("sync_code")
+        .eq("sync_code", syncCode)
+        .single();
+      if (error || !data) {
+        return res.status(401).json({ error: "Invalid sync code" });
+      }
+    }
+  } catch (e) {
+    // Supabase check failed — allow request to proceed rather than breaking AI feature
+    // (fail-open for availability, since the main goal is preventing anonymous abuse)
+  }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(500).json({ error: "API key not configured" });
@@ -38,9 +69,8 @@ export default async function handler(req, res) {
 
     if (!apiRes.ok) {
       const errBody = await apiRes.text().catch(() => "");
-      return res.status(apiRes.status).json({
-        error: `Anthropic API ${apiRes.status}: ${errBody.slice(0, 200)}`,
-      });
+      console.error("Anthropic API error:", apiRes.status, errBody.slice(0, 500));
+      return res.status(502).json({ error: "AI service temporarily unavailable" });
     }
 
     const data = await apiRes.json();
@@ -51,7 +81,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ text });
   } catch (e) {
     console.error("analyze error:", e);
-    return res.status(500).json({ error: e.message || "Internal error" });
+    return res.status(500).json({ error: "Analysis failed" });
   }
 }
 
