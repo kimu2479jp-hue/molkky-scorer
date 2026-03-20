@@ -349,7 +349,7 @@ const d=new Date().toISOString();
 /* Save replay for score table viewing */
 const fieldType=selectedLocation?selectedLocation.field_type:(localStorage.getItem(FIELD_TYPE_KEY)||null);
 const roofType=localStorage.getItem(ROOF_TYPE_KEY)||null;
-saveReplay(d,teams,history,teamOrder,winner,autoEnd,dqEndGame,{field:fieldType,roof:roofType,locationName:selectedLocation?selectedLocation.place_name:null,fieldName:selectedLocation?selectedLocation.sub_name:null,locationId:selectedLocation?selectedLocation.id:null});
+saveReplay(d,teams,history,teamOrder,winner,autoEnd,dqEndGame,{field:fieldType,roof:roofType,venueType:selectedLocation?selectedLocation.venue_type||"outdoor":null,locationName:selectedLocation?selectedLocation.place_name:null,fieldName:selectedLocation?selectedLocation.sub_name:null,locationId:selectedLocation?selectedLocation.id:null});
 /* Save stats */
 if(saveToStatsProp){
 const favs=loadFavs();
@@ -362,7 +362,7 @@ const startData=weatherStartRef.current;
 if(startData||endData||fieldType||roofType){
 const weatherSource=endData||startData;
 const avgWind=(startData&&endData)?Math.round((startData.windSpeed+endData.windSpeed)/2):weatherSource?Math.round(weatherSource.windSpeed):null;
-env={field:fieldType,roof:roofType,weatherCode:weatherSource?.weatherCode??null,weather:weatherSource?getWeatherInfo(weatherSource.weatherCode).label:null,temp:weatherSource?.temp??null,windSpeed:avgWind,windStart:startData?.windSpeed??null,windEnd:endData?.windSpeed??null,locationName:selectedLocation?selectedLocation.place_name:null,fieldName:selectedLocation?selectedLocation.sub_name:null,locationId:selectedLocation?selectedLocation.id:null};
+env={field:fieldType,roof:roofType,venueType:selectedLocation?selectedLocation.venue_type||"outdoor":null,weatherCode:weatherSource?.weatherCode??null,weather:weatherSource?getWeatherInfo(weatherSource.weatherCode).label:null,temp:weatherSource?.temp??null,windSpeed:avgWind,windStart:startData?.windSpeed??null,windEnd:endData?.windSpeed??null,locationName:selectedLocation?selectedLocation.place_name:null,fieldName:selectedLocation?selectedLocation.sub_name:null,locationId:selectedLocation?selectedLocation.id:null};
 }
 }catch(e){console.error("env build error:",e);}
 const records=buildGameRecord(teams,history,teamOrder,winner,timestamps,favs,d,env);

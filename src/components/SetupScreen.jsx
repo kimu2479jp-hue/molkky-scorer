@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { AlertTriangle, BarChart3, ClipboardList, RefreshCw, Settings, Target, Undo2 } from "lucide-react";
 
-import { C, MASCOT_S, MAX_NAME, MAX_PL, MAX_TEAMS, MF, PEN, WIN, LOCATION_FIELD_TYPES, FIELD_TYPE_BADGE_COLORS } from "../constants.js";
+import { C, MASCOT_S, MAX_NAME, MAX_PL, MAX_TEAMS, MF, PEN, WIN, LOCATION_FIELD_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS } from "../constants.js";
 import { _db, idbDel, idbSet, loadFavs, loadStats } from "../db.js";
 import { getSyncCode } from "../sync.js";
 import { getLocations } from "../locationSync.js";
@@ -267,6 +267,7 @@ const LocationSelector=locationList.length>0?(<div style={{marginBottom:10}}>
 <span style={{flex:1}}>
 <span style={{fontSize:14,fontWeight:600,color:"var(--text-primary)"}}>{loc.place_name} - {loc.sub_name}</span>
 <span style={{display:"inline-block",marginLeft:6,padding:"1px 6px",borderRadius:4,fontSize:10,fontWeight:700,color:"#fff",background:FIELD_TYPE_BADGE_COLORS[loc.field_type]||"#6b7280"}}>{fieldLabel(loc.field_type)}</span>
+<span style={{display:"inline-block",marginLeft:4,padding:"1px 6px",borderRadius:4,fontSize:10,fontWeight:700,color:"#fff",background:VENUE_TYPE_BADGE_COLORS[loc.venue_type]||"#3498db"}}>{(VENUE_TYPES.find(v=>v.value===loc.venue_type)||{}).label||"屋根なし"}</span>
 </span>
 </label>))}
 </div>

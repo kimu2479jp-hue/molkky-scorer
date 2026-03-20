@@ -112,6 +112,18 @@ export const FIELD_TYPE_BADGE_COLORS = {
   other: "#6b7280",
 };
 
+// ═══ Venue Type (for location profiles) ═══
+export const VENUE_TYPES = [
+  { value: "outdoor", label: "屋根なし" },
+  { value: "covered", label: "屋根あり" },
+  { value: "indoor", label: "屋内" },
+];
+export const VENUE_TYPE_BADGE_COLORS = {
+  outdoor: "#3498db",
+  covered: "#e67e22",
+  indoor: "#9b59b6",
+};
+
 // ═══ Roof Type ═══
 export const ROOF_TYPES = [
   { value: "none", label: "なし" },

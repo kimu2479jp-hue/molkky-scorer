@@ -43,7 +43,7 @@ export default async function handler(req, res) {
   // POST /api/game-environment — save game environment data
   if (req.method === "POST") {
     const body = req.body || {};
-    const { game_id, location_id, field_type, temperature, wind_speed, wind_direction, weather_code } = body;
+    const { game_id, location_id, field_type, venue_type, temperature, wind_speed, wind_direction, weather_code } = body;
 
     if (!game_id) return res.status(400).json({ error: "Missing game_id" });
     if (!field_type) return res.status(400).json({ error: "Missing field_type" });
@@ -52,11 +52,16 @@ export default async function handler(req, res) {
     if (!validTypes.includes(field_type)) {
       return res.status(400).json({ error: "Invalid field_type" });
     }
+    const validVenueTypes = ["outdoor", "covered", "indoor"];
+    if (venue_type && !validVenueTypes.includes(venue_type)) {
+      return res.status(400).json({ error: "Invalid venue_type" });
+    }
 
     const record = {
       game_id,
       location_id: location_id || null,
       field_type,
+      venue_type: venue_type || "outdoor",
       temperature: temperature ?? null,
       wind_speed: wind_speed ?? null,
       wind_direction: wind_direction != null ? Math.round(wind_direction) : null,

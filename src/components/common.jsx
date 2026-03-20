@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { AlertTriangle, Star, Lock, Settings, Cloud, Upload, BarChart3, MapPin, Plus, Pencil, Trash2, Search, X } from "lucide-react";
 
-import { MAX_FAV, MAX_NAME, WIN, MF, H1, C, SS, DEV_MASTER_LIST, ANALYSIS_DAILY_MAX, LEVEL_NAMES, FIELD_TYPES, FIELD_TYPE_KEY, ROOF_TYPES, ROOF_TYPE_KEY, LOCATION_FIELD_TYPES, FIELD_TYPE_BADGE_COLORS } from "../constants.js";
+import { MAX_FAV, MAX_NAME, WIN, MF, H1, C, SS, DEV_MASTER_LIST, ANALYSIS_DAILY_MAX, LEVEL_NAMES, FIELD_TYPES, FIELD_TYPE_KEY, ROOF_TYPES, ROOF_TYPE_KEY, LOCATION_FIELD_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS } from "../constants.js";
 import { ensureBlink, shuf, getFA } from "../gameLogic.js";
 import { getSyncCode, setSyncCodeLS, maskSyncCode, pushToServer, pullFromServer, getPinLockout, incPinAttempt, clearPinLockout, setPinAuthTs, verifyPinOnServer, createPinOnServer, checkServerHasPin, getPinAuthTs } from "../sync.js";
 import { getAnalysisTotal } from "../analysis.js";
@@ -505,6 +505,7 @@ const[regStep,setRegStep]=useState(1);
 const[regPlaceName,setRegPlaceName]=useState("");
 const[regSubName,setRegSubName]=useState("");
 const[regFieldType,setRegFieldType]=useState("");
+const[regVenueType,setRegVenueType]=useState("outdoor");
 const[regLat,setRegLat]=useState("");
 const[regLng,setRegLng]=useState("");
 const[regPlaceId,setRegPlaceId]=useState("");
@@ -516,7 +517,7 @@ useEffect(()=>{
 if(isAdmin&&syncConfirmed){getLocations().then(l=>{setLocs(l||[]);setLocLoading(false);}).catch(()=>setLocLoading(false));}
 else{setLocLoading(false);}
 },[isAdmin,syncConfirmed]);
-const resetLocForm=()=>{setRegStep(1);setRegPlaceName("");setRegSubName("");setRegFieldType("");setRegLat("");setRegLng("");setRegPlaceId("");setSearchQuery("");setSearchResults([]);setSearchErr("");setEditLoc(null);};
+const resetLocForm=()=>{setRegStep(1);setRegPlaceName("");setRegSubName("");setRegFieldType("");setRegVenueType("outdoor");setRegLat("");setRegLng("");setRegPlaceId("");setSearchQuery("");setSearchResults([]);setSearchErr("");setEditLoc(null);};
 const handleLocSearch=async()=>{
 if(!searchQuery.trim()||searchQuery.trim().length<2)return;
 setSearching(true);setSearchErr("");
@@ -542,11 +543,11 @@ setLocBusy(true);setLocErr("");
 const code=getSyncCode();
 const placeId=regPlaceId||("manual_"+Date.now());
 if(editLoc){
-const r=await updateLocation(code,pin,editLoc.id,{sub_name:regSubName.trim(),field_type:regFieldType});
+const r=await updateLocation(code,pin,editLoc.id,{sub_name:regSubName.trim(),field_type:regFieldType,venue_type:regVenueType});
 if(r.ok){const fresh=await getLocations();setLocs(fresh);setShowLocModal(false);resetLocForm();}
 else{setLocErr(r.error==="Unauthorized"?"PIN認証に失敗しました":("更新に失敗しました: "+r.error));}
 }else{
-const r=await createLocation(code,pin,{google_place_id:placeId,place_name:regPlaceName.trim(),sub_name:regSubName.trim(),field_type:regFieldType,latitude:lat,longitude:lng});
+const r=await createLocation(code,pin,{google_place_id:placeId,place_name:regPlaceName.trim(),sub_name:regSubName.trim(),field_type:regFieldType,venue_type:regVenueType,latitude:lat,longitude:lng});
 if(r.ok){const fresh=await getLocations();setLocs(fresh);setShowLocModal(false);resetLocForm();}
 else{setLocErr(r.error==="duplicate"?"このサブロケーション名は既に登録されています":r.error==="Unauthorized"?"PIN認証に失敗しました":("登録に失敗しました: "+r.error));}
 }
@@ -562,12 +563,13 @@ else{setLocErr("削除に失敗しました");}
 setLocBusy(false);setDelConfirm(null);
 };
 const openLocEdit=(loc)=>{
-setEditLoc(loc);setRegPlaceName(loc.place_name);setRegSubName(loc.sub_name);setRegFieldType(loc.field_type);
+setEditLoc(loc);setRegPlaceName(loc.place_name);setRegSubName(loc.sub_name);setRegFieldType(loc.field_type);setRegVenueType(loc.venue_type||"outdoor");
 setRegLat(String(loc.latitude));setRegLng(String(loc.longitude));setRegPlaceId(loc.google_place_id);setRegStep(2);setShowLocModal(true);
 };
 const locGrouped={};
 locs.forEach(l=>{if(!locGrouped[l.place_name])locGrouped[l.place_name]=[];locGrouped[l.place_name].push(l);});
 const locFieldLabel=(v)=>(LOCATION_FIELD_TYPES.find(f=>f.value===v)||{}).label||v;
+const locVenueLabel=(v)=>(VENUE_TYPES.find(f=>f.value===v)||{}).label||v;
 /* On mount: verify saved code is actually valid on server */
 useEffect(()=>{if(savedCode){checkServerHasPin(savedCode).then(r=>{setServerHasPin(r.has_pin);setSyncConfirmed(r.exists);if(!r.exists){setSyncInput("");setSyncCodeLS("");}});}else{setServerHasPin(false);setSyncConfirmed(false);}},[]);
 /* Remote kick */
@@ -659,6 +661,7 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 <div style={{flex:1}}>
 <span style={{fontSize:14,fontWeight:600,color:"var(--text-primary)"}}>{loc.sub_name}</span>
 <span style={{display:"inline-block",marginLeft:8,padding:"2px 8px",borderRadius:6,fontSize:11,fontWeight:700,color:"#fff",background:FIELD_TYPE_BADGE_COLORS[loc.field_type]||"#6b7280"}}>{locFieldLabel(loc.field_type)}</span>
+<span style={{display:"inline-block",marginLeft:4,padding:"2px 8px",borderRadius:6,fontSize:11,fontWeight:700,color:"#fff",background:VENUE_TYPE_BADGE_COLORS[loc.venue_type]||"#3498db"}}>{locVenueLabel(loc.venue_type||"outdoor")}</span>
 </div>
 <button onClick={()=>openLocEdit(loc)} style={{width:32,height:32,border:"none",borderRadius:6,background:"rgba(43,125,233,0.1)",color:"var(--accent-blue)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Pencil size={14}/></button>
 <button onClick={()=>setDelConfirm(loc)} style={{width:32,height:32,border:"none",borderRadius:6,background:"rgba(231,76,60,0.1)",color:"var(--text-danger)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Trash2 size={14}/></button>
@@ -708,6 +711,12 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 <label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>フィールド種別 *</label>
 <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
 {LOCATION_FIELD_TYPES.map(ft=>(<button key={ft.value} onClick={()=>setRegFieldType(ft.value)} style={{padding:"8px 14px",border:"2px solid "+(regFieldType===ft.value?FIELD_TYPE_BADGE_COLORS[ft.value]||"#6b7280":"#ddd"),borderRadius:8,background:regFieldType===ft.value?"rgba(0,0,0,0.05)":"#fff",color:regFieldType===ft.value?FIELD_TYPE_BADGE_COLORS[ft.value]||"#333":"#666",fontSize:14,fontWeight:regFieldType===ft.value?700:500,cursor:"pointer"}}>{ft.label}</button>))}
+</div>
+</div>
+<div style={{marginBottom:12}}>
+<label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>環境タイプ *</label>
+<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+{VENUE_TYPES.map(vt=>(<button key={vt.value} onClick={()=>setRegVenueType(vt.value)} style={{padding:"8px 14px",border:"2px solid "+(regVenueType===vt.value?VENUE_TYPE_BADGE_COLORS[vt.value]||"#6b7280":"#ddd"),borderRadius:8,background:regVenueType===vt.value?"rgba(0,0,0,0.05)":"#fff",color:regVenueType===vt.value?VENUE_TYPE_BADGE_COLORS[vt.value]||"#333":"#666",fontSize:14,fontWeight:regVenueType===vt.value?700:500,cursor:"pointer"}}>{vt.label}</button>))}
 </div>
 </div>
 {!editLoc&&<>

@@ -100,13 +100,17 @@ export default async function handler(req, res) {
 
     // --- Action: create ---
     if (action === "create") {
-      const { google_place_id, place_name, sub_name, field_type, latitude, longitude } = body;
+      const { google_place_id, place_name, sub_name, field_type, venue_type, latitude, longitude } = body;
       if (!google_place_id || !place_name || !sub_name || !field_type) {
         return res.status(400).json({ error: "Missing required fields: google_place_id, place_name, sub_name, field_type" });
       }
       const validTypes = ["grass", "dirt", "sand", "artificial_grass", "other"];
       if (!validTypes.includes(field_type)) {
         return res.status(400).json({ error: "Invalid field_type" });
+      }
+      const validVenueTypes = ["outdoor", "covered", "indoor"];
+      if (venue_type && !validVenueTypes.includes(venue_type)) {
+        return res.status(400).json({ error: "Invalid venue_type" });
       }
       if (typeof latitude !== "number" || typeof longitude !== "number") {
         return res.status(400).json({ error: "Invalid coordinates" });
@@ -119,6 +123,7 @@ export default async function handler(req, res) {
           place_name,
           sub_name,
           field_type,
+          venue_type: venue_type || "outdoor",
           latitude,
           longitude,
         })
@@ -147,6 +152,13 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: "Invalid field_type" });
         }
         updates.field_type = body.field_type;
+      }
+      if (body.venue_type !== undefined) {
+        const validVenueTypes = ["outdoor", "covered", "indoor"];
+        if (!validVenueTypes.includes(body.venue_type)) {
+          return res.status(400).json({ error: "Invalid venue_type" });
+        }
+        updates.venue_type = body.venue_type;
       }
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ error: "No fields to update" });
