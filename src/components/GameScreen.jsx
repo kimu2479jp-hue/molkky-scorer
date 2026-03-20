@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useReducer } from "react";
 import { AlertTriangle, Bot, ChevronLeft, ClipboardList, RefreshCw, Target, Trash2, Users, Undo2 } from "lucide-react";
 
-import { C, MASCOT_R, MAX_NAME, MAX_PL, MAX_FAV, MF, PEN, SS, WIN, ANALYSIS_DAILY_MAX, FIELD_TYPE_KEY, ROOF_TYPE_KEY, getWeatherInfo } from "../constants.js";
+import { C, MASCOT_R, MAX_NAME, MAX_PL, MAX_FAV, MF, PEN, SS, WIN, ANALYSIS_DAILY_MAX, getWeatherInfo } from "../constants.js";
 import { _db, idbSet, loadFavs, loadReplays, _saveFavsRaw } from "../db.js";
 import { _debouncedSync } from "../sync.js";
 import { buildGameRecord, fmtHM, fmtMD, saveGameStatsToDB, saveReplay, renamePlayerData } from "../stats.js";
@@ -347,8 +347,8 @@ if(!statsSavedRef.current[key]){
 statsSavedRef.current[key]=true;
 const d=new Date().toISOString();
 /* Save replay for score table viewing */
-const fieldType=selectedLocation?selectedLocation.field_type:(localStorage.getItem(FIELD_TYPE_KEY)||null);
-const roofType=localStorage.getItem(ROOF_TYPE_KEY)||null;
+const fieldType=selectedLocation?selectedLocation.field_type:null;
+const roofType=null;
 saveReplay(d,teams,history,teamOrder,winner,autoEnd,dqEndGame,{field:fieldType,roof:roofType,venueType:selectedLocation?selectedLocation.venue_type||"outdoor":null,locationName:selectedLocation?selectedLocation.place_name:null,fieldName:selectedLocation?selectedLocation.sub_name:null,locationId:selectedLocation?selectedLocation.id:null});
 /* Save stats */
 if(saveToStatsProp){
