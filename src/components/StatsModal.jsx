@@ -242,6 +242,7 @@ return(<div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 
 {(()=>{const fl=getFieldLabel(game.env);return fl?<span style={{padding:"1px 7px",borderRadius:5,fontSize:isTab?12:10,fontWeight:700,color:"#fff",background:FIELD_TYPE_BADGE_COLORS[game.env.fi]||"#6b7280"}}>{fl}</span>:null;})()}
 {game.env.vt&&game.env.vt!=="outdoor"&&<span style={{padding:"1px 7px",borderRadius:5,fontSize:isTab?12:10,fontWeight:700,color:"#fff",background:VENUE_TYPE_BADGE_COLORS[game.env.vt]||"#9b59b6"}}>{(VENUE_TYPES.find(v=>v.value===game.env.vt)||{}).label||game.env.vt}</span>}
 </span>)}
+{!game.env&&<span style={{fontSize:isTab?13:11,color:"var(--text-secondary)"}}>不明</span>}
 </div>
 <div style={{fontSize:isTab?15:13,color:"#555",marginTop:3}}>
 {game.players.length}人戦　参加者: {game.players.join(", ")}
