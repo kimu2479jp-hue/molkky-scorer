@@ -394,7 +394,7 @@ return(<table style={{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"
 <th style={{background:"#1e4a72",position:forCapture?"static":"sticky",top:H1,zIndex:7,padding:0,borderTop:"none",borderBottom:"2px solid #0d2a48"}}/>
 {ordered.map(o=>{const isAcTeam=activeCell&&activeCell.teamIndex===o.idx;const col=isCollapsed(o.idx);return(<React.Fragment key={o.idx}>
 {!col&&o.ap.map((p,pi)=>(<th key={pi} style={{background:isAcTeam?"#14365a":"#3d5a80",color:"#fff",fontWeight:800,fontSize:fs*0.78,textAlign:"center",verticalAlign:"top",borderLeft:pi===0?bl+(isAcTeam?"#ffc107":"#4b5563"):"1px solid rgba(255,255,255,0.15)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,letterSpacing:fs<=11?0:1,textShadow:"0 1px 3px rgba(0,0,0,0.4)"}}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>{p.name.slice(0,MAX_NAME)}</span></th>))}
-<th style={{background:col?"#3d5a80":"#0d2a48",color:col?"#fff":"#ffd700",fontWeight:900,textAlign:"center",verticalAlign:"top",borderLeft:col?bl+"#4b5563":"1px solid rgba(255,255,255,0.2)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,textShadow:"0 1px 3px rgba(0,0,0,0.4)",cursor:col?"pointer":"default"}} onClick={col?()=>setExpandedTeam(expandedTeam===o.idx?null:o.idx):undefined}><span style={{...VT,fontSize:fs*0.78,maxHeight:nh,fontWeight:900}}>{col?o.team.name.slice(0,3):"計"}</span></th>
+<th style={{background:col?"#3d5a80":"#0d2a48",color:col?"#fff":"rgba(255,200,100,0.85)",fontWeight:900,textAlign:"center",verticalAlign:"top",borderLeft:col?bl+"#4b5563":"2px solid rgba(255,180,50,0.45)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,textShadow:"0 1px 3px rgba(0,0,0,0.4)",cursor:col?"pointer":"default"}} onClick={col?()=>setExpandedTeam(expandedTeam===o.idx?null:o.idx):undefined}><span style={{...VT,fontSize:col?fs*0.78:fs*0.78-1,maxHeight:nh,fontWeight:900,letterSpacing:col?0:1}}>{col?o.team.name.slice(0,3):"計"}</span></th>
 </React.Fragment>);})}
 </tr></thead>
 <tbody>{showRows===0?(<tr><td colSpan={totalCols} style={{color:"#bbb",padding:24,fontSize:fs*0.8,textAlign:"center",borderBottom:"1px solid var(--border-lighter)"}}>スコアを入力してください</td></tr>):(
@@ -410,7 +410,7 @@ if(isP){if((e.type==="miss"||e.type==="fault")&&cf===1)bg="#fff9db";if((e.type==
 const cs={padding:cp,textAlign:"center",borderBottom:"1px solid var(--border-input)",color:clr,fontWeight:fw,background:bg,borderLeft:pi===0?bl+C[o.idx].ac+"33":"1px solid var(--border-lighter)",fontSize:fs};
 if(isAct)cs.animation="mk-blink 1s ease-in-out infinite";
 return <td key={pi} style={cs}>{txt}</td>;
-})}<td style={{padding:cp,textAlign:"center",borderBottom:"1px solid var(--border-input)",fontWeight:900,color:C[o.idx].tx,background:e?"#f0f3f8":"transparent",borderLeft:col?bl+"#4b5563":"2px solid #d0d0d0",fontSize:fs}}>{e?(dqWinnerIdx!=null&&o.idx===dqWinnerIdx&&turn===dqWinLastTurn?WIN:e.runningTotal):""}</td></React.Fragment>);
+})}<td style={{padding:cp,textAlign:"center",borderBottom:"1px solid var(--border-input)",fontWeight:900,color:C[o.idx].tx,background:e?"#f0f3f8":"transparent",borderLeft:col?bl+"#4b5563":"2px solid rgba(255,180,50,0.45)",fontSize:fs}}>{e?(dqWinnerIdx!=null&&o.idx===dqWinnerIdx&&turn===dqWinLastTurn?WIN:e.runningTotal):""}</td></React.Fragment>);
 })}
 </tr>);
 })
@@ -485,7 +485,7 @@ const[syncInput,setSyncInput]=useState(savedCode);/* input field value */
 const[syncConfirmed,setSyncConfirmed]=useState(!!savedCode);/* was a sync ever successful? */
 const[syncStatus,setSyncStatus]=useState("");
 const total=getAnalysisTotal();const totalDisplay=total>=10000?"∞":total;
-const costYen=(total*0.1).toFixed(1);
+const costYen=(total*5.6).toFixed(1);
 /* On mount: verify saved code is actually valid on server */
 useEffect(()=>{if(savedCode){checkServerHasPin(savedCode).then(r=>{setServerHasPin(r.has_pin);setSyncConfirmed(r.exists);if(!r.exists){setSyncInput("");setSyncCodeLS("");}});}else{setServerHasPin(false);setSyncConfirmed(false);}},[]);
 /* Remote kick */
@@ -579,17 +579,17 @@ return(<div style={{marginBottom:20}}>
 <div style={{marginBottom:20}}>
 <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>AI分析</div>
 <SW on={aiEnabled} onToggle={()=>onAIToggle(!aiEnabled)} label={"プレイスタイルAI分析 "+(aiEnabled?"(ON)":"(OFF)")} color="var(--accent-blue)"/>
-<div style={{background:"rgba(255,255,255,0.06)",borderRadius:14,padding:16,border:"1px solid rgba(255,255,255,0.08)"}}>
+{isAdmin&&<div style={{background:"rgba(255,255,255,0.06)",borderRadius:14,padding:16,border:"1px solid rgba(255,255,255,0.08)"}}>
 <div style={{fontSize:14,fontWeight:700,color:"var(--text-inverse)",marginBottom:10,display:"flex",alignItems:"center",gap:4}}><BarChart3 size={16}/> 累計使用量</div>
 <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:6}}>
 <span style={{fontSize:36,fontWeight:900,color:"var(--accent-blue)"}}>{totalDisplay}</span>
 <span style={{fontSize:14,color:"rgba(255,255,255,0.5)"}}>回使用</span>
 </div>
 <div style={{fontSize:13,color:"rgba(255,255,255,0.4)"}}>推定コスト: 約{costYen}円</div>
-<div style={{fontSize:12,color:"rgba(255,255,255,0.3)",marginTop:2}}>1回 ≈ 250トークン（Claude Sonnet）</div>
+<div style={{fontSize:12,color:"rgba(255,255,255,0.3)",marginTop:2}}>1回 ≈ 3,500トークン（Claude Opus 4.6）</div>
 <div style={{fontSize:12,color:"rgba(255,255,255,0.3)",marginTop:2}}>メンバー: 1人あたり{ANALYSIS_DAILY_MAX}回/日、管理者: 無制限</div>
-{isAdmin&&<a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",marginTop:10,padding:"8px 16px",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,background:"rgba(255,255,255,0.06)",color:"var(--accent-blue)",fontSize:13,fontWeight:700,textDecoration:"none"}}>🔗 Anthropicコンソールで残高確認</a>}
-</div>
+<a href="https://console.anthropic.com" target="_blank" rel="noopener noreferrer" style={{display:"inline-block",marginTop:10,padding:"8px 16px",border:"1px solid rgba(255,255,255,0.2)",borderRadius:8,background:"rgba(255,255,255,0.06)",color:"var(--accent-blue)",fontSize:13,fontWeight:700,textDecoration:"none"}}>🔗 Anthropicコンソールで残高確認</a>
+</div>}
 </div>
 {/* Player Level Setting (admin only) */}
 {isAdmin&&favs&&favs.length>0&&(
