@@ -1,12 +1,13 @@
-// Location sync — fetch/cache/CRUD for location profiles
+// Location sync — fetch/cache/CRUD for location profiles (scoped by sync_code)
 import { _db, idbGet, idbSet } from "./db.js";
 
 const LOC_CACHE_KEY = "locations";
 
-// Fetch all locations from server, cache in IDB
-export async function pullLocations() {
+// Fetch locations for a sync_code from server, cache in IDB
+export async function pullLocations(syncCode) {
+  if (!syncCode) return [];
   try {
-    const res = await fetch("/api/locations");
+    const res = await fetch("/api/locations?sync_code=" + encodeURIComponent(syncCode));
     if (!res.ok) throw new Error("API error " + res.status);
     const data = await res.json();
     const locs = data.locations || [];
@@ -19,14 +20,15 @@ export async function pullLocations() {
 }
 
 // Get locations: IDB cache first, server fallback
-export async function getLocations() {
+export async function getLocations(syncCode) {
+  if (!syncCode) return [];
   if (_db) {
     try {
       const cached = await idbGet(_db, LOC_CACHE_KEY);
       if (cached && Array.isArray(cached) && cached.length > 0) return cached;
     } catch (e) {}
   }
-  const pulled = await pullLocations();
+  const pulled = await pullLocations(syncCode);
   return pulled || [];
 }
 
@@ -41,7 +43,7 @@ export async function createLocation(code, pin, data) {
     const json = await res.json();
     if (!res.ok) return { ok: false, error: json.error || "create_failed" };
     // Refresh cache
-    await pullLocations();
+    await pullLocations(code);
     return { ok: true, location: json.location };
   } catch (e) {
     return { ok: false, error: "network" };
@@ -58,7 +60,7 @@ export async function updateLocation(code, pin, id, updates) {
     });
     const json = await res.json();
     if (!res.ok) return { ok: false, error: json.error || "update_failed" };
-    await pullLocations();
+    await pullLocations(code);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: "network" };
@@ -75,7 +77,7 @@ export async function deleteLocation(code, pin, id) {
     });
     const json = await res.json();
     if (!res.ok) return { ok: false, error: json.error || "delete_failed" };
-    await pullLocations();
+    await pullLocations(code);
     return { ok: true };
   } catch (e) {
     return { ok: false, error: "network" };

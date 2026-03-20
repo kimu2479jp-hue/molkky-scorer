@@ -514,7 +514,7 @@ const[searchResults,setSearchResults]=useState([]);
 const[searching,setSearching]=useState(false);
 const[searchErr,setSearchErr]=useState("");
 useEffect(()=>{
-if(isAdmin&&syncConfirmed){getLocations().then(l=>{setLocs(l||[]);setLocLoading(false);}).catch(()=>setLocLoading(false));}
+if(isAdmin&&syncConfirmed&&savedCode){getLocations(savedCode).then(l=>{setLocs(l||[]);setLocLoading(false);}).catch(()=>setLocLoading(false));}
 else{setLocLoading(false);}
 },[isAdmin,syncConfirmed]);
 const resetLocForm=()=>{setRegStep(1);setRegPlaceName("");setRegSubName("");setRegFieldType("");setRegVenueType("outdoor");setRegLat("");setRegLng("");setRegPlaceId("");setSearchQuery("");setSearchResults([]);setSearchErr("");setEditLoc(null);};
@@ -544,11 +544,11 @@ const code=getSyncCode();
 const placeId=regPlaceId||("manual_"+Date.now());
 if(editLoc){
 const r=await updateLocation(code,pin,editLoc.id,{sub_name:regSubName.trim(),field_type:regFieldType,venue_type:regVenueType});
-if(r.ok){const fresh=await getLocations();setLocs(fresh);setShowLocModal(false);resetLocForm();}
+if(r.ok){const fresh=await getLocations(code);setLocs(fresh);setShowLocModal(false);resetLocForm();}
 else{setLocErr(r.error==="Unauthorized"?"PIN認証に失敗しました":("更新に失敗しました: "+r.error));}
 }else{
 const r=await createLocation(code,pin,{google_place_id:placeId,place_name:regPlaceName.trim(),sub_name:regSubName.trim(),field_type:regFieldType,venue_type:regVenueType,latitude:lat,longitude:lng});
-if(r.ok){const fresh=await getLocations();setLocs(fresh);setShowLocModal(false);resetLocForm();}
+if(r.ok){const fresh=await getLocations(code);setLocs(fresh);setShowLocModal(false);resetLocForm();}
 else{setLocErr(r.error==="duplicate"?"このサブロケーション名は既に登録されています":r.error==="Unauthorized"?"PIN認証に失敗しました":("登録に失敗しました: "+r.error));}
 }
 setLocBusy(false);
@@ -558,7 +558,7 @@ const pin=adminPinRef.current;
 if(!pin){setLocErr("管理者PINが必要です");return;}
 setLocBusy(true);
 const r=await deleteLocation(getSyncCode(),pin,id);
-if(r.ok){const fresh=await getLocations();setLocs(fresh);}
+if(r.ok){const fresh=await getLocations(getSyncCode());setLocs(fresh);}
 else{setLocErr("削除に失敗しました");}
 setLocBusy(false);setDelConfirm(null);
 };

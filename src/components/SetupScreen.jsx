@@ -22,7 +22,8 @@ const[multiCourtShufData,setMultiCourtShufData]=useState(null);const[allCourtDat
 const[editMode,setEditMode]=useState(false);const[expandedDel,setExpandedDel]=useState(null);const lpRef=useRef(null);const reshuffleGuard=useRef(false);
 const[selectedLocation,setSelectedLocation]=useState(null);
 const[locationList,setLocationList]=useState([]);
-useEffect(()=>{getLocations().then(l=>setLocationList(l||[])).catch(()=>{});},[]);
+const setupSyncCode=getSyncCode();
+useEffect(()=>{if(setupSyncCode){getLocations(setupSyncCode).then(l=>setLocationList(l||[])).catch(()=>{});}},[]); // eslint-disable-line react-hooks/exhaustive-deps
 const[caDiscardStep,setCaDiscardStep]=useState(0);/* 0=none, 1=first confirm, 2=second confirm */
 const[reshuffleSettingsMode,setReshuffleSettingsMode]=useState(false);
 const[draftRestored,setDraftRestored]=useState(false);
@@ -256,7 +257,7 @@ const isSpValid=()=>{if(!sp||!Array.isArray(sp)||sp.length===0)return false;if(!
 const go=()=>{let ft;if(mode==="manual"){ft=teams.slice(0,tc).map(t=>({...t,players:t.players.filter(p=>p.trim())}));if(!ft.every(t=>t.players.length>0))return;}else{if(!sp||!isSpValid())return;ft=sp;}const ord=Array.from({length:ft.length},(_,i)=>i);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats,courtCount,courtCount>=2&&allCourtData?{courtCount,courtTeamCounts,courtData:allCourtData}:null,selectedLocation);};
 const fieldLabel=(v)=>(LOCATION_FIELD_TYPES.find(f=>f.value===v)||{}).label||v;
 const venueLabel=(v)=>(VENUE_TYPES.find(t=>t.value===v)||{}).label||"屋根なし";
-const LocationSelector=(<div style={{marginBottom:14}}>
+const LocationSelector=setupSyncCode?(<div style={{marginBottom:14}}>
 <div style={{fontSize:14,fontWeight:700,color:"rgba(255,255,255,0.5)",letterSpacing:2,marginBottom:6}}>場所</div>
 <div style={{background:"rgba(255,255,255,0.96)",borderRadius:12,padding:10,maxHeight:200,overflow:"auto"}}>
 <label style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,cursor:"pointer",background:!selectedLocation?"rgba(43,125,233,0.08)":"transparent",marginBottom:2}}>
@@ -273,7 +274,7 @@ const LocationSelector=(<div style={{marginBottom:14}}>
 </span>
 </label>))}
 </div>
-</div>);
+</div>):null;
 const usedManual=courtCount>=2?[1,2,3].filter(c=>c<=courtCount).flatMap(c=>courtTeams[c].slice(0,courtTeamCounts[c]).flatMap(t=>t.players)).filter(p=>p.trim()).map(p=>p.trim()):teams.slice(0,tc).flatMap(t=>t.players).filter(p=>p.trim()).map(p=>p.trim());
 const usedShuffle=mems.filter(m=>m.trim()).map(m=>m.trim());const used=mode==="manual"?usedManual:usedShuffle;
 const SL={display:"block",fontSize:14,fontWeight:700,color:"rgba(255,255,255,0.5)",letterSpacing:3,marginBottom:8};

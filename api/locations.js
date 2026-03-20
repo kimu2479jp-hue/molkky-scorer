@@ -62,11 +62,16 @@ export default async function handler(req, res) {
   const supabase = getSupabase();
   if (!supabase) return res.status(500).json({ error: "Supabase not configured" });
 
-  // GET /api/locations — list all locations (no auth required)
+  // GET /api/locations?sync_code=xxx — list locations for a sync_code
   if (req.method === "GET") {
+    const syncCode = req.query.sync_code;
+    if (!syncCode || typeof syncCode !== "string" || syncCode.length < 3) {
+      return res.status(400).json({ error: "sync_code required" });
+    }
     const { data, error } = await supabase
       .from("locations")
       .select("*")
+      .eq("sync_code", syncCode)
       .order("place_name", { ascending: true })
       .order("sub_name", { ascending: true });
     if (error) {
@@ -119,6 +124,7 @@ export default async function handler(req, res) {
       const { data, error } = await supabase
         .from("locations")
         .insert({
+          sync_code: code,
           google_place_id,
           place_name,
           sub_name,
@@ -168,7 +174,8 @@ export default async function handler(req, res) {
       const { error } = await supabase
         .from("locations")
         .update(updates)
-        .eq("id", id);
+        .eq("id", id)
+        .eq("sync_code", code);
       if (error) {
         console.error("location update error:", error.message);
         return res.status(500).json({ error: "update_failed" });
@@ -184,7 +191,8 @@ export default async function handler(req, res) {
       const { error } = await supabase
         .from("locations")
         .delete()
-        .eq("id", id);
+        .eq("id", id)
+        .eq("sync_code", code);
       if (error) {
         console.error("location delete error:", error.message);
         return res.status(500).json({ error: "delete_failed" });
