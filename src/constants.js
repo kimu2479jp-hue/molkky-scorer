@@ -94,6 +94,36 @@ export const FIELD_TYPES = [
 ];
 export const FIELD_TYPE_KEY = "mk-field-type";
 
+// Field type labels for location profiles (matches Supabase CHECK constraint)
+export const LOCATION_FIELD_TYPES = [
+  { value: "grass", label: "芝" },
+  { value: "dirt", label: "土" },
+  { value: "sand", label: "砂" },
+  { value: "artificial_grass", label: "人工芝" },
+  { value: "other", label: "その他" },
+];
+
+// Badge colors for field type display
+export const FIELD_TYPE_BADGE_COLORS = {
+  grass: "#22b566",
+  dirt: "#8B6914",
+  sand: "#C4A35A",
+  artificial_grass: "#7CB342",
+  other: "#6b7280",
+};
+
+// ═══ Venue Type (for location profiles) ═══
+export const VENUE_TYPES = [
+  { value: "outdoor", label: "屋根なし" },
+  { value: "covered", label: "屋根あり" },
+  { value: "indoor", label: "屋内" },
+];
+export const VENUE_TYPE_BADGE_COLORS = {
+  outdoor: "#3498db",
+  covered: "#e67e22",
+  indoor: "#9b59b6",
+};
+
 // ═══ Roof Type ═══
 export const ROOF_TYPES = [
   { value: "none", label: "なし" },

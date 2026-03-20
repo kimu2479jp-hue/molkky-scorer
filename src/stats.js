@@ -197,7 +197,7 @@ const tMax=times.length>0?Math.max(...times):null;
 const tAvg=times.length>0?times.reduce((a,b)=>a+b,0)/times.length:null;
 /* winner name for display */
 const winnerName=winner!==null?teams[winner].players.map(p2=>typeof p2==="object"?p2.name:p2).find((_,pi)=>{const wturns=history.filter(h=>h.teamIndex===winner);const last=wturns[wturns.length-1];return last&&last.playerIndex===pi;})||"":null;
-records.push({nm,data:{d,de:gameEnd,t:turns.length,s:totalPts,m:misses,f:faults,w:won?1:0,o:ojama.success,oa:ojama.attempts,fa:finA,fs:finS,hs:highScores,rc:rec,br:breakScore,tMin,tMax,tAvg,ft:finishType,sv:scoreValues,fo:isFirstOrder?1:0,tv:turnValues,ap:allPlayerNames,wn:gameWinnerName,wm:gameWinnerMembers,env:env?{fi:env.field||null,rf:env.roof||null,wc:env.weatherCode??null,wl:env.weather||null,tp:env.temp??null,ws:env.windSpeed??null}:null}});
+records.push({nm,data:{d,de:gameEnd,t:turns.length,s:totalPts,m:misses,f:faults,w:won?1:0,o:ojama.success,oa:ojama.attempts,fa:finA,fs:finS,hs:highScores,rc:rec,br:breakScore,tMin,tMax,tAvg,ft:finishType,sv:scoreValues,fo:isFirstOrder?1:0,tv:turnValues,ap:allPlayerNames,wn:gameWinnerName,wm:gameWinnerMembers,env:env?{fi:env.field||null,rf:env.roof||null,wc:env.weatherCode??null,wl:env.weather||null,tp:env.temp??null,ws:env.windSpeed??null,ln:env.locationName||null,li:env.locationId||null,fn:env.fieldName||null,vt:env.venueType||null}:null}});
 });});
 return records;
 }
@@ -208,7 +208,7 @@ try{
 const replays=_cache.replays;
 const slimTeams=teams.map(t=>({name:t.name,players:t.players.map(p=>({name:typeof p==="object"?p.name:p,active:typeof p==="object"?p.active:true}))}));
 const slimHistory=history.map(h=>({turn:h.turn,teamIndex:h.teamIndex,playerIndex:h.playerIndex,playerName:h.playerName,type:h.type,score:h.score,runningTotal:h.runningTotal,prevScore:h.prevScore,reset25:h.reset25,faultReset:h.faultReset,consecutiveFails:h.consecutiveFails}));
-replays[d]={teams:slimTeams,history:slimHistory,teamOrder,winner,autoEnd:!!autoEnd,dqEndGame:!!dqEndGame,env:env?{fi:env.field,rf:env.roof,wc:env.weatherCode,wl:env.weather,tp:env.temp,ws:env.windSpeed}:null};
+replays[d]={teams:slimTeams,history:slimHistory,teamOrder,winner,autoEnd:!!autoEnd,dqEndGame:!!dqEndGame,env:env?{fi:env.field,rf:env.roof,wc:env.weatherCode,wl:env.weather,tp:env.temp,ws:env.windSpeed,ln:env.locationName||null,li:env.locationId||null,fn:env.fieldName||null,vt:env.venueType||null}:null};
 /* Keep max MAX_REPLAYS, remove oldest */
 const keys=Object.keys(replays).sort();
 while(keys.length>MAX_REPLAYS){delete replays[keys.shift()];}

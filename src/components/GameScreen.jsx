@@ -10,7 +10,32 @@ import { failsOf, getPI, reducer, scoreOf, shuf } from "../gameLogic.js";
 import { CSSConfetti, Confirm, FavDropdown, GameSheet, ScoreTable, ShuffleAnimation } from "./common.jsx";
 
 // ═══ Weather fetch via OpenMeteo API ═══
-async function fetchWeatherData() {
+// Primary: use stored coordinates from location profile
+// Fallback: browser geolocation (may be blocked by Permissions-Policy)
+async function fetchWeatherFromCoords(lat, lng) {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&timezone=Asia%2FTokyo`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("API error " + res.status);
+    const data = await res.json();
+    const c = data.current;
+    return {
+      temp: Math.round(c.temperature_2m),
+      weatherCode: c.weather_code,
+      windSpeed: c.wind_speed_10m,
+      windDirection: c.wind_direction_10m,
+    };
+  } catch (e) {
+    console.error("weather fetch failed:", e);
+    return null;
+  }
+}
+async function fetchWeatherData(location) {
+  // If location with coordinates is provided, use those
+  if (location && location.latitude && location.longitude) {
+    return fetchWeatherFromCoords(location.latitude, location.longitude);
+  }
+  // Fallback: browser geolocation
   try {
     const pos = await new Promise((resolve, reject) => {
       if (!navigator.geolocation) return reject(new Error("no geolocation"));
@@ -20,20 +45,9 @@ async function fetchWeatherData() {
         maximumAge: 300000,
       });
     });
-    const lat = pos.coords.latitude.toFixed(2);
-    const lon = pos.coords.longitude.toFixed(2);
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m&wind_speed_unit=ms&timezone=Asia%2FTokyo`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("API error " + res.status);
-    const data = await res.json();
-    const c = data.current;
-    return {
-      temp: Math.round(c.temperature_2m),
-      weatherCode: c.weather_code,
-      windSpeed: c.wind_speed_10m,
-    };
+    return fetchWeatherFromCoords(pos.coords.latitude.toFixed(2), pos.coords.longitude.toFixed(2));
   } catch (e) {
-    console.error("weather fetch failed:", e);
+    console.error("weather fetch (geolocation) failed:", e);
     return null;
   }
 }
@@ -248,7 +262,7 @@ return(<><div style={{display:"flex",gap:6,marginBottom:6}}>{[["same","🔁同�
 </>);
 }
 
-export function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goBack,saveToStatsProp,recoverData,isAdmin,aiEnabled,shufAnim,hasCourtAllocation,clearCourtAllocation,courtCount,courtAllocation,onUpdateCourtAllocation,GameResult,StatsModal}){
+export function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goBack,saveToStatsProp,recoverData,selectedLocation,isAdmin,aiEnabled,shufAnim,hasCourtAllocation,clearCourtAllocation,courtCount,courtAllocation,onUpdateCourtAllocation,GameResult,StatsModal}){
 const init=recoverData?{
 teams:recoverData.teams.map(t=>({...t,players:t.players.map(p=>typeof p==="string"?{name:p,active:true}:p)})),
 history:recoverData.history,currentOrderIdx:recoverData.currentOrderIdx,currentTurn:recoverData.currentTurn,
@@ -307,14 +321,14 @@ prevHistLen.current=history.length;
 /* Auto-save progress for crash recovery (includes result screen) */
 useEffect(()=>{
 try{
-const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name:p.name,active:p.active}))})),history,teamOrder,currentOrderIdx,currentTurn,eliminated,gameNumber,plOffsets,dqEndGame:dqEnd,winner,autoEnd:!!autoEnd,gW:gW,numGames,bestOf,savedAt:Date.now()};
+const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name:p.name,active:p.active}))})),history,teamOrder,currentOrderIdx,currentTurn,eliminated,gameNumber,plOffsets,dqEndGame:dqEnd,winner,autoEnd:!!autoEnd,gW:gW,numGames,bestOf,selectedLocation:selectedLocation||null,savedAt:Date.now()};
 if(_db)idbSet(_db,"game-progress",snapshot).catch(e=>console.error("progress save error",e));
 }catch(e){console.error("Progress save failed:",e);}
 },[history,eliminated,currentTurn,winner,gW]);
 /* iOS safety: also save on pagehide/visibilitychange (fires before app kill) */
 useEffect(()=>{
 const saveNow=()=>{try{
-const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name:p.name,active:p.active}))})),history,teamOrder,currentOrderIdx,currentTurn,eliminated,gameNumber,plOffsets,dqEndGame:dqEnd,winner,autoEnd:!!autoEnd,gW:gW,numGames,bestOf,savedAt:Date.now()};
+const snapshot={teams:teams.map(t=>({name:t.name,players:t.players.map(p=>({name:p.name,active:p.active}))})),history,teamOrder,currentOrderIdx,currentTurn,eliminated,gameNumber,plOffsets,dqEndGame:dqEnd,winner,autoEnd:!!autoEnd,gW:gW,numGames,bestOf,selectedLocation:selectedLocation||null,savedAt:Date.now()};
 if(_db)idbSet(_db,"game-progress",snapshot).catch(e=>console.error("progress save error",e));
 }catch(e){}};
 const onVisChange=()=>{if(document.visibilityState==="hidden")saveNow();};
@@ -323,7 +337,7 @@ window.addEventListener("pagehide",saveNow);
 return()=>{document.removeEventListener("visibilitychange",onVisChange);window.removeEventListener("pagehide",saveNow);};
 },[history,eliminated,currentTurn,winner,teams,teamOrder,currentOrderIdx,gameNumber,plOffsets,gW,numGames,bestOf,autoEnd]);
 
-useEffect(()=>{fetchWeatherData().then(data=>{weatherStartRef.current=data;});},[]);
+useEffect(()=>{fetchWeatherData(selectedLocation).then(data=>{weatherStartRef.current=data;});},[]);
 
 useEffect(()=>{if(winner!==null&&!showRes){
 setGW(p=>{const n=[...p];n[winner]++;return n;});setShowRes(true);
@@ -333,22 +347,22 @@ if(!statsSavedRef.current[key]){
 statsSavedRef.current[key]=true;
 const d=new Date().toISOString();
 /* Save replay for score table viewing */
-const fieldType=localStorage.getItem(FIELD_TYPE_KEY)||null;
+const fieldType=selectedLocation?selectedLocation.field_type:(localStorage.getItem(FIELD_TYPE_KEY)||null);
 const roofType=localStorage.getItem(ROOF_TYPE_KEY)||null;
-saveReplay(d,teams,history,teamOrder,winner,autoEnd,dqEndGame,{field:fieldType,roof:roofType});
+saveReplay(d,teams,history,teamOrder,winner,autoEnd,dqEndGame,{field:fieldType,roof:roofType,venueType:selectedLocation?selectedLocation.venue_type||"outdoor":null,locationName:selectedLocation?selectedLocation.place_name:null,fieldName:selectedLocation?selectedLocation.sub_name:null,locationId:selectedLocation?selectedLocation.id:null});
 /* Save stats */
 if(saveToStatsProp){
 const favs=loadFavs();
 const buildAndSave=async()=>{
 let env=null;
 try{
-const endData=await fetchWeatherData();
+const endData=await fetchWeatherData(selectedLocation);
 weatherEndRef.current=endData;
 const startData=weatherStartRef.current;
 if(startData||endData||fieldType||roofType){
 const weatherSource=endData||startData;
 const avgWind=(startData&&endData)?Math.round((startData.windSpeed+endData.windSpeed)/2):weatherSource?Math.round(weatherSource.windSpeed):null;
-env={field:fieldType,roof:roofType,weatherCode:weatherSource?.weatherCode??null,weather:weatherSource?getWeatherInfo(weatherSource.weatherCode).label:null,temp:weatherSource?.temp??null,windSpeed:avgWind,windStart:startData?.windSpeed??null,windEnd:endData?.windSpeed??null};
+env={field:fieldType,roof:roofType,venueType:selectedLocation?selectedLocation.venue_type||"outdoor":null,weatherCode:weatherSource?.weatherCode??null,weather:weatherSource?getWeatherInfo(weatherSource.weatherCode).label:null,temp:weatherSource?.temp??null,windSpeed:avgWind,windStart:startData?.windSpeed??null,windEnd:endData?.windSpeed??null,locationName:selectedLocation?selectedLocation.place_name:null,fieldName:selectedLocation?selectedLocation.sub_name:null,locationId:selectedLocation?selectedLocation.id:null};
 }
 }catch(e){console.error("env build error:",e);}
 const records=buildGameRecord(teams,history,teamOrder,winner,timestamps,favs,d,env);
@@ -360,8 +374,8 @@ buildAndSave();
 }},[winner]);
 
 const execConf=()=>{if(!conf)return;if(conf.t==="score")dispatch({type:"SCORE",score:conf.s});else if(conf.t==="miss")dispatch({type:"MISS"});else dispatch({type:"FAULT"});setConf(null);};
-const handleNext=(order,newTeams)=>{if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);turnStartRef.current=Date.now();fetchWeatherData().then(data=>{weatherStartRef.current=data;});weatherEndRef.current=null;};
-const handleExtend=(type,order,newTeams)=>{if(type==="game")setNumGames(p=>p+1);else if(type==="set")setBestOf(p=>p+1);if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);turnStartRef.current=Date.now();fetchWeatherData().then(data=>{weatherStartRef.current=data;});weatherEndRef.current=null;};
+const handleNext=(order,newTeams)=>{if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);turnStartRef.current=Date.now();fetchWeatherData(selectedLocation).then(data=>{weatherStartRef.current=data;});weatherEndRef.current=null;};
+const handleExtend=(type,order,newTeams)=>{if(type==="game")setNumGames(p=>p+1);else if(type==="set")setBestOf(p=>p+1);if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);turnStartRef.current=Date.now();fetchWeatherData(selectedLocation).then(data=>{weatherStartRef.current=data;});weatherEndRef.current=null;};
 const extractTeamInfo=()=>teams.map(t=>({name:t.name,players:t.players.map(p=>p.name)}));
 const handleReshuffle=(type)=>{setShowRes(false);goBack(null,type);};
 const handleBack=()=>setSaveDialog(true);const[caKeepDialog,setCaKeepDialog]=useState(false);const[caKeepDiscard,setCaKeepDiscard]=useState(0);/* 0=none,1=first,2=second */

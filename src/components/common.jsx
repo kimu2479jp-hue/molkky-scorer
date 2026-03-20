@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
-import { AlertTriangle, Star, Lock, Settings, Cloud, Upload, BarChart3 } from "lucide-react";
+import { AlertTriangle, Star, Lock, Settings, Cloud, Upload, BarChart3, MapPin, Plus, Pencil, Trash2, Search, X } from "lucide-react";
 
-import { MAX_FAV, MAX_NAME, WIN, MF, H1, C, SS, DEV_MASTER_LIST, ANALYSIS_DAILY_MAX, LEVEL_NAMES, FIELD_TYPES, FIELD_TYPE_KEY, ROOF_TYPES, ROOF_TYPE_KEY } from "../constants.js";
+import { MAX_FAV, MAX_NAME, WIN, MF, H1, C, SS, DEV_MASTER_LIST, ANALYSIS_DAILY_MAX, LEVEL_NAMES, FIELD_TYPES, FIELD_TYPE_KEY, ROOF_TYPES, ROOF_TYPE_KEY, LOCATION_FIELD_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS } from "../constants.js";
 import { ensureBlink, shuf, getFA } from "../gameLogic.js";
 import { getSyncCode, setSyncCodeLS, maskSyncCode, pushToServer, pullFromServer, getPinLockout, incPinAttempt, clearPinLockout, setPinAuthTs, verifyPinOnServer, createPinOnServer, checkServerHasPin, getPinAuthTs } from "../sync.js";
 import { getAnalysisTotal } from "../analysis.js";
 import { loadPlayerLevels, savePlayerLevel } from "../db.js";
+import { getLocations, createLocation, updateLocation, deleteLocation } from "../locationSync.js";
 
 export function Confirm({msg,sub,okLabel,cancelLabel,thirdLabel,onOk,onCancel,onThird}){
 return(<div style={SS.ov}><div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:20,padding:"32px 28px",maxWidth:480,width:"100%",textAlign:"center",boxShadow:"var(--shadow-lg)"}}>
@@ -450,12 +451,12 @@ if(mode==="create"){
   if(step===1){if(pin.length<4||pin.length>6){setErr("4〜6桁で入力");return;}setStep(2);setErr("");return;}
   if(step===2){if(pin!==pin2){setErr("PINが一致しません");setPin2("");return;}
     setBusy(true);const r=await createPinOnServer(syncCode,pin);setBusy(false);
-    if(r.ok){setPinAuthTs(r.pin_updated_at);clearPinLockout();onSuccess();}
+    if(r.ok){setPinAuthTs(r.pin_updated_at);clearPinLockout();onSuccess(pin);}
     else{setErr(r.error||"作成に失敗しました");}
   }
 }else{
   setBusy(true);const r=await verifyPinOnServer(syncCode,pin);setBusy(false);
-  if(r.ok){setPinAuthTs(r.pin_updated_at);clearPinLockout();onSuccess();}
+  if(r.ok){setPinAuthTs(r.pin_updated_at);clearPinLockout();onSuccess(pin);}
   else{const lo2=incPinAttempt();setLockInfo(lo2);
     if(lo2.until){setErr("5回失敗のため10分間ロック");setPin("");}
     else{setErr("PINが違います（残"+String(5-(lo2.attempts||0))+"回）");setPin("");}
@@ -479,6 +480,7 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
 export function SettingsPage({onClose,isAdmin,onAdminToggle,aiEnabled,onAIToggle,shufAnim,onShufAnimToggle,favs}){
 const[showAdminPin,setShowAdminPin]=useState(false);
 const[playerLevels,setPlayerLevels]=useState(()=>loadPlayerLevels());
+const adminPinRef=useRef(null);
 const[serverHasPin,setServerHasPin]=useState(null);
 const savedCode=getSyncCode();/* from localStorage — may be stale */
 const[syncInput,setSyncInput]=useState(savedCode);/* input field value */
@@ -486,6 +488,88 @@ const[syncConfirmed,setSyncConfirmed]=useState(!!savedCode);/* was a sync ever s
 const[syncStatus,setSyncStatus]=useState("");
 const total=getAnalysisTotal();const totalDisplay=total>=10000?"∞":total;
 const costYen=(total*5.6).toFixed(1);
+// Field settings state (was in IIFE - must be at top level for Hooks rules)
+const[fieldType,setFieldType]=useState(()=>{try{return localStorage.getItem(FIELD_TYPE_KEY)||null;}catch{return null;}});
+const handleFieldChange=(val)=>{setFieldType(val);try{localStorage.setItem(FIELD_TYPE_KEY,val);}catch(e){}};
+const[roofType,setRoofType]=useState(()=>{try{return localStorage.getItem(ROOF_TYPE_KEY)||null;}catch{return null;}});
+const handleRoofChange=(val)=>{setRoofType(val);try{localStorage.setItem(ROOF_TYPE_KEY,val);}catch(e){}};
+// Location management state (was in IIFE - must be at top level for Hooks rules)
+const[locs,setLocs]=useState([]);
+const[locLoading,setLocLoading]=useState(true);
+const[locErr,setLocErr]=useState("");
+const[showLocModal,setShowLocModal]=useState(false);
+const[editLoc,setEditLoc]=useState(null);
+const[delConfirm,setDelConfirm]=useState(null);
+const[locBusy,setLocBusy]=useState(false);
+const[regStep,setRegStep]=useState(1);
+const[regPlaceName,setRegPlaceName]=useState("");
+const[regSubName,setRegSubName]=useState("");
+const[regFieldType,setRegFieldType]=useState("");
+const[regVenueType,setRegVenueType]=useState("outdoor");
+const[regLat,setRegLat]=useState("");
+const[regLng,setRegLng]=useState("");
+const[regPlaceId,setRegPlaceId]=useState("");
+const[searchQuery,setSearchQuery]=useState("");
+const[searchResults,setSearchResults]=useState([]);
+const[searching,setSearching]=useState(false);
+const[searchErr,setSearchErr]=useState("");
+useEffect(()=>{
+if(isAdmin&&syncConfirmed&&savedCode){getLocations(savedCode).then(l=>{setLocs(l||[]);setLocLoading(false);}).catch(()=>setLocLoading(false));}
+else{setLocLoading(false);}
+},[isAdmin,syncConfirmed]);
+const resetLocForm=()=>{setRegStep(1);setRegPlaceName("");setRegSubName("");setRegFieldType("");setRegVenueType("outdoor");setRegLat("");setRegLng("");setRegPlaceId("");setSearchQuery("");setSearchResults([]);setSearchErr("");setEditLoc(null);};
+const handleLocSearch=async()=>{
+if(!searchQuery.trim()||searchQuery.trim().length<2)return;
+setSearching(true);setSearchErr("");
+try{
+const res=await fetch("/api/places",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:searchQuery.trim(),code:getSyncCode()})});
+if(!res.ok){const j=await res.json();setSearchErr(j.error||"検索に失敗しました");setSearching(false);return;}
+const data=await res.json();
+setSearchResults(data.places||[]);
+if(!data.places||data.places.length===0)setSearchErr("該当する場所が見つかりません");
+}catch(e){setSearchErr("ネットワークエラー");}
+setSearching(false);
+};
+const selectPlace=(place)=>{
+setRegPlaceName(place.name);setRegLat(String(place.lat));setRegLng(String(place.lng));setRegPlaceId(place.place_id);setRegStep(2);
+};
+const handleLocSave=async()=>{
+const pin=adminPinRef.current;
+if(!pin){setLocErr("管理者PINが必要です。設定画面を開き直してください。");return;}
+if(!regPlaceName.trim()||!regSubName.trim()||!regFieldType){setLocErr("全ての項目を入力してください");return;}
+const lat=parseFloat(regLat);const lng=parseFloat(regLng);
+if(isNaN(lat)||isNaN(lng)){setLocErr("緯度・経度を正しく入力してください");return;}
+setLocBusy(true);setLocErr("");
+const code=getSyncCode();
+const placeId=regPlaceId||("manual_"+Date.now());
+if(editLoc){
+const r=await updateLocation(code,pin,editLoc.id,{sub_name:regSubName.trim(),field_type:regFieldType,venue_type:regVenueType});
+if(r.ok){const fresh=await getLocations(code);setLocs(fresh);setShowLocModal(false);resetLocForm();}
+else{setLocErr(r.error==="Unauthorized"?"PIN認証に失敗しました":("更新に失敗しました: "+r.error));}
+}else{
+const r=await createLocation(code,pin,{google_place_id:placeId,place_name:regPlaceName.trim(),sub_name:regSubName.trim(),field_type:regFieldType,venue_type:regVenueType,latitude:lat,longitude:lng});
+if(r.ok){const fresh=await getLocations(code);setLocs(fresh);setShowLocModal(false);resetLocForm();}
+else{setLocErr(r.error==="duplicate"?"このサブロケーション名は既に登録されています":r.error==="Unauthorized"?"PIN認証に失敗しました":("登録に失敗しました: "+r.error));}
+}
+setLocBusy(false);
+};
+const handleLocDelete=async(id)=>{
+const pin=adminPinRef.current;
+if(!pin){setLocErr("管理者PINが必要です");return;}
+setLocBusy(true);
+const r=await deleteLocation(getSyncCode(),pin,id);
+if(r.ok){const fresh=await getLocations(getSyncCode());setLocs(fresh);}
+else{setLocErr("削除に失敗しました");}
+setLocBusy(false);setDelConfirm(null);
+};
+const openLocEdit=(loc)=>{
+setEditLoc(loc);setRegPlaceName(loc.place_name);setRegSubName(loc.sub_name);setRegFieldType(loc.field_type);setRegVenueType(loc.venue_type||"outdoor");
+setRegLat(String(loc.latitude));setRegLng(String(loc.longitude));setRegPlaceId(loc.google_place_id);setRegStep(2);setShowLocModal(true);
+};
+const locGrouped={};
+locs.forEach(l=>{if(!locGrouped[l.place_name])locGrouped[l.place_name]=[];locGrouped[l.place_name].push(l);});
+const locFieldLabel=(v)=>(LOCATION_FIELD_TYPES.find(f=>f.value===v)||{}).label||v;
+const locVenueLabel=(v)=>(VENUE_TYPES.find(f=>f.value===v)||{}).label||v;
 /* On mount: verify saved code is actually valid on server */
 useEffect(()=>{if(savedCode){checkServerHasPin(savedCode).then(r=>{setServerHasPin(r.has_pin);setSyncConfirmed(r.exists);if(!r.exists){setSyncInput("");setSyncCodeLS("");}});}else{setServerHasPin(false);setSyncConfirmed(false);}},[]);
 /* Remote kick */
@@ -549,12 +633,7 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 </div>
 </div>
 {/* Field settings */}
-{(()=>{
-const[fieldType,setFieldType]=useState(()=>{try{return localStorage.getItem(FIELD_TYPE_KEY)||null;}catch{return null;}});
-const handleFieldChange=(val)=>{setFieldType(val);try{localStorage.setItem(FIELD_TYPE_KEY,val);}catch(e){}};
-const[roofType,setRoofType]=useState(()=>{try{return localStorage.getItem(ROOF_TYPE_KEY)||null;}catch{return null;}});
-const handleRoofChange=(val)=>{setRoofType(val);try{localStorage.setItem(ROOF_TYPE_KEY,val);}catch(e){}};
-return(<div style={{marginBottom:20}}>
+<div style={{marginBottom:20}}>
 <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>フィールド設定</div>
 <div style={{fontSize:12,color:"rgba(255,255,255,0.5)",marginBottom:6,fontWeight:600}}>地面</div>
 <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:12}}>
@@ -567,8 +646,112 @@ return(<div style={{marginBottom:20}}>
 <div style={{fontSize:12,color:"rgba(255,255,255,0.35)",marginTop:6,paddingLeft:4}}>
 {fieldType||roofType?[fieldType&&FIELD_TYPES.find(f=>f.value===fieldType)?.label,roofType&&ROOF_TYPES.find(r=>r.value===roofType)?.label].filter(Boolean).join(" / ")+" を選択中":"未設定（試合データに反映されません）"}
 </div>
-</div>);
-})()}
+</div>
+{/* Location management (admin only) */}
+{isAdmin&&syncConfirmed&&<div style={{marginBottom:20}}>
+<div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>場所管理</div>
+<div style={{background:"rgba(255,255,255,0.96)",borderRadius:14,padding:16}}>
+<div style={{fontSize:13,color:"var(--text-secondary)",marginBottom:12}}>モルックができる公共の場所を登録・管理できます。登録した場所は全ユーザーと共有されます。</div>
+<button onClick={()=>{resetLocForm();setShowLocModal(true);}} style={{width:"100%",padding:"12px",border:"2px dashed var(--accent-blue)",borderRadius:10,background:"rgba(43,125,233,0.06)",color:"var(--accent-blue)",fontSize:15,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,marginBottom:12}}><Plus size={18}/> 新しい場所を登録</button>
+{locLoading&&<div style={{textAlign:"center",color:"var(--text-secondary)",fontSize:14,padding:12}}>読み込み中...</div>}
+{!locLoading&&locs.length===0&&<div style={{textAlign:"center",color:"var(--text-secondary)",fontSize:14,padding:12}}>登録された場所はありません</div>}
+{Object.entries(locGrouped).map(([placeName,subs])=>(<div key={placeName} style={{marginBottom:12}}>
+<div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)",marginBottom:6,display:"flex",alignItems:"center",gap:4}}><MapPin size={14}/> {placeName}</div>
+{subs.map(loc=>(<div key={loc.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 12px",background:"#f8f9fa",borderRadius:8,marginBottom:4}}>
+<div style={{flex:1}}>
+<span style={{fontSize:14,fontWeight:600,color:"var(--text-primary)"}}>{loc.sub_name}</span>
+<span style={{display:"inline-block",marginLeft:8,padding:"2px 8px",borderRadius:6,fontSize:11,fontWeight:700,color:"#fff",background:FIELD_TYPE_BADGE_COLORS[loc.field_type]||"#6b7280"}}>{locFieldLabel(loc.field_type)}</span>
+<span style={{display:"inline-block",marginLeft:4,padding:"2px 8px",borderRadius:6,fontSize:11,fontWeight:700,color:"#fff",background:VENUE_TYPE_BADGE_COLORS[loc.venue_type]||"#3498db"}}>{locVenueLabel(loc.venue_type||"outdoor")}</span>
+</div>
+<button onClick={()=>openLocEdit(loc)} style={{width:32,height:32,border:"none",borderRadius:6,background:"rgba(43,125,233,0.1)",color:"var(--accent-blue)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Pencil size={14}/></button>
+<button onClick={()=>setDelConfirm(loc)} style={{width:32,height:32,border:"none",borderRadius:6,background:"rgba(231,76,60,0.1)",color:"var(--text-danger)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Trash2 size={14}/></button>
+</div>))}
+</div>))}
+{locErr&&<div style={{color:"var(--text-danger)",fontSize:13,fontWeight:600,marginTop:8}}>{locErr}</div>}
+</div>
+{/* Registration/Edit Modal */}
+{showLocModal&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+<div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:18,padding:24,maxWidth:420,width:"100%",maxHeight:"85vh",overflow:"auto"}}>
+<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+<h3 style={{fontSize:20,fontWeight:800,color:"var(--text-primary)",margin:0}}>{editLoc?"場所を編集":"場所を登録"}</h3>
+<button onClick={()=>{setShowLocModal(false);resetLocForm();setLocErr("");}} style={{width:34,height:34,border:"none",borderRadius:8,background:"#f0f0f0",fontSize:16,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><X size={18}/></button>
+</div>
+{!editLoc&&<div style={{padding:"10px 14px",background:"#fff8e1",borderRadius:10,marginBottom:16,fontSize:13,color:"#8B6914",fontWeight:600,lineHeight:1.5}}>公園・広場・グラウンドなどモルックができる公共の場所を登録してください。個人宅は登録できません。</div>}
+{regStep===1&&<>
+{/* Step 1: Search for place */}
+<div style={{marginBottom:12}}>
+<label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>場所を検索</label>
+<div style={{display:"flex",gap:8}}>
+<input value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")handleLocSearch();}} placeholder="公園名で検索..." style={{flex:1,border:"1px solid var(--border-input)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none"}}/>
+<button onClick={handleLocSearch} disabled={searching} style={{padding:"10px 16px",border:"none",borderRadius:8,background:"var(--accent-blue)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{searching?"...":"検索"}</button>
+</div>
+</div>
+{searchErr&&<div style={{fontSize:13,color:"var(--text-danger)",marginBottom:8}}>{searchErr}</div>}
+{searchResults.length>0&&<div style={{marginBottom:12,maxHeight:200,overflow:"auto",border:"1px solid #eee",borderRadius:10}}>
+{searchResults.map((p,i)=>(<button key={p.place_id||i} onClick={()=>selectPlace(p)} style={{width:"100%",padding:"10px 14px",border:"none",borderBottom:i<searchResults.length-1?"1px solid #eee":"none",background:"#fff",cursor:"pointer",textAlign:"left"}}>
+<div style={{fontSize:14,fontWeight:700,color:"var(--text-primary)"}}>{p.name}</div>
+<div style={{fontSize:12,color:"var(--text-secondary)",marginTop:2}}>{p.address}</div>
+</button>))}
+</div>}
+<div style={{textAlign:"center",margin:"12px 0",color:"var(--text-secondary)",fontSize:13}}>---- または ----</div>
+<button onClick={()=>setRegStep(2)} style={{width:"100%",padding:"10px",border:"1px solid var(--border-input)",borderRadius:8,background:"#f8f9fa",color:"var(--text-secondary)",fontSize:14,fontWeight:600,cursor:"pointer"}}>手動で入力する</button>
+</>}
+{regStep===2&&<>
+{/* Step 2: Field info */}
+<div style={{marginBottom:12}}>
+<label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>場所名{!editLoc&&" *"}</label>
+<input value={regPlaceName} onChange={e=>setRegPlaceName(e.target.value)} placeholder="例: 富士市中央公園" disabled={!!editLoc} style={{width:"100%",border:"1px solid var(--border-input)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none",background:editLoc?"#f0f0f0":"#fff",boxSizing:"border-box"}}/>
+</div>
+<div style={{marginBottom:12}}>
+<label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>サブロケーション名 *</label>
+<input value={regSubName} onChange={e=>setRegSubName(e.target.value)} placeholder="例: 芝エリア" style={{width:"100%",border:"1px solid var(--border-input)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none",boxSizing:"border-box"}}/>
+<div style={{fontSize:11,color:"#999",marginTop:2}}>同じ場所内のエリアを区別する名前</div>
+</div>
+<div style={{marginBottom:12}}>
+<label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>フィールド種別 *</label>
+<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+{LOCATION_FIELD_TYPES.map(ft=>(<button key={ft.value} onClick={()=>setRegFieldType(ft.value)} style={{padding:"8px 14px",border:"2px solid "+(regFieldType===ft.value?FIELD_TYPE_BADGE_COLORS[ft.value]||"#6b7280":"#ddd"),borderRadius:8,background:regFieldType===ft.value?"rgba(0,0,0,0.05)":"#fff",color:regFieldType===ft.value?FIELD_TYPE_BADGE_COLORS[ft.value]||"#333":"#666",fontSize:14,fontWeight:regFieldType===ft.value?700:500,cursor:"pointer"}}>{ft.label}</button>))}
+</div>
+</div>
+<div style={{marginBottom:12}}>
+<label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>環境タイプ *</label>
+<div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+{VENUE_TYPES.map(vt=>(<button key={vt.value} onClick={()=>setRegVenueType(vt.value)} style={{padding:"8px 14px",border:"2px solid "+(regVenueType===vt.value?VENUE_TYPE_BADGE_COLORS[vt.value]||"#6b7280":"#ddd"),borderRadius:8,background:regVenueType===vt.value?"rgba(0,0,0,0.05)":"#fff",color:regVenueType===vt.value?VENUE_TYPE_BADGE_COLORS[vt.value]||"#333":"#666",fontSize:14,fontWeight:regVenueType===vt.value?700:500,cursor:"pointer"}}>{vt.label}</button>))}
+</div>
+</div>
+{!editLoc&&<>
+<div style={{display:"flex",gap:8,marginBottom:12}}>
+<div style={{flex:1}}>
+<label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>緯度 *</label>
+<input value={regLat} onChange={e=>setRegLat(e.target.value)} placeholder="35.xxxx" type="text" inputMode="decimal" disabled={!!regPlaceId} style={{width:"100%",border:"1px solid var(--border-input)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none",background:regPlaceId?"#f0f0f0":"#fff",boxSizing:"border-box"}}/>
+</div>
+<div style={{flex:1}}>
+<label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>経度 *</label>
+<input value={regLng} onChange={e=>setRegLng(e.target.value)} placeholder="139.xxxx" type="text" inputMode="decimal" disabled={!!regPlaceId} style={{width:"100%",border:"1px solid var(--border-input)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none",background:regPlaceId?"#f0f0f0":"#fff",boxSizing:"border-box"}}/>
+</div>
+</div>
+</>}
+{locErr&&<div style={{color:"var(--text-danger)",fontSize:13,fontWeight:600,marginBottom:8}}>{locErr}</div>}
+<div style={{display:"flex",gap:8,marginTop:16}}>
+{!editLoc&&<button onClick={()=>{setRegStep(1);setLocErr("");}} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:15,fontWeight:700,cursor:"pointer"}}>戻る</button>}
+<button onClick={handleLocSave} disabled={locBusy} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--accent-blue)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",opacity:locBusy?0.5:1}}>{locBusy?"処理中...":editLoc?"更新":"登録"}</button>
+{editLoc&&<button onClick={()=>{setShowLocModal(false);resetLocForm();setLocErr("");}} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:15,fontWeight:700,cursor:"pointer"}}>キャンセル</button>}
+</div>
+</>}
+</div>
+</div>}
+{/* Delete confirmation */}
+{delConfirm&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:310,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+<div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:18,padding:24,maxWidth:360,width:"100%",textAlign:"center"}}>
+<div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:8}}>場所を削除</div>
+<div style={{fontSize:14,color:"var(--text-secondary)",marginBottom:16}}>「{delConfirm.place_name} - {delConfirm.sub_name}」を削除しますか？</div>
+<div style={{display:"flex",gap:8}}>
+<button onClick={()=>handleLocDelete(delConfirm.id)} disabled={locBusy} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",opacity:locBusy?0.5:1}}>{locBusy?"削除中...":"削除する"}</button>
+<button onClick={()=>setDelConfirm(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:15,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
+</div>
+</div>
+</div>}
+</div>}
 {/* Shuffle animation */}
 <div style={{marginBottom:20}}>
 <div style={{fontSize:13,fontWeight:700,color:"rgba(255,255,255,0.4)",letterSpacing:3,marginBottom:8}}>演出</div>
@@ -614,6 +797,6 @@ return(<button key={opt.value===null?"auto":opt.value} onClick={()=>{savePlayerL
 </div>
 )}
 </div>
-{showAdminPin&&<AdminPinModal mode={serverHasPin?"verify":"create"} syncCode={getSyncCode()} onSuccess={()=>{setShowAdminPin(false);onAdminToggle(true);setServerHasPin(true);}} onCancel={()=>setShowAdminPin(false)}/>}
+{showAdminPin&&<AdminPinModal mode={serverHasPin?"verify":"create"} syncCode={getSyncCode()} onSuccess={(enteredPin)=>{setShowAdminPin(false);onAdminToggle(true);setServerHasPin(true);if(enteredPin)adminPinRef.current=enteredPin;}} onCancel={()=>setShowAdminPin(false)}/>}
 </div>);
 }

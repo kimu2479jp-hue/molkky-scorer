@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Target, BarChart3, Lock, Bot, RefreshCw, Star, ClipboardList, AlertTriangle, Trash2 } from "lucide-react";
 
-import { PC, MASCOT_R, ANALYSIS_DAILY_MAX, LEVEL_NAMES, CONFIDENCE_LEVELS, PERIOD_OPTIONS, DEFAULT_PERIOD_MS, getWeatherInfo, FIELD_TYPES, ROOF_TYPES } from "../constants.js";
+import { PC, MASCOT_R, ANALYSIS_DAILY_MAX, LEVEL_NAMES, CONFIDENCE_LEVELS, PERIOD_OPTIONS, DEFAULT_PERIOD_MS, getWeatherInfo, FIELD_TYPES, ROOF_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS } from "../constants.js";
 import { loadStats, loadReplays, loadFavs, loadPlayerLevels } from "../db.js";
 import { deleteStatsByPeriod, deleteGameByKey, getAvailableGames, getGameDates, filterGamesByDates, filterGamesByPeriod, calcMetrics, fmtMD, fmtHM, estimatePlayerLevel } from "../stats.js";
 import { makeAnalysisKey, getAnalysisCached, fetchPlayerAnalysis, getPlayerAnalysisCount, calcNewIndicators, getTopScores } from "../analysis.js";
@@ -213,14 +213,9 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
 
 /* ═══ Game List Item ═══ */
 function getFieldLabel(env){
-if(!env||!env.fi)return "不明";
+if(!env||!env.fi)return null;
 const ft=FIELD_TYPES.find(f=>f.value===env.fi);
-const name=ft?ft.label:env.fi;
-if(!env.rf||env.rf==="none")return name;
-const rt=ROOF_TYPES.find(r=>r.value===env.rf);
-if(rt&&rt.value==="roof")return name+"(屋根)";
-if(rt&&rt.value==="indoor")return name+"(屋内)";
-return name;
+return ft?ft.label:env.fi;
 }
 function GameListItem({game,checked,onToggle,isTab,onShowScore,onDelete,isAdmin}){
 const dt=new Date(game.d);
@@ -240,11 +235,12 @@ return(<div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 
 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
 <span style={{fontSize:isTab?18:15,fontWeight:800,color:"var(--text-primary)"}}>{dateStr} {timeStr}</span>
 <span style={{fontSize:isTab?14:12,fontWeight:700,color:ftColor,background:ftColor+"18",padding:"2px 8px",borderRadius:4}}>{ftLabel}</span>
-{game.env&&(<span style={{fontSize:isTab?13:11,color:"var(--text-secondary)",display:"flex",alignItems:"center",gap:3}}>
+{game.env&&game.env.ln&&<span style={{fontSize:isTab?14:12,fontWeight:800,color:"var(--text-primary)"}}>{"📍"}{game.env.ln}</span>}
+{game.env&&(<span style={{fontSize:isTab?13:11,display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}>
 {game.env.wc!=null&&<span>{getWeatherInfo(game.env.wc).icon}</span>}
-{game.env.tp!=null&&<span>{game.env.tp}℃</span>}
-{game.env.ws!=null&&<span>{game.env.ws}m/s</span>}
-<span>{getFieldLabel(game.env)}</span>
+{(game.env.tp!=null||game.env.ws!=null)&&<span style={{fontWeight:800,color:"var(--text-primary)",fontSize:isTab?14:12}}>{game.env.tp!=null?(game.env.tp+"℃"):""}{game.env.tp!=null&&game.env.ws!=null?" ":""}{game.env.ws!=null?(game.env.ws+"m/s"):""}</span>}
+{(()=>{const fl=getFieldLabel(game.env);return fl?<span style={{padding:"1px 7px",borderRadius:5,fontSize:isTab?12:10,fontWeight:700,color:"#fff",background:FIELD_TYPE_BADGE_COLORS[game.env.fi]||"#6b7280"}}>{fl}</span>:null;})()}
+{game.env.vt&&game.env.vt!=="outdoor"&&<span style={{padding:"1px 7px",borderRadius:5,fontSize:isTab?12:10,fontWeight:700,color:"#fff",background:VENUE_TYPE_BADGE_COLORS[game.env.vt]||"#9b59b6"}}>{(VENUE_TYPES.find(v=>v.value===game.env.vt)||{}).label||game.env.vt}</span>}
 </span>)}
 {!game.env&&<span style={{fontSize:isTab?13:11,color:"var(--text-secondary)"}}>不明</span>}
 </div>
