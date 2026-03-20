@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Target, BarChart3, Lock, Bot, RefreshCw, Star, ClipboardList, AlertTriangle, Trash2 } from "lucide-react";
 
-import { PC, MASCOT_R, ANALYSIS_DAILY_MAX, LEVEL_NAMES, CONFIDENCE_LEVELS, PERIOD_OPTIONS, DEFAULT_PERIOD_MS, getWeatherInfo } from "../constants.js";
+import { PC, MASCOT_R, ANALYSIS_DAILY_MAX, LEVEL_NAMES, CONFIDENCE_LEVELS, PERIOD_OPTIONS, DEFAULT_PERIOD_MS, getWeatherInfo, FIELD_TYPES, ROOF_TYPES } from "../constants.js";
 import { loadStats, loadReplays, loadFavs, loadPlayerLevels } from "../db.js";
 import { deleteStatsByPeriod, deleteGameByKey, getAvailableGames, getGameDates, filterGamesByDates, filterGamesByPeriod, calcMetrics, fmtMD, fmtHM, estimatePlayerLevel } from "../stats.js";
 import { makeAnalysisKey, getAnalysisCached, fetchPlayerAnalysis, getPlayerAnalysisCount, calcNewIndicators, getTopScores } from "../analysis.js";
@@ -212,6 +212,16 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
 }
 
 /* ═══ Game List Item ═══ */
+function getFieldLabel(env){
+if(!env||!env.fi)return "不明";
+const ft=FIELD_TYPES.find(f=>f.value===env.fi);
+const name=ft?ft.label:env.fi;
+if(!env.rf||env.rf==="none")return name;
+const rt=ROOF_TYPES.find(r=>r.value===env.rf);
+if(rt&&rt.value==="roof")return name+"(屋根)";
+if(rt&&rt.value==="indoor")return name+"(屋内)";
+return name;
+}
 function GameListItem({game,checked,onToggle,isTab,onShowScore,onDelete,isAdmin}){
 const dt=new Date(game.d);
 const timeStr=fmtHM(dt);
@@ -234,7 +244,9 @@ return(<div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 
 {game.env.wc!=null&&<span>{getWeatherInfo(game.env.wc).icon}</span>}
 {game.env.tp!=null&&<span>{game.env.tp}℃</span>}
 {game.env.ws!=null&&<span>{game.env.ws}m/s</span>}
+<span>{getFieldLabel(game.env)}</span>
 </span>)}
+{!game.env&&<span style={{fontSize:isTab?13:11,color:"var(--text-secondary)"}}>不明</span>}
 </div>
 <div style={{fontSize:isTab?15:13,color:"#555",marginTop:3}}>
 {game.players.length}人戦　参加者: {game.players.join(", ")}
