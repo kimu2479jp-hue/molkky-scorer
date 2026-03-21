@@ -129,3 +129,11 @@ body {
   height: 10px;
   animation: mk-confetti 3s ease-in forwards;
 }
+
+/* ShuffleAnimation card shadow optimization */
+.mk-card-shadow {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.mk-card-shadow-glow {
+  transition: box-shadow 0.15s ease;
+}
