@@ -60,7 +60,7 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
   </div>);
 }
 
-export function CSSConfetti(){const colors=["#2b7de9","#d93a5e","#22b566","#d9a83a","#9b59b6","#e67e22","#1abc9c","#e74c3c","#ffd700","#ff69b4"];const pieces=Array.from({length:50},(_,i)=>({id:i,left:Math.random()*100,delay:Math.random()*2,color:colors[i%colors.length],size:6+Math.random()*8,shape:Math.random()>0.5?"50%":"0"}));return(<div className="mk-confetti-container">{pieces.map(p=>(<div key={p.id} className="mk-confetti-piece" style={{left:p.left+"%",width:p.size,height:p.size,background:p.color,borderRadius:p.shape,animationDelay:p.delay+"s"}}/>))}</div>);}
+export function CSSConfetti(){const colors=["#2b7de9","#d93a5e","#22b566","#d9a83a","#9b59b6","#e67e22","#1abc9c","#e74c3c","#ffd700","#ff69b4"];const pieces=Array.from({length:25},(_,i)=>({id:i,left:Math.random()*100,delay:Math.random()*2,color:colors[i%colors.length],size:8+Math.random()*12,shape:Math.random()>0.5?"50%":"0"}));return(<div className="mk-confetti-container">{pieces.map(p=>(<div key={p.id} className="mk-confetti-piece" style={{left:p.left+"%",width:p.size,height:p.size,background:p.color,borderRadius:p.shape,animationDelay:p.delay+"s"}}/>))}</div>);}
 
 /* ═══ Shuffle Card Animation ═══ */
 export function ShuffleAnimation({names,teams,onDone,skipIntro,remainingDeck,isLastCourt,courtLabel,isMultiCourt,onSkipThisCourt,onSkipAll,onStartGame,onReshuffle}){
@@ -159,7 +159,7 @@ const overlayOp=closing?0:1;
 /* Corner number/suit font sizes proportional to card */
 const cornerNum=isTabletSA?Math.round(cardH*0.18):17;const cornerSuit=isTabletSA?Math.round(cardH*0.16):15;
 try{
-return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,"+(0.85*overlayOp)+")",zIndex:9000,pointerEvents:"auto",transition:closing?"opacity 0.4s ease":"none",opacity:closing?0:1}}>
+return(<div style={{position:"fixed",inset:0,width:"100%",height:"100%",background:"rgba(0,0,0,"+(0.85*overlayOp)+")",zIndex:9000,pointerEvents:"auto",transition:closing?"opacity 0.4s ease":"none",opacity:closing?0:1}}>
 {/* Dealer character image */}
 <div style={{position:"fixed",left:cx-(isTabletSA?80:50),top:dealerY-(isTabletSA?100:70),opacity:phase===0?Math.min(t*2,1):phase===1?1:phase===2?0.7:phase>=4?0.4:0.85,transform:"scale("+dealerScale+")",transformOrigin:"50% 80%",transition:"none",willChange:"transform",zIndex:8999,pointerEvents:"none"}}>
 <img src="/dealer-character.png" alt="" style={{width:isTabletSA?160:100,height:isTabletSA?160:100,objectFit:"contain",pointerEvents:"none",filter:"drop-shadow(0 4px 12px rgba(0,0,0,0.5))"}}/>
@@ -179,20 +179,20 @@ const vLs=nl<=2?"6px":nl<=3?"4px":"2px";
 const cardDealTime2=T.p3+revealPos[idx]*perCard;const holdStart2=cardDealTime2+0.8;const holdEnd2=holdStart2+1.0;
 const isHolding=phase===3&&t>=holdStart2&&t<holdEnd2;const holdProg2=isHolding?(t-holdStart2)/1.0:0;
 const glowSh=isHolding?", 0 0 30px "+ac+"66":"";
-return(<div key={idx} style={{position:"fixed",left:outer.left,top:outer.top,width:cardW,height:cardH,
+return(<div key={idx} style={{position:"absolute",left:outer.left,top:outer.top,width:cardW,height:cardH,
 perspective:"800px",WebkitPerspective:"800px",zIndex:outer.zIndex,opacity:outer.opacity,
 transform:"scale("+outer.scale+")"+(outer.rotate?" rotate("+outer.rotate+"deg)":""),transition:"none",willChange:"transform"}}>
 <div style={{width:"100%",height:"100%",transformStyle:"preserve-3d",WebkitTransformStyle:"preserve-3d",
 transform:"rotateY("+Math.round(flipDeg)+"deg)",transition:"none",position:"relative"}}>
 {/* Back face */}
-<div style={{position:"absolute",inset:0,backfaceVisibility:"hidden",WebkitBackfaceVisibility:"hidden",
-borderRadius:br,overflow:"hidden",boxShadow:"0 4px 20px rgba(0,0,0,0.3)"}}>
+<div className="mk-card-shadow" style={{position:"absolute",inset:0,backfaceVisibility:"hidden",WebkitBackfaceVisibility:"hidden",
+borderRadius:br,overflow:"hidden"}}>
 <img src="/card_back.JPG" alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:br,pointerEvents:"none"}}/>
 </div>
 {/* Front face */}
-<div style={{position:"absolute",inset:0,backfaceVisibility:"hidden",WebkitBackfaceVisibility:"hidden",
+<div className={"mk-card-shadow"+(glowSh?" mk-card-shadow-glow":"")} style={{position:"absolute",inset:0,backfaceVisibility:"hidden",WebkitBackfaceVisibility:"hidden",
 transform:"rotateY(180deg)",borderRadius:br,background:"#fff",overflow:"hidden",
-boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+glowSh,display:"flex",alignItems:"center",justifyContent:"center"}}>
+...(glowSh?{boxShadow:"0 0 30px "+ac+"66"}:{}),display:"flex",alignItems:"center",justifyContent:"center"}}>
 <div style={{position:"absolute",top:0,left:0,right:0,height:3,borderRadius:br+" "+br+" 0 0",background:ac}}/>
 <div style={{position:"absolute",inset:"6px 6px 6px 6px",border:"1px solid "+ac+"4d",borderRadius:6}}/>
 <div style={{position:"absolute",top:4,left:5,textAlign:"center",lineHeight:1}}>
@@ -211,7 +211,7 @@ boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+glowSh,display:"flex",alignItems:"center"
 </div>
 </div>);})}
 {/* Remaining deck cards for multi-court */}
-{remainingDeck>0&&phase>=3&&Array.from({length:Math.min(remainingDeck,8)},(_,i)=>(<div key={"rem"+i} style={{position:"fixed",left:deckCx-cardW/2+i*1,top:cy-cardH/2-i*1,width:cardW,height:cardH,borderRadius:isTabletSA?16:12,overflow:"hidden",boxShadow:"0 4px 20px rgba(0,0,0,0.3)",zIndex:9000+i,opacity:dealIdxRef.current>=nCards-1?0.7:1}}><img src="/card_back.JPG" alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:isTabletSA?16:12,pointerEvents:"none"}}/></div>))}
+{remainingDeck>0&&phase>=3&&Array.from({length:Math.min(remainingDeck,8)},(_,i)=>(<div key={"rem"+i} className="mk-card-shadow" style={{position:"absolute",left:deckCx-cardW/2+i*1,top:cy-cardH/2-i*1,width:cardW,height:cardH,borderRadius:isTabletSA?16:12,overflow:"hidden",zIndex:9000+i,opacity:dealIdxRef.current>=nCards-1?0.7:1}}><img src="/card_back.JPG" alt="" style={{width:"100%",height:"100%",objectFit:"cover",borderRadius:isTabletSA?16:12,pointerEvents:"none"}}/></div>))}
 {/* Phase 4: team reveal panel overlay */}
 {phase===4&&(<div style={{position:"fixed",inset:0,zIndex:9050,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:isTabletSA?24:16,opacity:Math.min(1,(t-T.p4)/0.3)}}>
 <div style={{display:isTabletSA&&nTeams>=3?"grid":"flex",gridTemplateColumns:isTabletSA&&nTeams>=3?"1fr 1fr":undefined,gap:isTabletSA?20:12,justifyContent:"center",flexWrap:"wrap",maxWidth:"100%",width:isTabletSA?"90%":undefined}}>
@@ -236,11 +236,11 @@ boxShadow:"0 4px 20px rgba(0,0,0,0.3)"+glowSh,display:"flex",alignItems:"center"
 )}
 </div>)}
 {/* Court label for multi-court */}
-{courtLabel&&<div style={{position:"fixed",top:"calc(16px + env(safe-area-inset-top, 0px))",left:isTabletSA?32:16,zIndex:9200,pointerEvents:"none"}}><span style={{fontSize:isTabletSA?22:16,fontWeight:900,color:"rgba(255,255,255,0.9)",background:"rgba(0,0,0,0.5)",padding:isTabletSA?"8px 24px":"6px 16px",borderRadius:12,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>{courtLabel}</span></div>}
+{courtLabel&&<div style={{position:"fixed",top:"calc(16px + env(safe-area-inset-top, 0px))",left:isTabletSA?32:16,zIndex:9200,pointerEvents:"none"}}><span style={{fontSize:isTabletSA?22:16,fontWeight:900,color:"rgba(255,255,255,0.9)",background:"rgba(0,0,0,0.65)",padding:isTabletSA?"8px 24px":"6px 16px",borderRadius:12}}>{courtLabel}</span></div>}
 {/* Skip button during animation */}
 {phase<4&&!closing&&!skipConfirm&&<button onClick={()=>setSkipConfirm(true)} style={{position:"fixed",bottom:"calc(24px + env(safe-area-inset-bottom, 0px))",right:20,padding:"8px 16px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:20,background:"rgba(0,0,0,0.4)",color:"rgba(255,255,255,0.7)",fontSize:13,fontWeight:600,cursor:"pointer",zIndex:9200,backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>スキップ ⏭</button>}
 {/* Skip confirm dialog */}
-{skipConfirm&&<div style={{position:"fixed",inset:0,zIndex:9300,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)"}}>
+{skipConfirm&&<div style={{position:"fixed",inset:0,zIndex:9300,display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,0,0,0.7)"}}>
 <div style={{background:"#1a1a2e",border:"1px solid rgba(255,255,255,0.2)",borderRadius:16,padding:"24px 28px",textAlign:"center",maxWidth:isMultiCourt?320:280}}>
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>スキップしますか？</div>
 {isMultiCourt?(<div style={{display:"flex",flexDirection:"column",gap:8}}>
