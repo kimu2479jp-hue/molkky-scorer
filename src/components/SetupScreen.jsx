@@ -33,7 +33,7 @@ useEffect(()=>{saveDraft();return()=>{if(draftTimerRef.current)clearTimeout(draf
 const[trimConfirm,setTrimConfirm]=useState(null);/* {filled,newMax,step,onConfirm} */
 const showTrimConfirm=(filled,newMax,onConfirm)=>{if(filled<=newMax||filled===0){onConfirm();return;}setTrimConfirm({filled,newMax,step:1,onConfirm});};
 const trimDialogExec=()=>{if(!trimConfirm)return;const{newMax,onConfirm}=trimConfirm;onConfirm();setMems(prev=>prev.slice(0,Math.max(newMax,2)));setSp(null);setAllCourtData(null);setTrimConfirm(null);};
-const lpStart=(e)=>{if(e.target.tagName==="INPUT"||e.target.tagName==="BUTTON"||e.target.tagName==="SELECT")return;lpRef.current=setTimeout(()=>{setEditMode(true);setExpandedDel(null);},600);};
+const lpStart=(e)=>{if(e.target.tagName==="INPUT"||e.target.tagName==="BUTTON"||e.target.tagName==="SELECT")return;lpRef.current=setTimeout(()=>{setEditMode(true);setExpandedDel(null);},450);};
 const lpEnd=()=>{if(lpRef.current){clearTimeout(lpRef.current);lpRef.current=null;}};
 const lpMove=()=>{if(lpRef.current){clearTimeout(lpRef.current);lpRef.current=null;}};
 /* Auto-adjust team count when player count exceeds per-team max */
