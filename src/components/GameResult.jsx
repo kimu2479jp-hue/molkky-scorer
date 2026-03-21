@@ -46,7 +46,7 @@ const doSave=async()=>{setSaving(true);try{const canvas=drawScoreImage(teams,his
 /* Build current game records for per-game stats view */
 const favs=loadFavs();
 const currentGameRecords=buildGameRecord(teams,history,teamOrder,winner,timestamps||[],favs);
-const startLP=()=>{statsLPRef.current=setTimeout(()=>{setShowStats("delete");},600);};
+const startLP=()=>{statsLPRef.current=setTimeout(()=>{setShowStats("delete");},450);};
 const cancelLP=()=>{if(statsLPRef.current)clearTimeout(statsLPRef.current);};
 return(
 <div className="mk-slide-up" style={{position:"fixed",inset:0,background:"var(--bg-surface-alt)",zIndex:100,display:"flex",flexDirection:"column",overflow:"hidden",overscrollBehavior:"none"}}>
