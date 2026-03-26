@@ -1,8 +1,8 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Trophy, BarChart3, Camera, ClipboardList, MessageCircle, RefreshCw } from "lucide-react";
 
 import { WIN, MF, C, MAX_NAME } from "../constants.js";
-import { loadFavs } from "../db.js";
+import { loadFavs, saveWindData } from "../db.js";
 import { buildGameRecord } from "../stats.js";
 import { scoreOf } from "../gameLogic.js";
 import { ScoreTable } from "./common.jsx";
@@ -30,7 +30,7 @@ return c;
 }
 async function saveImage(canvas){return new Promise((res,rej)=>{canvas.toBlob(async blob=>{if(!blob)return rej("fail");const file=new File([blob],"molkky-score.png",{type:"image/png"});if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:"モルック スコア"});res("shared");}catch(e){if(e.name!=="AbortError")rej(e);else res("cancelled");}}else{const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="molkky-score.png";a.click();URL.revokeObjectURL(url);res("dl");}},"image/png");});}
 
-export function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gameNumber,onNext,onBack,onExtend,onReshuffle,hasCourtAllocation,courtCount,timestamps,isAdmin,aiEnabled,autoEnd,dqEndGame,shufAnim,StatsModal}){
+export function GameResult({teams,history,teamOrder,winner,gameWins,bestOf,numGames,gameNumber,onNext,onBack,onExtend,onReshuffle,hasCourtAllocation,courtCount,timestamps,isAdmin,aiEnabled,autoEnd,dqEndGame,shufAnim,StatsModal,windSensorEnabled,piAddress,turnWindData,windManagerRef}){
 const[comment,setComment]=useState("");const[comments,setComments]=useState([]);
 const[ordMode,setOrdMode]=useState("reverse");const[ordVal,setOrdVal]=useState([...teamOrder].reverse());const[ordTeams,setOrdTeams]=useState(null);
 const[saving,setSaving]=useState(false);const[showStats,setShowStats]=useState(false);
@@ -48,6 +48,20 @@ const favs=loadFavs();
 const currentGameRecords=buildGameRecord(teams,history,teamOrder,winner,timestamps||[],favs);
 const startLP=()=>{statsLPRef.current=setTimeout(()=>{setShowStats("delete");},450);};
 const cancelLP=()=>{if(statsLPRef.current)clearTimeout(statsLPRef.current);};
+/* Save wind data to IndexedDB */
+const windSavedRef=useRef(false);
+useEffect(()=>{
+if(!windSensorEnabled||!turnWindData||turnWindData.length===0||windSavedRef.current)return;
+windSavedRef.current=true;
+const gameId=new Date().toISOString()+"-g"+gameNumber;
+const manager=windManagerRef&&windManagerRef.current;
+const windDataToSave={
+windSensor:{enabled:true,piAddress:piAddress||null,compassHeadingInitial:manager?manager.compassHeadingInitial:null},
+turnWindData:turnWindData,
+windSummary:manager?manager.calcSummary(turnWindData):null,
+};
+saveWindData(gameId,windDataToSave).catch(e=>console.error("wind save error",e));
+},[]);
 return(
 <div className="mk-slide-up" style={{position:"fixed",inset:0,background:"var(--bg-surface-alt)",zIndex:100,display:"flex",flexDirection:"column",overflow:"hidden",overscrollBehavior:"none"}}>
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(10px + env(safe-area-inset-top, 0px)) 20px 10px",background:"var(--bg-secondary)",flexShrink:0}}>

@@ -7,6 +7,7 @@ import { _debouncedSync } from "../sync.js";
 import { buildGameRecord, fmtHM, fmtMD, saveGameStatsToDB, saveReplay, renamePlayerData } from "../stats.js";
 import { fetchPlayerAnalysis, getAnalysisCached, getPlayerAnalysisCount, makeAnalysisKey } from "../analysis.js";
 import { failsOf, getPI, reducer, scoreOf, shuf } from "../gameLogic.js";
+import { WindSensorManager } from "../windSensor.js";
 import { CSSConfetti, Confirm, FavDropdown, GameSheet, ScoreTable, ShuffleAnimation } from "./common.jsx";
 
 // ═══ Weather fetch via OpenMeteo API ═══
@@ -262,7 +263,8 @@ return(<><div style={{display:"flex",gap:6,marginBottom:6}}>{[["same","🔁同�
 </>);
 }
 
-export function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goBack,saveToStatsProp,recoverData,selectedLocation,isAdmin,aiEnabled,shufAnim,hasCourtAllocation,clearCourtAllocation,courtCount,courtAllocation,onUpdateCourtAllocation,GameResult,StatsModal}){
+export function GameScreen({initialTeams,initialOrder,bestOf:iBo,numGames:iNg,dqEnd,goBack,saveToStatsProp,recoverData,selectedLocation,piAddress,isAdmin,aiEnabled,shufAnim,hasCourtAllocation,clearCourtAllocation,courtCount,courtAllocation,onUpdateCourtAllocation,GameResult,StatsModal}){
+const windSensorEnabled=!!piAddress;
 const init=recoverData?{
 teams:recoverData.teams.map(t=>({...t,players:t.players.map(p=>typeof p==="string"?{name:p,active:true}:p)})),
 history:recoverData.history,currentOrderIdx:recoverData.currentOrderIdx,currentTurn:recoverData.currentTurn,
@@ -295,6 +297,11 @@ const dur=(Date.now()-turnStartRef.current)/1000;
 const hIdx=history.length-1;
 setTimestamps(p=>[...p,{histIdx:hIdx,ts:Date.now(),dur}]);
 turnStartRef.current=Date.now();
+/* Wind sensor snapshot */
+if(windSensorEnabled&&windManagerRef.current){
+const snap=windManagerRef.current.snapshot();
+if(snap)setTurnWindData(prev=>[...prev,snap]);
+}
 /* Trigger animations based on last entry */
 const last=history[history.length-1];
 if(last){
@@ -313,6 +320,7 @@ setAnimState(p=>({...p,flash:tI,shake:tI}));setTimeout(()=>setAnimState(p=>({...
 }
 } else if(history.length<prevHistLen.current){
 setTimestamps(p=>p.slice(0,-1));
+if(windSensorEnabled)setTurnWindData(prev=>prev.slice(0,-1));
 turnStartRef.current=Date.now();
 }
 prevHistLen.current=history.length;
@@ -338,6 +346,31 @@ return()=>{document.removeEventListener("visibilitychange",onVisChange);window.r
 },[history,eliminated,currentTurn,winner,teams,teamOrder,currentOrderIdx,gameNumber,plOffsets,gW,numGames,bestOf,autoEnd]);
 
 useEffect(()=>{fetchWeatherData(selectedLocation).then(data=>{weatherStartRef.current=data;});},[]);
+
+/* ═══ Wind Sensor ═══ */
+const[currentWind,setCurrentWind]=useState(null);
+const[windConnected,setWindConnected]=useState(false);
+const[compassValid,setCompassValid]=useState(false);
+const[turnWindData,setTurnWindData]=useState([]);
+const windManagerRef=useRef(null);
+const[windToast,setWindToast]=useState(null);
+useEffect(()=>{
+if(!windSensorEnabled)return;
+const manager=new WindSensorManager();
+windManagerRef.current=manager;
+manager.onDataCallback=(data)=>{
+setCurrentWind(data);
+setCompassValid(!!data.compass_valid);
+if(manager.compassHeadingInitial==null&&data.compass_valid){
+manager.setInitialCompassHeading();
+}
+};
+manager.onStatusCallback=(status)=>{
+setWindConnected(status.connected);
+};
+manager.connect(piAddress);
+return()=>{manager.disconnect();windManagerRef.current=null;};
+},[windSensorEnabled,piAddress]);
 
 useEffect(()=>{if(winner!==null&&!showRes){
 setGW(p=>{const n=[...p];n[winner]++;return n;});setShowRes(true);
@@ -374,8 +407,8 @@ buildAndSave();
 }},[winner]);
 
 const execConf=()=>{if(!conf)return;if(conf.t==="score")dispatch({type:"SCORE",score:conf.s});else if(conf.t==="miss")dispatch({type:"MISS"});else dispatch({type:"FAULT"});setConf(null);};
-const handleNext=(order,newTeams)=>{if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);turnStartRef.current=Date.now();fetchWeatherData(selectedLocation).then(data=>{weatherStartRef.current=data;});weatherEndRef.current=null;};
-const handleExtend=(type,order,newTeams)=>{if(type==="game")setNumGames(p=>p+1);else if(type==="set")setBestOf(p=>p+1);if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);turnStartRef.current=Date.now();fetchWeatherData(selectedLocation).then(data=>{weatherStartRef.current=data;});weatherEndRef.current=null;};
+const handleNext=(order,newTeams)=>{if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);setTurnWindData([]);turnStartRef.current=Date.now();fetchWeatherData(selectedLocation).then(data=>{weatherStartRef.current=data;});weatherEndRef.current=null;};
+const handleExtend=(type,order,newTeams)=>{if(type==="game")setNumGames(p=>p+1);else if(type==="set")setBestOf(p=>p+1);if(newTeams)dispatch({type:"SET_TEAMS",teams:newTeams});dispatch({type:"RESET_GAME",teamOrder:order});setShowRes(false);setTimestamps([]);setTurnWindData([]);turnStartRef.current=Date.now();fetchWeatherData(selectedLocation).then(data=>{weatherStartRef.current=data;});weatherEndRef.current=null;};
 const extractTeamInfo=()=>teams.map(t=>({name:t.name,players:t.players.map(p=>p.name)}));
 const handleReshuffle=(type)=>{setShowRes(false);goBack(null,type);};
 const handleBack=()=>setSaveDialog(true);const[caKeepDialog,setCaKeepDialog]=useState(false);const[caKeepDiscard,setCaKeepDiscard]=useState(0);/* 0=none,1=first,2=second */
@@ -424,12 +457,17 @@ return(
 <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
 <button style={{...SS.tBtn,padding:isTablet?"7px 10px":"5px 8px"}} onClick={handleBack}><ChevronLeft size={isTablet?18:14}/></button>
 <button style={{...SS.tBtn,padding:isTablet?"7px 10px":undefined}} onClick={()=>setShowPl(true)}><Users size={isTablet?18:14}/></button>
+{windSensorEnabled&&windConnected&&<button style={{...SS.tBtn,padding:isTablet?"7px 10px":"5px 8px",fontSize:isTablet?12:10,fontWeight:700}} onClick={()=>{if(windManagerRef.current){windManagerRef.current.resetCompassHeading();setWindToast("風速計の基準方向を再設定しました");setTimeout(()=>setWindToast(null),2000);}}}><RefreshCw size={isTablet?14:12}/></button>}
 </div>
 <span style={{fontSize:isTablet?28:16,fontWeight:isTablet?900:700,color:"#fff",textAlign:"center",flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{gameNumber}試合目 {currentTurn}ターン目{bestOf>0?" "+bestOf+"先取":""}</span>
 <div style={{display:"flex",gap:2,flexShrink:0}}>
 <div style={{display:"flex",background:"rgba(255,255,255,0.12)",borderRadius:7,padding:2,gap:2}}>{[["both","両方"],["sheet","表"],["input","入力"]].map(([k,l])=>(<button key={k} onClick={()=>setView(k)} style={{padding:isTablet?"6px 12px":"4px 9px",border:"none",borderRadius:5,background:view===k?"rgba(255,255,255,0.2)":"transparent",color:view===k?"#fff":"rgba(255,255,255,0.4)",fontSize:isTablet?16:12,fontWeight:600,cursor:"pointer"}}>{l}</button>))}</div>
 </div>
 </div>
+{/* Wind sensor compass warning banner */}
+{windSensorEnabled&&windConnected&&!compassValid&&(
+<div style={{padding:"8px 12px",background:"rgba(251,191,36,0.15)",border:"1px solid #fbbf24",borderRadius:6,margin:"4px 10px 0",fontSize:14,color:"#b45309"}}>{"⚠"} コンパス異常 — 風向きデータなし（風速のみ記録中）</div>
+)}
 {/* Active team card */}
 {(view==="both"||view==="input")&&<ActiveCard/>}
 {/* Inactive teams row */}
@@ -440,8 +478,9 @@ return(
 </div>
 {showPl&&<PlModal teams={teams} dispatch={dispatch} onClose={()=>setShowPl(false)} isAdmin={isAdmin} courtCount={courtCount} courtAllocation={courtAllocation} onUpdateCourtAllocation={onUpdateCourtAllocation}/>}
 {conf&&<Confirm msg={conf.msg} onOk={execConf} onCancel={()=>setConf(null)}/>}
-{showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} onReshuffle={handleReshuffle} hasCourtAllocation={hasCourtAllocation} courtCount={courtCount} timestamps={timestamps} isAdmin={isAdmin} aiEnabled={aiEnabled} autoEnd={!!autoEnd} dqEndGame={!!dqEndGame} shufAnim={shufAnim} StatsModal={StatsModal}/>}
+{showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} onReshuffle={handleReshuffle} hasCourtAllocation={hasCourtAllocation} courtCount={courtCount} timestamps={timestamps} isAdmin={isAdmin} aiEnabled={aiEnabled} autoEnd={!!autoEnd} dqEndGame={!!dqEndGame} shufAnim={shufAnim} StatsModal={StatsModal} windSensorEnabled={windSensorEnabled} piAddress={piAddress} turnWindData={turnWindData} windManagerRef={windManagerRef}/>}
 {animState.confetti&&<CSSConfetti/>}
+{windToast&&<div style={{position:"fixed",top:"calc(60px + env(safe-area-inset-top, 0px))",left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,0.85)",color:"#fff",padding:"10px 20px",borderRadius:10,fontSize:14,fontWeight:700,zIndex:9000,pointerEvents:"none"}}>{windToast}</div>}
 {saveDialog&&<Confirm msg={"チーム・プレイヤー情報を\n設定画面に保存しますか？"} sub={"保存すると次のゲームで\n同じメンバーをすぐ使えます"} okLabel="保存する" cancelLabel="保存しない" thirdLabel="キャンセル（試合に戻る）" onOk={()=>doBack(true)} onCancel={doBackNoSaveWithCA} onThird={()=>setSaveDialog(false)}/>}
 {caKeepDialog&&(<div style={{position:"fixed",inset:0,zIndex:9600,background:"rgba(0,0,0,0.5)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
 <div style={{background:"#1a1a2e",borderRadius:16,padding:"24px 28px",maxWidth:380,width:"100%"}}>
