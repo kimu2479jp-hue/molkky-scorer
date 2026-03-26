@@ -1,202 +1,109 @@
 # CLAUDE.md - Molkky Scorer
 
 ## Project Overview
-Molkky (Finnish skittle throwing game) score management PWA.
+モルック（フィンランド発祥の屋外スキットルスローイングゲーム）のスコア管理PWA。
 
 ## Tech Stack
-- React 18 (Vite 5) - single page app
-- Inline styles (no CSS-in-JS libraries)
-- State management: useReducer
-- Persistence: IndexedDB
-- Backend: Supabase (sync/storage)
-- Hosting: Vercel (with serverless API routes in /api)
+- React 18 (Vite 5) - SPA, inline styles (no CSS-in-JS)
+- State: useReducer + IndexedDB
+- Backend: Supabase (sync/storage, locations, game_environment)
+- Hosting: Vercel (serverless API routes in /api)
+- AI Analysis: Anthropic API (claude-opus-4-6)
+- Location: Google Places API (server proxy) + OpenMeteo (weather)
 
 ## Project Structure
 ```
-src/App.jsx      - Main application (single file, keep it that way)
-src/main.jsx     - Entry point
-src/styles.css   - Global styles
-api/analyze.js   - Vercel serverless function
-api/sync.js      - Vercel serverless function (Supabase sync)
-public/          - Static assets, manifest, icons
+src/
+  App.jsx              - Root component, screen routing
+  constants.js         - Shared constants, field types, badge colors
+  db.js                - IndexedDB operations
+  sync.js              - Supabase cloud sync
+  stats.js             - Statistics calculations
+  analysis.js          - AI analysis logic
+  gameLogic.js         - Game state helpers
+  locationSync.js      - Location data IndexedDB cache
+  components/
+    common.jsx         - Shared UI components, location management
+    SetupScreen.jsx    - Pre-match configuration
+    GameScreen.jsx     - In-match scoring (primary screen)
+    GameResult.jsx     - Post-match results, reshuffle flow
+    StatsModal.jsx     - Player/team statistics display
+api/
+  analyze.js           - Anthropic API proxy (PIN auth)
+  sync.js              - Supabase sync endpoint
+  locations.js         - Location CRUD (PIN auth)
+  places.js            - Google Places API server proxy
+  game-environment.js  - Game environment data API
+public/                - Static assets, manifest, icons
 ```
-
-## Critical Constraints
-- **DO NOT modify game logic**: reducer, adv, scoreOf, failsOf, getPI, and related functions must remain unchanged
-- **ASCII only**: No smart quotes or special characters (curly quotes, em-dashes, etc.)
-- **Single file**: App.jsx must remain a single file - do not split into components
-- **iPhone Safari PWA**: Must work correctly as an installed PWA on iOS Safari
-- **Team-specific colors (C array .bg/.ac/.nm) are NOT used in GameScreen during active match display**. They remain in use for SetupScreen, GameResult, ShuffleAnimation, and canvas image export.
-
-## Available Libraries
-- lucide-react (icons)
-- recharts (charts)
-- @supabase/supabase-js
 
 ## Build
 ```bash
 npx vite build
 ```
 
-## Design Philosophy
+## Vercel Configuration
+- Project: `molkky-scorer`
+- Production URL: `molkky-scorer.vercel.app`
+- Required env vars: `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `GOOGLE_PLACES_API_KEY`
 
-### What This Scorer Solves
-Molkky is a time-limited competition. The scorer operator and surrounding players must read and judge multiple pieces of information simultaneously within a few seconds per turn:
-- Read opponent scores from the score table
-- Know remaining points to reach 50
-- Identify opponent finishing opportunities
-- Read score trends to gauge opponent form
-- Judge miss frequency
+## Critical Constraints
+- **ゲームロジック変更禁止**: reducer, adv, scoreOf, failsOf, getPI 等は変更しない
+- **ASCII only**: スマートクォート、emダッシュ等の特殊文字禁止
+- **iOS Safari PWA互換**: インストール済みPWAとして正常動作すること
+- **GameScreenでチーム固有色(C配列 .bg/.ac/.nm)は使用しない**: SetupScreen, GameResult, ShuffleAnimation, canvas画像エクスポートでは使用可
 
-Decisions happen within tens of seconds per turn. "Readable" is not enough -- the information design must enable instant, accurate situational awareness at a glance. Visibility (instant correct comprehension) is the most important quality standard.
+## Design Philosophy (Summary)
+モルックは時間制限ある競技。iPad三脚固定・屋外直射日光・3m離れた複数人が遠目で見る環境で、数秒以内に状況を正確に把握できるUIが必須。
 
-### Core Design Nucleus
-The UI must enable instant, error-free recognition of "the current situation":
-1. Current game number and turn number
-2. Which team is currently active
-3. Who is the current player
-4. Current score
-5. Miss count and status
+- **GameScreen** = 視認性が絶対最優先。機能 > 美しさ
+- **Stats screens** = おしゃれさとデザインセンス。試合後にゆっくり見る画面
+- **SetupScreen** = 操作のしやすさ。素早く直感的な試合前設定
 
-### Screen-by-Screen Priorities
-- **GameScreen** (in-match) = Most important. Visibility (rapid, accurate situation reading) is the absolute priority. Function over aesthetics.
-- **Stats screens** = Aesthetics and polish. Viewed at leisure after matches.
-- **SetupScreen** = Ease of operation. Quick, intuitive pre-match configuration.
+詳細なUI設計ガイドラインは `.claude/skills/molkky-ui-design/SKILL.md` を参照。
 
-## Target Environment
+## UI Color System
+- **アクティブチーム**: 濃紺ヘッダー(#14365a)+白文字、黄色アクセント(#ffc107)
+- **非アクティブチーム**: 低彩度暗背景(#1a2a3e)+白文字、グレーヘッダー(#6b7280)
+- **カラーパレット**: 濃紺/黄色・琥珀/グレー/白/黒の5系統のみ
+- **禁止**: 中間色、薄いグラデーション、半透明
 
-### Tablet (iPad) = Primary Reference
-- **Conditions:** Direct sunlight, iPad portrait, tripod at 1.5m height, up to 3m viewing distance, 8-10 people viewing simultaneously
-- **Final standard:** Multiple people up to 3m away must instantly grasp the current situation even in direct sunlight
-- **Priority when in doubt:** Group visibility > Instant readability > Error resistance > Contrast in sunlight > Elegance
+## Security
+- CORS制限、PIN認証(bcrypt)、ペイロード制限、セキュリティヘッダー実装済み
+- analyze.js, locations.js, game-environment.js はPIN認証必須
+- APIキーはすべてサーバーサイド(Vercel環境変数)で管理
 
-### Smartphone (iPhone)
-- **Conditions:** Single user, close-range operation
-- **Final standard:** Comfortable, intuitive operation with immediate information access
+## Implemented Features
+- マルチコート機能(iPad端末コート+紙コート、最大3コート×4チーム×4人)
+- シャッフルアニメーション(カジノディーラー方式)
+- 管理者/メンバー権限(4-6桁PIN)
+- Supabase cloud sync
+- AI分析(タスク1-3完了: 新規指標、プロンプトテンプレート、レベル自動推定Lv1-5)
+- 場所プロフィール(Google Places proxy, フィールド種別5択, 環境タイプ3択, OpenMeteo天候自動取得)
+- お気に入り名前管理、試合単位スタッツ削除、カレンダーページネーション
 
-### Adoption Checklist for Tablet Improvements
-1. Can primary information be read when contrast drops in direct sunlight?
-2. Can the active team be identified at a glance from up to 3m away?
-3. Are team name, current player name, score, and miss count visible as a coherent information block?
-4. Does the layout hold up with 3 or 4 teams?
-5. Has visibility been sacrificed for the sake of aesthetics?
+## Hidden Specs
+- "キムラ" は組み換え後も端末コート固定
+- 開発者《𝕸𝖆𝖘𝖙𝖊𝖗》グループはlocalStorageでコンソールからのみ切替
 
-All 5 must be satisfied for an improvement to be adopted.
+## Collaboration Rules
+- 確認事項・質問・コミットメッセージ・PRの説明文は全て日本語
+- 段階的に小さく変更し、各変更後にビルド検証
+- 実機確認を待ってから次の変更に進む
+- 関係ない部分を書き換えない
+- 出力に文字数制限はない。フルパワーで回答すること
+- 迷ったら複雑さより保守性+磨き上げを優先
 
-## UI Design Principles
-
-### Active/Inactive Color System
-Team-specific colors are removed from GameScreen match display. Teams are distinguished by active/inactive state only.
-
-**Active team:**
-- Header band: dark navy (#14365a) with white text
-- Left accent bar: yellow (#ffc107)
-- Player name: yellow (#ffc107) for emphasis
-- Score table header: dark navy
-
-**Inactive team(s):**
-- Header band/row: low-saturation dark background (#1a2a3e) with white text
-- Score table header: gray (#6b7280)
-
-**Common:**
-- Color palette limited to 5 families: dark navy, yellow/amber, gray, white, black
-- No mid-tones, light gradients, or semi-transparent colors
-- Input area maintains current style (bright background base, already good)
-
-### Information Block Concept
-Team name + player name + score + misses are displayed as a meaningful unit (information block), not as scattered individual values. Information blocks take priority over isolated large numbers.
-
-### Visual Hierarchy Through Layout
-The primary tool for eye guidance is layout, position, and size. Color contrast serves as a supporting reinforcement, not the primary mechanism.
-
-### Elegance Through Structure
-Elegance is expressed through whitespace, alignment, information hierarchy, and color count control. Mid-tones, light gradients, semi-transparent effects, and weak borders are removed as means of expressing elegance.
-
-### Background Direction
-- Full dark background is retired
-- Content and input areas shift to bright backgrounds
-- Dark navy is reserved for headers and active emphasis only
-- Goal: "high visibility with structural elegance", not "pale and refined"
-
-### Player Name Display
-- Full names shown without truncation as a rule
-- Never sacrifice font size or weight for full display if it hurts outdoor visibility
-- Absorb long names through layout adjustments first
-- Active player name is one of the most important pieces of information
-
-### Input Area Constraints
-- Button sizes must not exceed the current isTablet logic upper limits
-
-## Current Branch Goal
-
-### UI Visibility Redesign
-This branch focuses on improving GameScreen visibility during active matches.
-
-Primary goals:
-- Replace team-specific color system with active/inactive color distinction
-- Improve contrast for outdoor/sunlight readability
-- Apply design principles from the UI improvement guideline v2
-- Fix the shuffle animation bug (skipConfirm state missing)
-
-### Dealer Animation (retained from previous branch)
-The dealer animation redesign for ShuffleAnimation is a separate presentation layer upgrade. The shuffle animation's visual direction (casino dealer character, premium card design, polished motion) remains a future goal. The immediate priority is fixing the animation bug and improving GameScreen visibility.
-
-## Critical Scope Rules
-All UI changes must stay isolated from core game logic.
-
-Do not change:
-- reducer
-- adv
-- scoreOf
-- failsOf
-- getPI
-- existing score rules
-- existing match result logic
-- existing persistence behavior unless absolutely necessary
-
-## Collaboration Instructions for Claude Code
-When working on this branch:
-- Make small changes one at a time
-- Verify build passes after each change
-- Request real-device confirmation from the user before proceeding to next change
-- Do not rewrite unrelated parts of the app
-- Preserve existing constraints from this CLAUDE.md file
-- When uncertain, favor maintainability plus polish over complexity for its own sake
-
-### Lessons from Previous Failures
-1. Claude AI artifact previews cannot verify correct display (styles.css CSS variables are not loaded). Always confirm on real device after Vercel deploy.
-2. Do not make "lightening" an end in itself. Bright gray backgrounds + gray text caused contrast failures before. The goal is high contrast readability, not brightness.
-3. Do not break what already works well. Dark background + white text for inactive rows was rated positively -- maintain that direction.
-4. Confirm visual direction with mockups before writing code.
-5. iPhone Safari copy-paste corrupts code (smart quotes, unicode ellipsis, en-dashes). Never edit files via GitHub Web UI on iPhone. Always use Claude Code for git operations.
-6. ShuffleAnimation bugs can cause full-screen black lockout. Always include safety valve (auto-close on stall) and try-catch wrapper around the entire return.
-
-### Human Perspective Verification Principles
-Technical correctness of code alone is not sufficient. After implementation, always self-verify from the following perspectives.
-
-**About the developer (Taichi-san):**
-- Not a professional programmer or designer, but a company employee who loves Molkky
-- Has deep knowledge of Molkky competition rules and operational know-how, but limited technical knowledge of programming and design
-- Judges by "how it looks on screen", not "how the function works"
-- Follows a workflow of checking via Vercel preview on a real device to determine quality
-- When technical explanation is needed, avoid jargon and explain in plain language
-
-**Final Verification Checklist (applies to all changes):**
-1. **How would a human see this screen?** Not the rationality of the code, but imagine how it actually appears to human eyes when displayed on a device screen. Can the text be read? Can buttons be found? Is it instantly clear what to do next?
-2. **Imagine viewing on an outdoor iPad from 3m away.** The primary usage environment of this app is outdoors, tripod-mounted, with multiple people viewing from a distance. "Visible" on an indoor monitor and "readable" outdoors are completely different things.
-3. **Choose the optimal solution for humans over the technically optimal solution.** Example: Even if dynamic font size calculation achieves "uniform fill rate across all character counts", if the result is text too small to read, fixed sizes per character count are the correct answer. The experience of the person looking at the screen takes priority over algorithmic elegance.
-4. **Apply different judgment criteria based on screen purpose.**
-   - **In-match screen (GameScreen):** What is most understandable for humans viewing it is the absolute top priority. Design beauty is only pursued to the extent it serves visibility.
-   - **Stats screen, Settings screen, Others:** Balance design sense with visibility. The goal is "high quality comparable to a professional designer, without AI-like feel". Allow stylishness while ensuring users never get lost in operation.
-5. **When in doubt, ask Taichi-san for judgment.** Present mock images or options and have them verified via preview. Do not make decisions based on technical convenience alone.
-
-### Design Quality Standards
-The design goal of this project is "high quality comparable to a professional designer, without AI-like feel".
-- Avoid characteristics of generic AI-generated UI (uniform grays, Inter/Roboto-family fonts, characterless card layouts)
-- Make intentional design decisions tailored to each screen's personality
-- A design quality polishing phase is planned after completion of large-scale feature implementation
+## Lessons from Previous Failures
+1. Claude AI artifact プレビューでは正しい表示を検証できない(styles.css CSS変数が未ロード)。必ず実機Vercelデプロイ後に確認
+2. 「明るくする」を目的にしない。明るいグレー背景+グレー文字はコントラスト不足の前科あり。目標は高コントラスト可読性
+3. 暗い背景+白文字の非アクティブ行は好評だった方向性を維持
+4. コードを書く前にモックで視覚的方向性を確認
+5. iPhone Safariコピペはコードを破壊する(スマートクォート、Unicode省略記号)。GitHub Web UIでのiPhone編集は絶対禁止。git操作は必ずClaude Codeで
+6. ShuffleAnimationバグは全画面ブラックアウトを引き起こす。安全弁(stall時自動クローズ)+try-catchラッパー必須
 
 ## 鉄則
 - 直接依頼された変更だけを行う
 - 求められていないリファクタリング・改善・フォーマット変更はしない
-- 日本語テキストは直接文字で書く。Unicode escapeは絶対に使わない
+- 日本語テキストは直接文字で書く。Unicodeエスケープは絶対に使わない
+- 太一さんの指示が太一さん自身の目的に反する場合は、そのまま実行せず改善案を提案する
