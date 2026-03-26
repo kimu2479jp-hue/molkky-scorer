@@ -113,3 +113,43 @@ return{merged:true,added,favs:serverFavs};
 
 }catch(e){_syncBusy=false;return{merged:false,reason:"network",error:e.message};}
 }
+
+// ═══ Wind Data Sync (separate from main sync — uses game_wind_data table) ═══
+
+export async function pushWindData(gameId, windData) {
+  const code = getSyncCode();
+  if (!code || !gameId || !windData) return { ok: false };
+  try {
+    const r = await fetch("/api/game-wind-data", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sync_code: code,
+        game_id: gameId,
+        wind_sensor: windData.windSensor || null,
+        turn_wind_data: windData.turnWindData || null,
+        wind_summary: windData.windSummary || null,
+      }),
+    });
+    const d = await r.json();
+    return { ok: r.ok, error: d.error };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+export async function pullWindData(gameId) {
+  const code = getSyncCode();
+  if (!code || !gameId) return null;
+  try {
+    const r = await fetch(
+      "/api/game-wind-data?game_id=" + encodeURIComponent(gameId) +
+      "&sync_code=" + encodeURIComponent(code)
+    );
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d.wind_data || null;
+  } catch (e) {
+    return null;
+  }
+}

@@ -116,6 +116,34 @@ return[];
 }
 export function _saveFavsRaw(l){try{localStorage.setItem(LS_KEY,JSON.stringify(l));localStorage.setItem(LS_FAV_BK,JSON.stringify(l));}catch(e){}}
 
+// ═══ Wind Sensor Data (per-game) ═══
+export async function saveWindData(gameId, data) {
+  if (!_db || !gameId) return;
+  try {
+    await idbSet(_db, "windData:" + gameId, data);
+  } catch (e) {
+    console.error("wind data save error", e);
+  }
+}
+
+export async function loadWindData(gameId) {
+  if (!_db || !gameId) return null;
+  try {
+    return await idbGet(_db, "windData:" + gameId) || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function deleteWindData(gameId) {
+  if (!_db || !gameId) return;
+  try {
+    await idbDel(_db, "windData:" + gameId);
+  } catch (e) {
+    console.error("wind data delete error", e);
+  }
+}
+
 // ═══ Player Manual Level ═══
 export function loadPlayerLevels(){
 try{const d=JSON.parse(localStorage.getItem(LS_LEVEL_KEY));return d&&typeof d==="object"?d:{};}catch(e){return{};}

@@ -168,6 +168,40 @@ export function getWeatherInfo(code) {
   return WEATHER_MAP[code] || { icon: "❓", label: "不明" };
 }
 
+// ═══ Wind Sensor ═══
+export const WIND_SPEED_CAP = 15;
+export const WIND_BUFFER_SIZE = 60;
+export const WIND_WS_PORT = 8765;
+export const WIND_RECONNECT_MS = 5000;
+export const WIND_SENSOR_KEY = "mk-wind-sensor";
+
+export const WIND_CATEGORIES = [
+  { key: "tailwind", min: 337.5, max: 22.5, label: "追い風" },
+  { key: "tail_right", min: 22.5, max: 67.5, label: "右後方" },
+  { key: "right_cross", min: 67.5, max: 112.5, label: "右横風" },
+  { key: "head_right", min: 112.5, max: 157.5, label: "右前方" },
+  { key: "headwind", min: 157.5, max: 202.5, label: "向かい風" },
+  { key: "head_left", min: 202.5, max: 247.5, label: "左前方" },
+  { key: "left_cross", min: 247.5, max: 292.5, label: "左横風" },
+  { key: "tail_left", min: 292.5, max: 337.5, label: "左後方" },
+];
+
+export const WIND_CATEGORY_LABELS = {
+  tailwind: "追い風", tail_right: "右後方", right_cross: "右横風", head_right: "右前方",
+  headwind: "向かい風", head_left: "左前方", left_cross: "左横風", tail_left: "左後方",
+};
+
+export const WIND_CATEGORY_COLORS = {
+  tailwind: "#22c55e", tail_right: "#7dd3fc", right_cross: "#38bdf8", head_right: "#fb923c",
+  headwind: "#ef4444", head_left: "#f97316", left_cross: "#38bdf8", tail_left: "#7dd3fc",
+  unknown: "#9ca3af",
+};
+
+export const ABSOLUTE_DIRECTION_LABELS = {
+  N: "北", NE: "北東", E: "東", SE: "南東",
+  S: "南", SW: "南西", W: "西", NW: "北西",
+};
+
 // ═══ Dev ═══
 export const DEV_MASTER_LIST=["キムラ"];
 
