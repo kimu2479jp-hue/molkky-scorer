@@ -169,6 +169,14 @@ export function getWeatherInfo(code) {
 }
 
 // ═══ Wind Sensor ═══
+export function getWindDirectionLabel(degrees) {
+  if (degrees == null || isNaN(degrees)) return '';
+  const normalized = ((degrees % 360) + 360) % 360;
+  const directions = ['北', '北東', '東', '南東', '南', '南西', '西', '北西'];
+  const index = Math.round(normalized / 45) % 8;
+  return directions[index];
+}
+
 export const WIND_SPEED_CAP = 15;
 export const WIND_BUFFER_SIZE = 60;
 export const WIND_WS_PORT = 8765;
