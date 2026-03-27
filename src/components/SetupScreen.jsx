@@ -21,11 +21,13 @@ const[showSettings,setShowSettings]=useState(false);const[shufAnimData,setShufAn
 const[multiCourtShufData,setMultiCourtShufData]=useState(null);const[allCourtData,setAllCourtData]=useState(null);const[showCourtOverview,setShowCourtOverview]=useState(false);const[showSmartFav,setShowSmartFav]=useState(false);
 const[editMode,setEditMode]=useState(false);const[expandedDel,setExpandedDel]=useState(null);const lpRef=useRef(null);const reshuffleGuard=useRef(false);
 const[selectedLocation,setSelectedLocation]=useState(null);
+const selectedLocationRestoredRef=useRef(false);
 const[windSensorEnabled,setWindSensorEnabled]=useState(false);
 const[windSensorPiAddr,setWindSensorPiAddr]=useState(()=>{try{return localStorage.getItem("windSensorPiAddress")||"";}catch(e){return"";}});
 const[locationList,setLocationList]=useState([]);
 const setupSyncCode=getSyncCode();
 useEffect(()=>{if(setupSyncCode){getLocations(setupSyncCode).then(l=>setLocationList(l||[])).catch(()=>{});}},[]); // eslint-disable-line react-hooks/exhaustive-deps
+useEffect(()=>{if(selectedLocationRestoredRef.current)return;if(locationList.length===0)return;selectedLocationRestoredRef.current=true;try{const saved=localStorage.getItem("molkky_selected_location");if(saved){const id=JSON.parse(saved);const found=locationList.find(l=>l.id===id);if(found){setSelectedLocation(found);}else{localStorage.removeItem("molkky_selected_location");}}}catch(e){localStorage.removeItem("molkky_selected_location");}},[ locationList]); // eslint-disable-line react-hooks/exhaustive-deps
 const[caDiscardStep,setCaDiscardStep]=useState(0);/* 0=none, 1=first confirm, 2=second confirm */
 const[reshuffleSettingsMode,setReshuffleSettingsMode]=useState(false);
 const[draftRestored,setDraftRestored]=useState(false);
@@ -263,12 +265,12 @@ const LocationSelector=setupSyncCode?(<div style={{marginBottom:14}}>
 <div style={{fontSize:14,fontWeight:700,color:"rgba(255,255,255,0.5)",letterSpacing:2,marginBottom:6}}>場所</div>
 <div style={{background:"rgba(255,255,255,0.96)",borderRadius:12,padding:10,maxHeight:200,overflow:"auto"}}>
 <label style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,cursor:"pointer",background:!selectedLocation?"rgba(43,125,233,0.08)":"transparent",marginBottom:2}}>
-<input type="radio" name="loc" checked={!selectedLocation} onChange={()=>setSelectedLocation(null)} style={{accentColor:"var(--accent-blue)"}}/>
+<input type="radio" name="loc" checked={!selectedLocation} onChange={()=>{setSelectedLocation(null);localStorage.removeItem("molkky_selected_location");}} style={{accentColor:"var(--accent-blue)"}}/>
 <span style={{fontSize:14,fontWeight:600,color:!selectedLocation?"var(--accent-blue)":"var(--text-secondary)"}}>場所を選択しない</span>
 </label>
 {locationList.length===0&&<div style={{fontSize:13,color:"var(--text-secondary)",padding:"8px 10px"}}>場所が登録されていません</div>}
 {locationList.map(loc=>(<label key={loc.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",borderRadius:8,cursor:"pointer",background:selectedLocation&&selectedLocation.id===loc.id?"rgba(43,125,233,0.08)":"transparent",marginBottom:2}}>
-<input type="radio" name="loc" checked={selectedLocation&&selectedLocation.id===loc.id} onChange={()=>setSelectedLocation(loc)} style={{accentColor:"var(--accent-blue)"}}/>
+<input type="radio" name="loc" checked={selectedLocation&&selectedLocation.id===loc.id} onChange={()=>{setSelectedLocation(loc);localStorage.setItem("molkky_selected_location",JSON.stringify(loc.id));}} style={{accentColor:"var(--accent-blue)"}}/>
 <span style={{flex:1}}>
 <span style={{fontSize:14,fontWeight:600,color:"var(--text-primary)"}}>{loc.place_name} - {loc.sub_name}</span>
 <span style={{display:"inline-block",marginLeft:6,padding:"1px 6px",borderRadius:4,fontSize:10,fontWeight:700,color:"#fff",background:FIELD_TYPE_BADGE_COLORS[loc.field_type]||"#6b7280"}}>{fieldLabel(loc.field_type)}</span>

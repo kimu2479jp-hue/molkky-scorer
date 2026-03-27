@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Target, BarChart3, Lock, Bot, RefreshCw, Star, ClipboardList, AlertTriangle, Trash2 } from "lucide-react";
 
-import { PC, MASCOT_R, ANALYSIS_DAILY_MAX, LEVEL_NAMES, CONFIDENCE_LEVELS, PERIOD_OPTIONS, DEFAULT_PERIOD_MS, getWeatherInfo, FIELD_TYPES, ROOF_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS, WIND_CATEGORY_COLORS, WIND_CATEGORY_LABELS, ABSOLUTE_DIRECTION_LABELS, WIND_SPEED_CAP } from "../constants.js";
+import { PC, MASCOT_R, ANALYSIS_DAILY_MAX, LEVEL_NAMES, CONFIDENCE_LEVELS, PERIOD_OPTIONS, DEFAULT_PERIOD_MS, getWeatherInfo, FIELD_TYPES, ROOF_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS, WIND_CATEGORY_COLORS, WIND_CATEGORY_LABELS, ABSOLUTE_DIRECTION_LABELS, WIND_SPEED_CAP, getWindDirectionLabel } from "../constants.js";
 import { loadStats, loadReplays, loadFavs, loadPlayerLevels, loadWindData } from "../db.js";
 import { deleteStatsByPeriod, deleteGameByKey, getAvailableGames, getGameDates, filterGamesByDates, filterGamesByPeriod, calcMetrics, fmtMD, fmtHM, estimatePlayerLevel } from "../stats.js";
 import { makeAnalysisKey, getAnalysisCached, fetchPlayerAnalysis, getPlayerAnalysisCount, calcNewIndicators, getTopScores } from "../analysis.js";
@@ -441,7 +441,7 @@ return dirLabel+" "+(s.avgWindSpeed||0).toFixed(1)+"m/s";
 }
 return (s.avgWindSpeed||0).toFixed(1)+"m/s";
 }
-if(gameEnv&&gameEnv.ws!=null)return gameEnv.ws+"m/s";
+if(gameEnv&&gameEnv.ws!=null){const dirLabel=(gameEnv.wd!=null)?getWindDirectionLabel(gameEnv.wd):"";return dirLabel?(dirLabel+" "+gameEnv.ws+"m/s"):(gameEnv.ws+"m/s");}
 return null;
 }
 function GameListItem({game,checked,onToggle,isTab,onShowScore,onDelete,isAdmin,windData}){

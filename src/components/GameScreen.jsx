@@ -394,8 +394,9 @@ weatherEndRef.current=endData;
 const startData=weatherStartRef.current;
 if(startData||endData||fieldType||roofType){
 const weatherSource=endData||startData;
-const avgWind=(startData&&endData)?Math.round((startData.windSpeed+endData.windSpeed)/2):weatherSource?Math.round(weatherSource.windSpeed):null;
-env={field:fieldType,roof:roofType,venueType:selectedLocation?selectedLocation.venue_type||"outdoor":null,weatherCode:weatherSource?.weatherCode??null,weather:weatherSource?getWeatherInfo(weatherSource.weatherCode).label:null,temp:weatherSource?.temp??null,windSpeed:avgWind,windStart:startData?.windSpeed??null,windEnd:endData?.windSpeed??null,locationName:selectedLocation?selectedLocation.place_name:null,fieldName:selectedLocation?selectedLocation.sub_name:null,locationId:selectedLocation?selectedLocation.id:null};
+const avgWind=(startData&&endData)?Math.round((startData.windSpeed+endData.windSpeed)/2*10)/10:weatherSource?Math.round(weatherSource.windSpeed*10)/10:null;
+const avgWindDir=(startData&&endData&&startData.windDirection!=null&&endData.windDirection!=null)?Math.round((startData.windDirection+endData.windDirection)/2):weatherSource?.windDirection!=null?Math.round(weatherSource.windDirection):null;
+env={field:fieldType,roof:roofType,venueType:selectedLocation?selectedLocation.venue_type||"outdoor":null,weatherCode:weatherSource?.weatherCode??null,weather:weatherSource?getWeatherInfo(weatherSource.weatherCode).label:null,temp:weatherSource?.temp??null,windSpeed:avgWind,windDirection:avgWindDir,windStart:startData?.windSpeed??null,windEnd:endData?.windSpeed??null,locationName:selectedLocation?selectedLocation.place_name:null,fieldName:selectedLocation?selectedLocation.sub_name:null,locationId:selectedLocation?selectedLocation.id:null};
 }
 }catch(e){console.error("env build error:",e);}
 const records=buildGameRecord(teams,history,teamOrder,winner,timestamps,favs,d,env);

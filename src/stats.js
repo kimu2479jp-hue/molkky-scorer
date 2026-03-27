@@ -208,7 +208,7 @@ try{
 const replays=_cache.replays;
 const slimTeams=teams.map(t=>({name:t.name,players:t.players.map(p=>({name:typeof p==="object"?p.name:p,active:typeof p==="object"?p.active:true}))}));
 const slimHistory=history.map(h=>({turn:h.turn,teamIndex:h.teamIndex,playerIndex:h.playerIndex,playerName:h.playerName,type:h.type,score:h.score,runningTotal:h.runningTotal,prevScore:h.prevScore,reset25:h.reset25,faultReset:h.faultReset,consecutiveFails:h.consecutiveFails}));
-replays[d]={teams:slimTeams,history:slimHistory,teamOrder,winner,autoEnd:!!autoEnd,dqEndGame:!!dqEndGame,env:env?{fi:env.field,rf:env.roof,wc:env.weatherCode,wl:env.weather,tp:env.temp,ws:env.windSpeed,ln:env.locationName||null,li:env.locationId||null,fn:env.fieldName||null,vt:env.venueType||null}:null};
+replays[d]={teams:slimTeams,history:slimHistory,teamOrder,winner,autoEnd:!!autoEnd,dqEndGame:!!dqEndGame,env:env?{fi:env.field,rf:env.roof,wc:env.weatherCode,wl:env.weather,tp:env.temp,ws:env.windSpeed,wd:env.windDirection!=null?env.windDirection:null,ln:env.locationName||null,li:env.locationId||null,fn:env.fieldName||null,vt:env.venueType||null}:null};
 /* Keep max MAX_REPLAYS, remove oldest */
 const keys=Object.keys(replays).sort();
 while(keys.length>MAX_REPLAYS){delete replays[keys.shift()];}
