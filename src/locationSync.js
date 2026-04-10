@@ -1,5 +1,6 @@
 // Location sync — fetch/cache/CRUD for location profiles (scoped by sync_code)
 import { _db, idbGet, idbSet } from "./db.js";
+import { API_BASE } from "./constants.js";
 
 const LOC_CACHE_KEY = "locations";
 
@@ -7,7 +8,7 @@ const LOC_CACHE_KEY = "locations";
 export async function pullLocations(syncCode) {
   if (!syncCode) return [];
   try {
-    const res = await fetch("/api/locations?sync_code=" + encodeURIComponent(syncCode));
+    const res = await fetch(API_BASE+"/api/locations?sync_code=" + encodeURIComponent(syncCode));
     if (!res.ok) throw new Error("API error " + res.status);
     const data = await res.json();
     const locs = data.locations || [];
@@ -35,7 +36,7 @@ export async function getLocations(syncCode) {
 // Create a new location (admin, PIN required)
 export async function createLocation(code, pin, data) {
   try {
-    const res = await fetch("/api/locations", {
+    const res = await fetch(API_BASE+"/api/locations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, pin, action: "create", ...data }),
@@ -53,7 +54,7 @@ export async function createLocation(code, pin, data) {
 // Update a location (admin, PIN required)
 export async function updateLocation(code, pin, id, updates) {
   try {
-    const res = await fetch("/api/locations", {
+    const res = await fetch(API_BASE+"/api/locations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, pin, action: "update", id, ...updates }),
@@ -70,7 +71,7 @@ export async function updateLocation(code, pin, id, updates) {
 // Delete a location (admin, PIN required)
 export async function deleteLocation(code, pin, id) {
   try {
-    const res = await fetch("/api/locations", {
+    const res = await fetch(API_BASE+"/api/locations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, pin, action: "delete", id }),

@@ -1,4 +1,4 @@
-import { SYNC_CODE_KEY, PIN_LOCKOUT_KEY, PIN_AUTH_TS_KEY, MAX_SYNC_CODES } from "./constants.js";
+import { SYNC_CODE_KEY, PIN_LOCKOUT_KEY, PIN_AUTH_TS_KEY, MAX_SYNC_CODES, API_BASE } from "./constants.js";
 import { _cache, _persistStats, _persistReplays, loadFavs, _saveFavsRaw } from "./db.js";
 
 // ═══ Cloud Sync — Supabase via /api/sync ═══
@@ -27,21 +27,21 @@ export function setPinAuthTs(ts){try{localStorage.setItem(PIN_AUTH_TS_KEY,ts||""
 
 export async function verifyPinOnServer(code,pin){
 if(!code)return{ok:false,reason:"no_code"};
-try{const r=await fetch("/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},
+try{const r=await fetch(API_BASE+"/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},
 body:JSON.stringify({code,action:"verify_pin",pin})});
 return await r.json();
 }catch(e){return{ok:false,reason:"network"};}
 }
 export async function createPinOnServer(code,pin){
 if(!code)return{ok:false,error:"no_code"};
-try{const r=await fetch("/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},
+try{const r=await fetch(API_BASE+"/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},
 body:JSON.stringify({code,action:"create_pin",pin})});
 return await r.json();
 }catch(e){return{ok:false,error:"network"};}
 }
 export async function checkServerHasPin(code){
 if(!code)return{has_pin:false,pin_updated_at:null,exists:false};
-try{const r=await fetch("/api/sync?code="+encodeURIComponent(code));
+try{const r=await fetch(API_BASE+"/api/sync?code="+encodeURIComponent(code));
 if(!r.ok)return{has_pin:false,pin_updated_at:null,exists:false};
 const d=await r.json();return{has_pin:!!d.has_pin,pin_updated_at:d.pin_updated_at||null,exists:true};
 }catch(e){return{has_pin:false,pin_updated_at:null,exists:false};}
@@ -61,7 +61,7 @@ const code=getSyncCode();
 if(!code||_syncBusy)return{ok:false};
 _syncBusy=true;
 try{
-const r=await fetch("/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},
+const r=await fetch(API_BASE+"/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},
 body:JSON.stringify({code,favorites:loadFavs(),stats:_cache.stats,replays:_cache.replays})});
 const d=await r.json();
 _syncBusy=false;
@@ -74,8 +74,8 @@ const code=getSyncCode();
 if(!code||_syncBusy)return{merged:false,reason:"no_code"};
 _syncBusy=true;
 try{
-const r=await fetch("/api/sync?code="+encodeURIComponent(code));
-if(r.status===404){_syncBusy=false;try{const cr=await fetch("/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code,action:"count_codes"})});const cd=await cr.json();if(cd.ok&&cd.count>=MAX_SYNC_CODES){return{merged:false,reason:"limit",error:"既存の同期コードを使用してください"};}}catch(e){}await pushToServer();return{merged:true,reason:"new_pushed",added:0};}
+const r=await fetch(API_BASE+"/api/sync?code="+encodeURIComponent(code));
+if(r.status===404){_syncBusy=false;try{const cr=await fetch(API_BASE+"/api/sync",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code,action:"count_codes"})});const cd=await cr.json();if(cd.ok&&cd.count>=MAX_SYNC_CODES){return{merged:false,reason:"limit",error:"既存の同期コードを使用してください"};}}catch(e){}await pushToServer();return{merged:true,reason:"new_pushed",added:0};}
 if(!r.ok){const e=await r.json().catch(()=>({}));_syncBusy=false;return{merged:false,reason:"error",error:e.error||"HTTP "+r.status};}
 const data=await r.json();
 
@@ -120,7 +120,7 @@ export async function pushWindData(gameId, windData) {
   const code = getSyncCode();
   if (!code || !gameId || !windData) return { ok: false };
   try {
-    const r = await fetch("/api/game-wind-data", {
+    const r = await fetch(API_BASE+"/api/game-wind-data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
