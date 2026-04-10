@@ -182,6 +182,7 @@ export const WIND_BUFFER_SIZE = 60;
 export const WIND_WS_PORT = 8765;
 export const WIND_RECONNECT_MS = 5000;
 export const WIND_SENSOR_KEY = "mk-wind-sensor";
+export const WIND_SENSOR_ENABLED_KEY = "mk-wind-sensor-enabled";
 
 export const WIND_CATEGORIES = [
   { key: "tailwind", min: 337.5, max: 22.5, label: "追い風" },

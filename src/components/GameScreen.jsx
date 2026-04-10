@@ -274,6 +274,7 @@ autoEnd:!!recoverData.autoEnd,turnStartTime:Date.now(),plOffsets:recoverData.plO
 }:{teams:initialTeams.map(t=>({...t,players:t.players.map(n=>({name:n,active:true}))})),history:[],currentOrderIdx:0,currentTurn:1,teamOrder:initialOrder,eliminated:initialTeams.map(()=>false),winner:null,gameNumber:1,dqEndGame:dqEnd,autoEnd:false,turnStartTime:Date.now(),plOffsets:initialTeams.map(()=>0)};
 const[st,dispatch]=useReducer(reducer,init);const{teams,history,currentOrderIdx,currentTurn,teamOrder,eliminated,winner,gameNumber,plOffsets,autoEnd,dqEndGame}=st;
 const[showPl,setShowPl]=useState(false);const[showRes,setShowRes]=useState(()=>!!(recoverData&&recoverData.winner!=null));
+const[savedGameDateKey,setSavedGameDateKey]=useState(null);
 const[view,setView]=useState("both");const[conf,setConf]=useState(null);
 const[gW,setGW]=useState(()=>(recoverData&&recoverData.gW)?recoverData.gW:initialTeams.map(()=>0));
 const[numGames,setNumGames]=useState(recoverData&&recoverData.numGames?recoverData.numGames:iNg);const[bestOf,setBestOf]=useState(recoverData&&recoverData.bestOf?recoverData.bestOf:iBo);
@@ -379,6 +380,7 @@ const key=gameNumber+"-"+history.length;
 if(!statsSavedRef.current[key]){
 statsSavedRef.current[key]=true;
 const d=new Date().toISOString();
+setSavedGameDateKey(d);
 /* Save replay for score table viewing */
 const fieldType=selectedLocation?selectedLocation.field_type:null;
 const roofType=null;
@@ -458,6 +460,7 @@ return(
 <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
 <button style={{...SS.tBtn,padding:isTablet?"7px 10px":"5px 8px"}} onClick={handleBack}><ChevronLeft size={isTablet?18:14}/></button>
 <button style={{...SS.tBtn,padding:isTablet?"7px 10px":undefined}} onClick={()=>setShowPl(true)}><Users size={isTablet?18:14}/></button>
+{windSensorEnabled&&<span style={{fontSize:isTablet?14:11,fontWeight:700,padding:isTablet?"4px 10px":"2px 6px",borderRadius:6,background:windConnected?"rgba(34,181,102,0.2)":"rgba(239,68,68,0.2)",color:windConnected?"#22b566":"#ef4444",whiteSpace:"nowrap"}}>{windConnected?"風速計OK":"風速計..."}</span>}
 {windSensorEnabled&&windConnected&&<button style={{...SS.tBtn,padding:isTablet?"7px 10px":"5px 8px",fontSize:isTablet?12:10,fontWeight:700}} onClick={()=>{if(windManagerRef.current){windManagerRef.current.resetCompassHeading();setWindToast("風速計の基準方向を再設定しました");setTimeout(()=>setWindToast(null),2000);}}}><RefreshCw size={isTablet?14:12}/></button>}
 </div>
 <span style={{fontSize:isTablet?28:16,fontWeight:isTablet?900:700,color:"#fff",textAlign:"center",flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{gameNumber}試合目 {currentTurn}ターン目{bestOf>0?" "+bestOf+"先取":""}</span>
@@ -479,7 +482,7 @@ return(
 </div>
 {showPl&&<PlModal teams={teams} dispatch={dispatch} onClose={()=>setShowPl(false)} isAdmin={isAdmin} courtCount={courtCount} courtAllocation={courtAllocation} onUpdateCourtAllocation={onUpdateCourtAllocation}/>}
 {conf&&<Confirm msg={conf.msg} onOk={execConf} onCancel={()=>setConf(null)}/>}
-{showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} onReshuffle={handleReshuffle} hasCourtAllocation={hasCourtAllocation} courtCount={courtCount} timestamps={timestamps} isAdmin={isAdmin} aiEnabled={aiEnabled} autoEnd={!!autoEnd} dqEndGame={!!dqEndGame} shufAnim={shufAnim} StatsModal={StatsModal} windSensorEnabled={windSensorEnabled} piAddress={piAddress} turnWindData={turnWindData} windManagerRef={windManagerRef}/>}
+{showRes&&winner!==null&&<GameResult teams={teams} history={history} teamOrder={teamOrder} winner={winner} gameWins={gW} bestOf={bestOf} numGames={numGames} gameNumber={gameNumber} onNext={handleNext} onBack={handleBack} onExtend={handleExtend} onReshuffle={handleReshuffle} hasCourtAllocation={hasCourtAllocation} courtCount={courtCount} timestamps={timestamps} isAdmin={isAdmin} aiEnabled={aiEnabled} autoEnd={!!autoEnd} dqEndGame={!!dqEndGame} shufAnim={shufAnim} StatsModal={StatsModal} windSensorEnabled={windSensorEnabled} piAddress={piAddress} turnWindData={turnWindData} gameDateKey={savedGameDateKey} windManagerRef={windManagerRef}/>}
 {animState.confetti&&<CSSConfetti/>}
 {windToast&&<div style={{position:"fixed",top:"calc(60px + env(safe-area-inset-top, 0px))",left:"50%",transform:"translateX(-50%)",background:"rgba(0,0,0,0.85)",color:"#fff",padding:"10px 20px",borderRadius:10,fontSize:14,fontWeight:700,zIndex:9000,pointerEvents:"none"}}>{windToast}</div>}
 {saveDialog&&<Confirm msg={"チーム・プレイヤー情報を\n設定画面に保存しますか？"} sub={"保存すると次のゲームで\n同じメンバーをすぐ使えます"} okLabel="保存する" cancelLabel="保存しない" thirdLabel="キャンセル（試合に戻る）" onOk={()=>doBack(true)} onCancel={doBackNoSaveWithCA} onThird={()=>setSaveDialog(false)}/>}

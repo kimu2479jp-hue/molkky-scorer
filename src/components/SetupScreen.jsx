@@ -22,7 +22,7 @@ const[multiCourtShufData,setMultiCourtShufData]=useState(null);const[allCourtDat
 const[editMode,setEditMode]=useState(false);const[expandedDel,setExpandedDel]=useState(null);const lpRef=useRef(null);const reshuffleGuard=useRef(false);
 const[selectedLocation,setSelectedLocation]=useState(null);
 const selectedLocationRestoredRef=useRef(false);
-const[windSensorEnabled,setWindSensorEnabled]=useState(false);
+const[windSensorEnabled,setWindSensorEnabled]=useState(()=>{try{return localStorage.getItem("mk-wind-sensor-enabled")==="true";}catch(e){return false;}});
 const[windSensorPiAddr,setWindSensorPiAddr]=useState(()=>{try{return localStorage.getItem("windSensorPiAddress")||"";}catch(e){return"";}});
 const[locationList,setLocationList]=useState([]);
 const setupSyncCode=getSyncCode();
@@ -325,7 +325,7 @@ return(
 {LocationSelector}
 {/* Wind Sensor Section */}
 <div style={{marginBottom:14}}>
-<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",borderRadius:12,background:windSensorEnabled?"rgba(34,181,102,0.15)":"rgba(255,255,255,0.06)",border:windSensorEnabled?"2px solid rgba(34,181,102,0.4)":"2px solid rgba(255,255,255,0.15)",cursor:"pointer"}} onClick={()=>setWindSensorEnabled(p=>!p)}>
+<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",borderRadius:12,background:windSensorEnabled?"rgba(34,181,102,0.15)":"rgba(255,255,255,0.06)",border:windSensorEnabled?"2px solid rgba(34,181,102,0.4)":"2px solid rgba(255,255,255,0.15)",cursor:"pointer"}} onClick={()=>setWindSensorEnabled(p=>{const next=!p;try{localStorage.setItem("mk-wind-sensor-enabled",next?"true":"false");}catch(e){}return next;})}>
 <span style={{fontSize:15,fontWeight:700,color:windSensorEnabled?"var(--text-success)":"rgba(255,255,255,0.5)"}}>風速計連携</span>
 <div style={{width:48,height:28,borderRadius:14,padding:2,background:windSensorEnabled?"var(--accent-green)":"rgba(255,255,255,0.25)",transition:"background 0.2s",display:"flex",alignItems:"center",justifyContent:windSensorEnabled?"flex-end":"flex-start"}}>
 <div style={{width:24,height:24,borderRadius:12,background:"var(--bg-surface)",boxShadow:"0 1px 3px rgba(0,0,0,0.2)",transition:"all 0.2s"}}/>
