@@ -8,6 +8,7 @@ import { buildGameRecord, fmtHM, fmtMD, saveGameStatsToDB, saveReplay, renamePla
 import { fetchPlayerAnalysis, getAnalysisCached, getPlayerAnalysisCount, makeAnalysisKey } from "../analysis.js";
 import { failsOf, getPI, reducer, scoreOf, shuf } from "../gameLogic.js";
 import { WindSensorManager } from "../windSensor.js";
+import { WindDebugOverlay } from "./WindDebugOverlay.jsx";
 import { CSSConfetti, Confirm, FavDropdown, GameSheet, ScoreTable, ShuffleAnimation } from "./common.jsx";
 
 // ═══ Weather fetch via OpenMeteo API ═══
@@ -355,6 +356,8 @@ const[compassValid,setCompassValid]=useState(false);
 const[turnWindData,setTurnWindData]=useState([]);
 const windManagerRef=useRef(null);
 const[windToast,setWindToast]=useState(null);
+const windDebugEnabled=typeof window!=="undefined"&&new URLSearchParams(window.location.search).has("wind-debug");
+const[windDebugLogs,setWindDebugLogs]=useState([]);
 useEffect(()=>{
 if(!windSensorEnabled)return;
 const manager=new WindSensorManager();
@@ -369,6 +372,9 @@ manager.setInitialCompassHeading();
 manager.onStatusCallback=(status)=>{
 setWindConnected(status.connected);
 };
+if(windDebugEnabled){
+manager.onDebugLogCallback=(logs)=>{setWindDebugLogs(logs);};
+}
 manager.connect(piAddress);
 return()=>{manager.disconnect();windManagerRef.current=null;};
 },[windSensorEnabled,piAddress]);
@@ -509,5 +515,6 @@ return(
 </div>
 </>)}
 </div></div>)}
+{windDebugEnabled&&<WindDebugOverlay logs={windDebugLogs} connected={windConnected} piAddress={piAddress}/>}
 </div>);
 }
