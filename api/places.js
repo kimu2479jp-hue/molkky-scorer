@@ -23,13 +23,28 @@ const ALLOWED_TYPES = [
   "recreation_center",
 ];
 
+function isLocalNetworkOrigin(origin) {
+  if (!origin) return false;
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+    if (/^10\./.test(hostname)) return true;
+    if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) return true;
+    if (/^192\.168\./.test(hostname)) return true;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export default async function handler(req, res) {
   // CORS
   const allowedOrigins = [
     process.env.ALLOWED_ORIGIN || "https://molkky-scorer.vercel.app",
   ];
   const origin = req.headers.origin || "";
-  const isAllowed = allowedOrigins.includes(origin) || origin.endsWith(".vercel.app");
+  const isAllowed = allowedOrigins.includes(origin) || origin.endsWith(".vercel.app") || isLocalNetworkOrigin(origin);
   res.setHeader("Access-Control-Allow-Origin", isAllowed ? origin : allowedOrigins[0]);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
