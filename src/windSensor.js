@@ -61,12 +61,25 @@ export class WindSensorManager {
     this.currentWind = null;
     this.onDataCallback = null;
     this.onStatusCallback = null;
+    this.onDebugLogCallback = null;
     this.reconnectTimer = null;
     this.piAddress = null;
     this.compassHeadingInitial = null;
+    this.debugLogs = [];
+    this._firstMessageLogged = false;
+  }
+
+  _log(message) {
+    const now = new Date();
+    const ts = now.toTimeString().slice(0, 8) + "." + String(now.getMilliseconds()).padStart(3, "0");
+    const entry = "[" + ts + "] " + message;
+    this.debugLogs.push(entry);
+    if (this.debugLogs.length > 100) this.debugLogs.shift();
+    this.onDebugLogCallback?.([...this.debugLogs]);
   }
 
   connect(piAddress) {
+    this._log("connect() called with: " + piAddress);
     this.piAddress = piAddress;
     this._connectWs();
   }
@@ -101,10 +114,15 @@ export class WindSensorManager {
 
   _connectWs() {
     if (!this.piAddress) return;
+    this._log("_connectWs() constructing URL...");
     try {
-      this.ws = new WebSocket(this.piAddress.startsWith("wss://") || this.piAddress.startsWith("ws://") ? this.piAddress : "ws://" + this.piAddress + ":" + W);
+      const wsUrl = this.piAddress.startsWith("wss://") || this.piAddress.startsWith("ws://") ? this.piAddress : "ws://" + this.piAddress + ":" + WIND_WS_PORT;
+      this._log("WebSocket URL: " + wsUrl);
+      this.ws = new WebSocket(wsUrl);
+      this._log("new WebSocket() called");
 
       this.ws.onopen = () => {
+        this._log("WS onopen - connected");
         this.connected = true;
         if (this.onStatusCallback) {
           this.onStatusCallback({ connected: true, address: this.piAddress });
@@ -113,6 +131,11 @@ export class WindSensorManager {
 
       this.ws.onmessage = (event) => {
         try {
+          if (!this._firstMessageLogged) {
+            this._firstMessageLogged = true;
+            const preview = typeof event.data === "string" ? event.data.slice(0, 100) : String(event.data).slice(0, 100);
+            this._log("WS first message received: " + preview);
+          }
           const data = JSON.parse(event.data);
           this.currentWind = data;
           this.compassValid = !!data.compass_valid;
@@ -124,18 +147,24 @@ export class WindSensorManager {
         }
       };
 
-      this.ws.onclose = () => {
+      this.ws.onclose = (event) => {
+        this._log("WS onclose - code: " + event.code + ", reason: " + event.reason + ", wasClean: " + event.wasClean);
         this.connected = false;
+        this._firstMessageLogged = false;
         if (this.onStatusCallback) {
           this.onStatusCallback({ connected: false });
         }
+        this._log("Reconnect scheduled in " + WIND_RECONNECT_MS + "ms");
         this.reconnectTimer = setTimeout(() => this._connectWs(), WIND_RECONNECT_MS);
       };
 
-      this.ws.onerror = () => {
+      this.ws.onerror = (event) => {
+        this._log("WS onerror - type: " + event.type);
         if (this.ws) this.ws.close();
       };
     } catch (e) {
+      this._log("WS catch error: " + e.message);
+      this._log("Reconnect scheduled in " + WIND_RECONNECT_MS + "ms");
       this.reconnectTimer = setTimeout(() => this._connectWs(), WIND_RECONNECT_MS);
     }
   }
