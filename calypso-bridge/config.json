@@ -1,0 +1,7 @@
+{
+  "ble_address": null,
+  "ws_port": 8765,
+  "log_level": "INFO",
+  "compass_offset_x": 0,
+  "compass_offset_y": 0
+}

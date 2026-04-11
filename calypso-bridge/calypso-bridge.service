@@ -1,0 +1,14 @@
+[Unit]
+Description=Calypso CMI1022 BLE Bridge
+After=bluetooth.target network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/calypso-bridge
+ExecStart=/home/pi/calypso-venv/bin/python bridge.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
