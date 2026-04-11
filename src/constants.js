@@ -1,3 +1,8 @@
+// API呼び出しのベースURL
+// Vercelデプロイ時: 未設定（空文字 → 相対パス /api/...）
+// Pi HTTP配信時: VITE_API_BASE=https://molkky-scorer.vercel.app でビルド
+export const API_BASE = (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_BASE) || "";
+
 // ═══ Game Rules ═══
 export const MAX_TEAMS=4,MAX_PL=4,MAX_SHUF=16,MAX_NAME=7,WIN=50,RST=25,PEN=37,MF=3;
 

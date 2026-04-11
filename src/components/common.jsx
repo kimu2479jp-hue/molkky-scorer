@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { AlertTriangle, Star, Lock, Settings, Cloud, Upload, BarChart3, MapPin, Plus, Pencil, Trash2, Search, X } from "lucide-react";
 
-import { MAX_FAV, MAX_NAME, WIN, MF, H1, C, SS, DEV_MASTER_LIST, ANALYSIS_DAILY_MAX, LEVEL_NAMES, LOCATION_FIELD_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS } from "../constants.js";
+import { MAX_FAV, MAX_NAME, WIN, MF, H1, C, SS, DEV_MASTER_LIST, ANALYSIS_DAILY_MAX, LEVEL_NAMES, LOCATION_FIELD_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS, API_BASE } from "../constants.js";
 import { ensureBlink, shuf, getFA } from "../gameLogic.js";
 import { getSyncCode, setSyncCodeLS, maskSyncCode, pushToServer, pullFromServer, getPinLockout, incPinAttempt, clearPinLockout, setPinAuthTs, verifyPinOnServer, createPinOnServer, checkServerHasPin, getPinAuthTs } from "../sync.js";
 import { getAnalysisTotal } from "../analysis.js";
@@ -517,7 +517,7 @@ const handleLocSearch=async()=>{
 if(!searchQuery.trim()||searchQuery.trim().length<2)return;
 setSearching(true);setSearchErr("");
 try{
-const res=await fetch("/api/places",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:searchQuery.trim(),code:getSyncCode()})});
+const res=await fetch(API_BASE+"/api/places",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:searchQuery.trim(),code:getSyncCode()})});
 if(!res.ok){const j=await res.json();setSearchErr(j.error||"検索に失敗しました");setSearching(false);return;}
 const data=await res.json();
 setSearchResults(data.places||[]);
