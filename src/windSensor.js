@@ -102,7 +102,7 @@ export class WindSensorManager {
   _connectWs() {
     if (!this.piAddress) return;
     try {
-      this.ws = new WebSocket("ws://" + this.piAddress + ":" + WIND_WS_PORT);
+      this.ws = new WebSocket(this.piAddress.startsWith("wss://") || this.piAddress.startsWith("ws://") ? this.piAddress : "ws://" + this.piAddress + ":" + W);
 
       this.ws.onopen = () => {
         this.connected = true;
