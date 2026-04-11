@@ -460,6 +460,7 @@ return(
 <div style={{display:"flex",gap:4,alignItems:"center",flexShrink:0}}>
 <button style={{...SS.tBtn,padding:isTablet?"7px 10px":"5px 8px"}} onClick={handleBack}><ChevronLeft size={isTablet?18:14}/></button>
 <button style={{...SS.tBtn,padding:isTablet?"7px 10px":undefined}} onClick={()=>setShowPl(true)}><Users size={isTablet?18:14}/></button>
+{windSensorEnabled&&<span style={{fontSize:isTablet?14:11,fontWeight:700,padding:isTablet?"4px 10px":"2px 6px",borderRadius:6,background:windConnected?"rgba(34,181,102,0.2)":"rgba(239,68,68,0.2)",color:windConnected?"#22b566":"#ef4444",whiteSpace:"nowrap"}}>{windConnected?"風速計OK":"風速計..."}</span>}
 {windSensorEnabled&&windConnected&&<button style={{...SS.tBtn,padding:isTablet?"7px 10px":"5px 8px",fontSize:isTablet?12:10,fontWeight:700}} onClick={()=>{if(windManagerRef.current){windManagerRef.current.resetCompassHeading();setWindToast("風速計の基準方向を再設定しました");setTimeout(()=>setWindToast(null),2000);}}}><RefreshCw size={isTablet?14:12}/></button>}
 </div>
 <span style={{fontSize:isTablet?28:16,fontWeight:isTablet?900:700,color:"#fff",textAlign:"center",flex:1,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{gameNumber}試合目 {currentTurn}ターン目{bestOf>0?" "+bestOf+"先取":""}</span>
