@@ -426,7 +426,7 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
   </div>);
 }
 
-/* ═══ Wind Data Modal (full-size) ═══ */
+/* ═══ Wind Data Modal (full-screen, same layout as GameScoreModal) ═══ */
 function WindDataModal({gameKey,onClose}){
 const isTab=typeof window!=="undefined"&&window.innerWidth>=768;
 const[windData,setWindData]=useState(null);
@@ -447,33 +447,31 @@ if(!replay||!replay.history||replay.history.length===0)return null;
 const dt=new Date(gameKey);
 const dateStr=(dt.getMonth()+1)+"/"+dt.getDate()+" "+fmtHM(dt);
 const summary=windData.windSummary||{};
-return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
-<div style={{width:"95%",maxHeight:"90%",background:"var(--bg-surface)",borderRadius:16,display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
+return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={onClose}>
 {/* Header */}
-<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px 10px",background:"var(--bg-secondary)",flexShrink:0}}>
+<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(10px + env(safe-area-inset-top, 0px)) 16px 8px",background:"var(--bg-secondary)",flexShrink:0}} onClick={e=>e.stopPropagation()}>
 <div style={{display:"flex",alignItems:"center",gap:8}}>
 <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg>
 <span style={{fontSize:isTab?22:18,fontWeight:800,color:"var(--text-inverse)"}}>風速データ</span>
-<span style={{fontSize:isTab?16:13,color:"rgba(255,255,255,0.7)"}}>{dateStr}</span>
 </div>
-<button onClick={onClose} style={{padding:"6px 14px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"transparent",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>✕</button>
+<div style={{fontSize:14,color:"rgba(255,255,255,0.7)"}}>{dateStr}</div>
+<button onClick={onClose} style={{padding:"6px 14px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"transparent",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>✕ 閉じる</button>
 </div>
 {/* Content */}
-<div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:16}}>
+<div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",background:"var(--bg-surface)",padding:"8px 6px"}} onClick={e=>e.stopPropagation()}>
 {/* Summary row */}
-<div style={{display:"flex",gap:10,marginBottom:16}}>
+<div style={{display:"flex",gap:6,marginBottom:8,padding:"0 2px"}}>
 {[
 {label:"平均風速",value:(summary.avgWindSpeed||0).toFixed(1)+" m/s",color:"#3b82f6"},
 {label:"最大風速",value:(summary.maxWindSpeed||0).toFixed(1)+" m/s",color:"#f97316"},
 {label:"投擲数",value:String(summary.sampleCount||windData.turnWindData.length),color:"#6b7280"},
-].map(item=>(<div key={item.label} style={{flex:1,textAlign:"center",background:"var(--bg-surface)",borderRadius:12,padding:"12px 6px",border:"1px solid var(--border-input)"}}>
+].map(item=>(<div key={item.label} style={{flex:1,textAlign:"center",background:"var(--bg-surface)",borderRadius:10,padding:"10px 4px",border:"1px solid var(--border-input)"}}>
 <div style={{fontSize:isTab?14:12,fontWeight:600,color:"#9ca3af"}}>{item.label}</div>
 <div style={{fontSize:isTab?28:24,fontWeight:800,color:item.color,marginTop:4}}>{item.value}</div>
 </div>))}
 </div>
 {/* Large Wind Chart */}
 <WindChartLarge windData={windData} history={replay.history} teams={replay.teams} isTab={isTab}/>
-</div>
 </div>
 </div>);
 }
@@ -487,8 +485,8 @@ if(totalTurns===0)return null;
 
 const[selectedIdx,setSelectedIdx]=useState(null);
 
-/* Layout constants - expanded for modal */
-const marginL=44,marginR=16,marginT=8,marginB=28;
+/* Layout constants - expanded for full-screen modal */
+const marginL=36,marginR=6,marginT=8,marginB=24;
 const gapBetween=14;
 const upperH=isTab?260:200;
 const lowerH=isTab?200:150;
@@ -497,7 +495,7 @@ const totalH=marginT+upperH+gapBetween+lowerH+marginB;
 /* Horizontal scroll: >=40 turns */
 const useScroll=totalTurns>=40;
 const minPxPerTurn=useScroll?(isTab?16:12):0;
-const chartInnerW=useScroll?totalTurns*minPxPerTurn:Math.max(280,totalTurns*(isTab?16:10));
+const chartInnerW=useScroll?totalTurns*minPxPerTurn:Math.max(280,totalTurns*(isTab?20:14));
 const svgW=marginL+chartInnerW+marginR;
 
 /* Y axis: upper (wind speed) */
@@ -549,9 +547,9 @@ const isMiss=turn.type==="miss"||turn.type==="fault"||turn.score===0;
 return{turn,wind,ti,teamName,playerName,scores,isMiss,x:xForTurn(selectedIdx)};
 })():null;
 
-return(<div>
+return(<div style={{minHeight:totalH+160}}>
 {/* Chart */}
-<div style={{overflowX:useScroll?"auto":"hidden",WebkitOverflowScrolling:"touch",borderRadius:12,border:"1px solid var(--border-input)",background:"var(--bg-surface)"}}>
+<div style={{overflowX:useScroll?"auto":"hidden",WebkitOverflowScrolling:"touch",borderRadius:8,background:"var(--bg-surface)"}}>
 <svg width={useScroll?svgW:"100%"} height={totalH} viewBox={useScroll?undefined:`0 0 ${svgW} ${totalH}`} style={{display:"block"}} onClick={handleBgTap}>
 
 {/* Upper: wind speed dots */}
