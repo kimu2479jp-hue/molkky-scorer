@@ -426,6 +426,248 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
   </div>);
 }
 
+/* ═══ Wind Data Modal (full-size) ═══ */
+function WindDataModal({gameKey,onClose}){
+const isTab=typeof window!=="undefined"&&window.innerWidth>=768;
+const[windData,setWindData]=useState(null);
+const[replay,setReplay]=useState(null);
+const[loaded,setLoaded]=useState(false);
+useEffect(()=>{
+setLoaded(false);setWindData(null);setReplay(null);
+if(!gameKey)return;
+const replays=loadReplays();
+const r=replays[gameKey]||null;
+setReplay(r);
+loadWindData(gameKey).then(d=>{setWindData(d);setLoaded(true);});
+},[gameKey]);
+if(!gameKey||!loaded)return null;
+if(!windData||!windData.windSensor||!windData.windSensor.enabled)return null;
+if(!windData.turnWindData||windData.turnWindData.length===0)return null;
+if(!replay||!replay.history||replay.history.length===0)return null;
+const dt=new Date(gameKey);
+const dateStr=(dt.getMonth()+1)+"/"+dt.getDate()+" "+fmtHM(dt);
+const summary=windData.windSummary||{};
+return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
+<div style={{width:"95%",maxHeight:"90%",background:"var(--bg-surface)",borderRadius:16,display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={e=>e.stopPropagation()}>
+{/* Header */}
+<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 16px 10px",background:"var(--bg-secondary)",flexShrink:0}}>
+<div style={{display:"flex",alignItems:"center",gap:8}}>
+<svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg>
+<span style={{fontSize:isTab?22:18,fontWeight:800,color:"var(--text-inverse)"}}>風速データ</span>
+<span style={{fontSize:isTab?16:13,color:"rgba(255,255,255,0.7)"}}>{dateStr}</span>
+</div>
+<button onClick={onClose} style={{padding:"6px 14px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"transparent",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>✕</button>
+</div>
+{/* Content */}
+<div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",padding:16}}>
+{/* Summary row */}
+<div style={{display:"flex",gap:10,marginBottom:16}}>
+{[
+{label:"平均風速",value:(summary.avgWindSpeed||0).toFixed(1)+" m/s",color:"#3b82f6"},
+{label:"最大風速",value:(summary.maxWindSpeed||0).toFixed(1)+" m/s",color:"#f97316"},
+{label:"投擲数",value:String(summary.sampleCount||windData.turnWindData.length),color:"#6b7280"},
+].map(item=>(<div key={item.label} style={{flex:1,textAlign:"center",background:"var(--bg-surface)",borderRadius:12,padding:"12px 6px",border:"1px solid var(--border-input)"}}>
+<div style={{fontSize:isTab?14:12,fontWeight:600,color:"#9ca3af"}}>{item.label}</div>
+<div style={{fontSize:isTab?28:24,fontWeight:800,color:item.color,marginTop:4}}>{item.value}</div>
+</div>))}
+</div>
+{/* Large Wind Chart */}
+<WindChartLarge windData={windData} history={replay.history} teams={replay.teams} isTab={isTab}/>
+</div>
+</div>
+</div>);
+}
+
+/* ═══ Wind Chart Large (for modal - expanded sizes) ═══ */
+function WindChartLarge({windData,history,teams,isTab}){
+const turnWind=windData.turnWindData||[];
+const summary=windData.windSummary||{};
+const totalTurns=history.length;
+if(totalTurns===0)return null;
+
+const[selectedIdx,setSelectedIdx]=useState(null);
+
+/* Layout constants - expanded for modal */
+const marginL=44,marginR=16,marginT=8,marginB=28;
+const gapBetween=14;
+const upperH=isTab?260:200;
+const lowerH=isTab?200:150;
+const totalH=marginT+upperH+gapBetween+lowerH+marginB;
+
+/* Horizontal scroll: >=40 turns */
+const useScroll=totalTurns>=40;
+const minPxPerTurn=useScroll?(isTab?16:12):0;
+const chartInnerW=useScroll?totalTurns*minPxPerTurn:Math.max(280,totalTurns*(isTab?16:10));
+const svgW=marginL+chartInnerW+marginR;
+
+/* Y axis: upper (wind speed) */
+const maxWind=turnWind.reduce((mx,w)=>w?Math.max(mx,w.windSpeed||0):mx,0);
+const yWindMax=Math.min(Math.ceil(maxWind+0.5),WIND_SPEED_CAP);
+const yWindTicks=[];
+const yWindStep=yWindMax<=4?1:yWindMax<=10?2:yWindMax<=20?4:5;
+for(let v=0;v<=yWindMax;v+=yWindStep)yWindTicks.push(v);
+
+/* Y axis: lower (score 0-50) */
+const yScoreMax=50;
+
+/* Mapping helpers */
+const xForTurn=i=>marginL+(i+0.5)*(chartInnerW/totalTurns);
+const yWindForVal=v=>{const capped=Math.min(v,WIND_SPEED_CAP);return marginT+upperH-(capped/yWindMax)*upperH;};
+const yScoreForVal=v=>marginT+upperH+gapBetween+lowerH-(v/yScoreMax)*lowerH;
+
+/* Cumulative scores per team at each turn */
+const teamCount=teams.length;
+const cumScores=[];
+const runningScores=new Array(teamCount).fill(0);
+for(let i=0;i<totalTurns;i++){
+const t=history[i];
+if(t.type==="score"||t.score>0){
+runningScores[t.teamIndex]+=t.score;
+if(runningScores[t.teamIndex]>50)runningScores[t.teamIndex]=25;
+}
+cumScores.push([...runningScores]);
+}
+
+/* X axis label thinning */
+const xLabelStep=totalTurns<=20?1:totalTurns<=40?5:10;
+
+/* Arrow path for wind direction inside dot */
+const arrowPath="M0,-4 L2,2 L0,1 L-2,2 Z";
+
+const handleTap=(idx)=>{setSelectedIdx(prev=>prev===idx?null:idx);};
+const handleBgTap=()=>{setSelectedIdx(null);};
+
+/* Popup content */
+const popup=selectedIdx!==null?(() => {
+const turn=history[selectedIdx];
+const wind=turnWind[selectedIdx];
+const ti=turn.teamIndex;
+const teamName=teams[ti]?.name||("Team "+(ti+1));
+const playerName=teams[ti]?.players?.[turn.playerIndex]?.name||teams[ti]?.players?.[turn.playerIndex]||"";
+const scores=cumScores[selectedIdx];
+const isMiss=turn.type==="miss"||turn.type==="fault"||turn.score===0;
+return{turn,wind,ti,teamName,playerName,scores,isMiss,x:xForTurn(selectedIdx)};
+})():null;
+
+return(<div>
+{/* Chart */}
+<div style={{overflowX:useScroll?"auto":"hidden",WebkitOverflowScrolling:"touch",borderRadius:12,border:"1px solid var(--border-input)",background:"var(--bg-surface)"}}>
+<svg width={useScroll?svgW:"100%"} height={totalH} viewBox={useScroll?undefined:`0 0 ${svgW} ${totalH}`} style={{display:"block"}} onClick={handleBgTap}>
+
+{/* Upper: wind speed dots */}
+{yWindTicks.map(v=>(<line key={"wg"+v} x1={marginL} x2={marginL+chartInnerW} y1={yWindForVal(v)} y2={yWindForVal(v)} stroke="#e5e7eb" strokeWidth={0.5}/>))}
+{yWindTicks.map(v=>(<text key={"wl"+v} x={marginL-6} y={yWindForVal(v)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#9ca3af">{v}</text>))}
+<text x={8} y={marginT+upperH/2} textAnchor="middle" dominantBaseline="middle" fontSize={10} fill="#9ca3af" transform={`rotate(-90,8,${marginT+upperH/2})`}>m/s</text>
+
+{/* Average wind line */}
+{summary.avgWindSpeed>0&&<line x1={marginL} x2={marginL+chartInnerW} y1={yWindForVal(summary.avgWindSpeed)} y2={yWindForVal(summary.avgWindSpeed)} stroke="#9ca3af" strokeWidth={1} strokeDasharray="4,3"/>}
+
+{/* Wind dots */}
+{history.map((turn,i)=>{
+const wind=turnWind[i];
+if(!wind||wind.windSpeed==null)return null;
+const cx=xForTurn(i);
+const cy=yWindForVal(wind.windSpeed);
+const r=4+(wind.windSpeed/yWindMax)*7;
+const color=wind.compassValid===false?"#9ca3af":(WIND_CATEGORY_COLORS[wind.windCategory]||"#9ca3af");
+const isSelected=selectedIdx===i;
+return(<g key={"wd"+i} onClick={e=>{e.stopPropagation();handleTap(i);}} style={{cursor:"pointer"}}>
+<circle cx={cx} cy={cy} r={r} fill={color} opacity={isSelected?1:0.8} stroke={isSelected?"#fff":"none"} strokeWidth={isSelected?2:0}/>
+{wind.compassValid!==false&&wind.relativeDirection!=null&&r>=5&&(
+<g transform={`translate(${cx},${cy}) rotate(${wind.relativeDirection})`}>
+<path d={arrowPath} fill="rgba(255,255,255,0.85)" stroke="none"/>
+</g>
+)}
+</g>);
+})}
+
+{/* Lower: cumulative score lines */}
+{[0,10,20,30,40,50].map(v=>(<line key={"sg"+v} x1={marginL} x2={marginL+chartInnerW} y1={yScoreForVal(v)} y2={yScoreForVal(v)} stroke="#e5e7eb" strokeWidth={v===50?0:0.5}/>))}
+<line x1={marginL} x2={marginL+chartInnerW} y1={yScoreForVal(50)} y2={yScoreForVal(50)} stroke="#eab308" strokeWidth={1.5} strokeDasharray="6,3"/>
+{[0,10,20,30,40,50].map(v=>(<text key={"sl"+v} x={marginL-6} y={yScoreForVal(v)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#9ca3af">{v}</text>))}
+<text x={8} y={marginT+upperH+gapBetween+lowerH/2} textAnchor="middle" dominantBaseline="middle" fontSize={10} fill="#9ca3af" transform={`rotate(-90,8,${marginT+upperH+gapBetween+lowerH/2})`}>点</text>
+
+{/* Score lines per team */}
+{Array.from({length:teamCount}).map((_,ti)=>{
+const points=[];
+let lastY=null;
+for(let i=0;i<totalTurns;i++){
+const x=xForTurn(i);
+const y=yScoreForVal(cumScores[i][ti]);
+if(history[i].teamIndex===ti){
+if(lastY!==null&&points.length>0){points.push(`${x},${lastY}`);}
+points.push(`${x},${y}`);
+lastY=y;
+}else{
+if(lastY!==null)points.push(`${x},${lastY}`);
+}
+}
+if(points.length<2)return null;
+return(<polyline key={"tl"+ti} points={points.join(" ")} fill="none" stroke={TEAM_LINE_COLORS[ti%4]} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" opacity={0.85}/>);
+})}
+
+{/* Score dots at team's own turns */}
+{history.map((turn,i)=>{
+const x=xForTurn(i);
+const y=yScoreForVal(cumScores[i][turn.teamIndex]);
+const isSelected=selectedIdx===i;
+return(<circle key={"sd"+i} cx={x} cy={y} r={isSelected?4:2.5} fill={TEAM_LINE_COLORS[turn.teamIndex%4]} stroke={isSelected?"#fff":"none"} strokeWidth={isSelected?1.5:0} onClick={e=>{e.stopPropagation();handleTap(i);}} style={{cursor:"pointer"}}/>);
+})}
+
+{/* Connector line for selected */}
+{selectedIdx!==null&&turnWind[selectedIdx]&&turnWind[selectedIdx].windSpeed!=null&&(()=>{
+const x=xForTurn(selectedIdx);
+const yTop=yWindForVal(turnWind[selectedIdx].windSpeed);
+const yBot=yScoreForVal(cumScores[selectedIdx][history[selectedIdx].teamIndex]);
+return(<line x1={x} x2={x} y1={yTop} y2={yBot} stroke="#9ca3af" strokeWidth={1} strokeDasharray="3,2"/>);
+})()}
+
+{/* X axis labels */}
+{history.map((_,i)=>{
+if((i+1)%xLabelStep!==0&&i!==0)return null;
+return(<text key={"xl"+i} x={xForTurn(i)} y={totalH-4} textAnchor="middle" fontSize={9} fill="#9ca3af">{i+1}</text>);
+})}
+
+{/* Separator between upper and lower */}
+<line x1={marginL} x2={marginL+chartInnerW} y1={marginT+upperH+gapBetween/2} y2={marginT+upperH+gapBetween/2} stroke="#d1d5db" strokeWidth={0.5} strokeDasharray="2,2"/>
+
+</svg>
+</div>
+
+{/* Team legend */}
+<div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap",marginTop:8}}>
+{teams.map((team,ti)=>(<div key={ti} style={{display:"flex",alignItems:"center",gap:4}}>
+<div style={{width:10,height:10,borderRadius:5,background:TEAM_LINE_COLORS[ti%4]}}/>
+<span style={{fontSize:12,fontWeight:700,color:"#555"}}>{team.name||("Team "+(ti+1))}</span>
+</div>))}
+</div>
+
+{/* Popup */}
+{popup&&(<div style={{position:"relative",marginTop:10}}>
+<div style={{background:"#1a1a2e",borderRadius:12,padding:14,color:"#fff",fontSize:14,maxWidth:360,margin:"0 auto"}}>
+<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+<span style={{background:TEAM_LINE_COLORS[popup.ti%4],color:"#fff",padding:"2px 8px",borderRadius:6,fontSize:13,fontWeight:700}}>{popup.teamName}</span>
+<span style={{fontWeight:700,fontSize:15}}>{typeof popup.playerName==="string"?popup.playerName:(popup.playerName?.name||"")}</span>
+</div>
+{popup.wind&&popup.wind.windSpeed!=null&&(<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+<span style={{fontWeight:700}}>{popup.wind.windSpeed.toFixed(1)} m/s</span>
+{popup.wind.compassValid!==false?
+<span style={{background:WIND_CATEGORY_COLORS[popup.wind.windCategory]||"#9ca3af",color:"#fff",padding:"1px 8px",borderRadius:5,fontSize:12,fontWeight:700}}>{WIND_CATEGORY_LABELS[popup.wind.windCategory]||"不明"}</span>
+:<span style={{background:"#9ca3af",color:"#fff",padding:"1px 8px",borderRadius:5,fontSize:12,fontWeight:700}}>風向き: データなし</span>}
+</div>)}
+<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+<span style={{fontSize:13,color:"#ccc"}}>得点:</span>
+{popup.isMiss?<span style={{background:"#ef4444",color:"#fff",padding:"1px 8px",borderRadius:5,fontSize:13,fontWeight:700}}>F</span>
+:<span style={{background:"#eab308",color:"#000",padding:"1px 8px",borderRadius:5,fontSize:13,fontWeight:700}}>{popup.turn.score}</span>}
+</div>
+<div style={{fontSize:12,color:"#aaa",marginTop:4}}>
+{teams.map((team,ti)=>(<span key={ti} style={{marginRight:8}}><span style={{color:TEAM_LINE_COLORS[ti%4],fontWeight:700}}>{team.name||("T"+(ti+1))}</span>: {popup.scores[ti]}点</span>))}
+</div>
+</div>
+</div>)}
+</div>);
+}
+
 /* ═══ Game List Item ═══ */
 function getFieldLabel(env){
 if(!env||!env.fi)return null;
@@ -444,7 +686,7 @@ return (s.avgWindSpeed||0).toFixed(1)+"m/s";
 if(gameEnv&&gameEnv.ws!=null){const dirLabel=(gameEnv.wd!=null)?getWindDirectionLabel(gameEnv.wd):"";return dirLabel?(dirLabel+" "+gameEnv.ws+"m/s"):(gameEnv.ws+"m/s");}
 return null;
 }
-function GameListItem({game,checked,onToggle,isTab,onShowScore,onDelete,isAdmin,windData}){
+function GameListItem({game,checked,onToggle,isTab,onShowScore,onShowWind,onDelete,isAdmin,windData}){
 const dt=new Date(game.d);
 const timeStr=fmtHM(dt);
 const dateStr=(dt.getMonth()+1)+"/"+dt.getDate();
@@ -478,6 +720,7 @@ return(<div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 
 {hasTeam&&<div style={{fontSize:isTab?13:11,color:"var(--accent-blue)",fontWeight:600,marginTop:1}}>勝利チームのメンバー: {game.winnerMembers.join(", ")}</div>}
 </div>
 {hasReplay&&<button onClick={e=>{e.stopPropagation();onShowScore&&onShowScore(game.d);}} style={{padding:"6px 10px",border:"1px solid #2b7de9",borderRadius:8,background:"#f0f6ff",color:"var(--accent-blue)",fontSize:isTab?14:12,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}><ClipboardList size={14}/></button>}
+{windData&&windData.turnWindData&&windData.turnWindData.length>0&&<button onClick={e=>{e.stopPropagation();onShowWind&&onShowWind(game.d);}} style={{padding:"6px 10px",border:"1px solid #0d9488",borderRadius:8,background:"#f0fdfa",color:"#0d9488",fontSize:isTab?14:12,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>風</button>}
 {isAdmin&&onDelete&&<button onClick={e=>{e.stopPropagation();onDelete(game.d,game);}} style={{padding:"6px 10px",border:"1px solid #e74c3c",borderRadius:8,background:"#fef2f2",color:"#e74c3c",fontSize:isTab?14:12,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}><Trash2 size={14}/></button>}
   </div>);
 }
@@ -698,7 +941,7 @@ return(<div className="mk-fade-scale-in" style={{position:"fixed",inset:0,backgr
 </div>
 </div>
 {(()=>{const CAL_PAGE_SIZE=10;const calTotalPages=Math.ceil(calFilteredGames.length/CAL_PAGE_SIZE);const calPagedGames=calFilteredGames.slice(calPage*CAL_PAGE_SIZE,(calPage+1)*CAL_PAGE_SIZE);return(<>
-{calPagedGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab} onShowScore={setScoreGame} onDelete={(key,game)=>setDeleteConf(game)} isAdmin={isAdmin} windData={windDataCache[g.d]}/>))}
+{calPagedGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab} onShowScore={setScoreGame} onShowWind={setWindChartGame} onDelete={(key,game)=>setDeleteConf(game)} isAdmin={isAdmin} windData={windDataCache[g.d]}/>))}
 {calTotalPages>1&&<div style={{display:"flex",gap:6,justifyContent:"center",marginTop:8}}>
 {Array.from({length:calTotalPages},(_,i)=>(<button key={i} onClick={()=>setCalPage(i)} style={{width:36,height:36,border:calPage===i?"2px solid var(--accent-blue)":"1px solid var(--border-input)",borderRadius:8,background:calPage===i?"var(--accent-blue)":"var(--bg-surface)",color:calPage===i?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{i+1}</button>))}
 </div>}
@@ -727,7 +970,7 @@ setSelectedGameKeys(new Set(matched.map(g=>g.d)));
 return(<button key={k} onClick={applyPreset} style={{padding:"6px 12px",border:"1px solid #2b7de9",borderRadius:8,background:"#f0f6ff",color:"var(--accent-blue)",fontSize:13,fontWeight:700,cursor:"pointer"}}>{label}</button>);
 })}
 </div>
-{recentGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab} onShowScore={setScoreGame} onDelete={(key,game)=>setDeleteConf(game)} isAdmin={isAdmin} windData={windDataCache[g.d]}/>))}
+{recentGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab} onShowScore={setScoreGame} onShowWind={setWindChartGame} onDelete={(key,game)=>setDeleteConf(game)} isAdmin={isAdmin} windData={windDataCache[g.d]}/>))}
 {/* F: Pagination */}
 {totalPages>1&&(<div style={{display:"flex",justifyContent:"center",gap:8,marginTop:10}}>
 {Array.from({length:totalPages},(_,i)=>(<button key={i} onClick={()=>setRecentPage(i)} style={{width:36,height:36,border:recentPage===i?"2px solid var(--accent-blue)":"1px solid var(--border-input)",borderRadius:8,background:recentPage===i?"var(--accent-blue)":"var(--bg-surface)",color:recentPage===i?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{i+1}</button>))}
@@ -785,15 +1028,6 @@ return(<div key={pd.name} style={{display:"flex",alignItems:"center",gap:6,paddi
 <table style={{width:"100%",borderCollapse:"collapse",fontSize:14}}><thead><tr style={{background:"var(--bg-secondary)",color:"var(--text-inverse)"}}><th style={{padding:"8px",textAlign:"left"}}>プレイヤー</th><th style={{padding:"8px"}}>試合</th><th style={{padding:"8px"}}>勝利</th><th style={{padding:"8px"}}>ターン</th><th style={{padding:"8px"}}>ミス</th><th style={{padding:"8px"}}>ミス率</th><th style={{padding:"8px"}}>上がり率</th></tr></thead>
 <tbody>{playersData.map(pd=>{const m=pd.metrics;return(<tr key={pd.name} style={{borderBottom:"1px solid var(--border-lighter)"}}><td style={{padding:"8px",fontWeight:700,color:pd.color}}>{pd.name}</td><td style={{padding:"8px",textAlign:"center"}}>{m.gameCount}</td><td style={{padding:"8px",textAlign:"center"}}>{m.winCount}</td><td style={{padding:"8px",textAlign:"center"}}>{m.turnCount}</td><td style={{padding:"8px",textAlign:"center",color:"var(--accent-orange)"}}>{m.missCount}</td><td style={{padding:"8px",textAlign:"center"}}>{(m.missRate*100).toFixed(1)}%</td><td style={{padding:"8px",textAlign:"center"}}>{(m.finishRate*100).toFixed(1)}%</td></tr>);})}</tbody></table>
 </div>
-{/* Wind Chart (single game selection only) */}
-{(()=>{
-/* Determine single game key */
-const singleGameKey=viewMode==="current"
-?(currentGameRecords&&currentGameRecords.length>0&&currentGameRecords[0].data?.d)||null
-:selectedGameKeys.size===1?[...selectedGameKeys][0]:null;
-if(!singleGameKey)return null;
-return <WindChartLoader gameKey={singleGameKey}/>;
-})()}
 {/* Score Distribution */}
 <ScoreDistribution playersData={playersData} favs={favs} isAdmin={isAdmin} aiEnabled={aiEnabled!==false} getGames={getPlayerGames}/>
 {/* Detailed metrics */}
@@ -824,6 +1058,7 @@ return(<div key={pd.name} style={{marginBottom:12}}>
 </div>
 {/* Score table modal */}
 {scoreGame&&<GameScoreModal gameKey={scoreGame} onClose={()=>setScoreGame(null)}/>}
+{windChartGame&&<WindDataModal gameKey={windChartGame} onClose={()=>setWindChartGame(null)}/>}
 {/* Delete dialogs */}
 {delStep===1&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:250,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}}>
 {isAdmin?(<>
