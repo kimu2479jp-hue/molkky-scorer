@@ -112,6 +112,70 @@ export class WindSensorManager {
     return this.setInitialCompassHeading();
   }
 
+  /** 接続テスト: 一時的にWebSocket接続して結果を返す */
+  testConnection(address, timeout = 5000) {
+    this._log("testConnection() called with: " + address);
+    return new Promise((resolve) => {
+      let ws = null;
+      let done = false;
+      const cleanup = () => {
+        done = true;
+        if (ws) {
+          try { ws.onclose = null; ws.onerror = null; ws.onmessage = null; ws.close(); } catch (e) {}
+          ws = null;
+        }
+      };
+      const timer = setTimeout(() => {
+        if (!done) {
+          this._log("testConnection timeout (" + timeout + "ms)");
+          cleanup();
+          resolve({ ok: false, detail: "5秒以内に応答なし" });
+        }
+      }, timeout);
+      try {
+        const wsUrl = address.startsWith("wss://") || address.startsWith("ws://") ? address : "ws://" + address + ":" + WIND_WS_PORT;
+        this._log("testConnection URL: " + wsUrl);
+        ws = new WebSocket(wsUrl);
+        this._log("testConnection WebSocket created");
+        ws.onopen = () => {
+          this._log("testConnection onopen");
+        };
+        ws.onmessage = (event) => {
+          if (done) return;
+          clearTimeout(timer);
+          const preview = typeof event.data === "string" ? event.data.slice(0, 100) : "";
+          this._log("testConnection message: " + preview);
+          try {
+            const data = JSON.parse(event.data);
+            const speed = data.wind_speed != null ? data.wind_speed.toFixed(1) : "?";
+            const compass = data.compass_valid ? "OK" : "NG";
+            cleanup();
+            resolve({ ok: true, detail: "風速 " + speed + " m/s / コンパス " + compass });
+          } catch (e) {
+            cleanup();
+            resolve({ ok: true, detail: "データ受信OK" });
+          }
+        };
+        ws.onerror = (event) => {
+          if (done) return;
+          this._log("testConnection onerror - type: " + event.type);
+          clearTimeout(timer);
+          cleanup();
+          resolve({ ok: false, detail: "接続エラー" });
+        };
+        ws.onclose = (event) => {
+          if (done) return;
+          this._log("testConnection onclose - code: " + event.code + ", reason: " + event.reason);
+        };
+      } catch (e) {
+        this._log("testConnection catch error: " + e.message);
+        clearTimeout(timer);
+        cleanup();
+        resolve({ ok: false, detail: "WebSocket作成エラー" });
+      }
+    });
+  }
+
   _connectWs() {
     if (!this.piAddress) return;
     this._log("_connectWs() constructing URL...");

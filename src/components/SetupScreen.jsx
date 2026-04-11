@@ -6,9 +6,10 @@ import { _db, idbDel, idbSet, loadFavs, loadStats } from "../db.js";
 import { getSyncCode } from "../sync.js";
 import { getLocations } from "../locationSync.js";
 import { shuf } from "../gameLogic.js";
+import { WindSensorManager } from "../windSensor.js";
 import { CourtOverview, FavDropdown, MultiCourtShuffleManager, SettingsPage, ShuffleAnimation, SmartFavPicker } from "./common.jsx";
 
-export function SetupScreen({onStart,savedTeams,isAdmin,onAdminToggle,aiEnabled,onAIToggle,shufAnim,onShufAnimToggle,courtAllocation,onClearCourtAllocation,setupDraft,onClearSetupDraft,autoReshuffleMode,onClearAutoReshuffle,favs,addF,rmF,editF,StatsModal}){
+export function SetupScreen({onStart,savedTeams,isAdmin,onAdminToggle,aiEnabled,onAIToggle,shufAnim,onShufAnimToggle,courtAllocation,onClearCourtAllocation,setupDraft,onClearSetupDraft,autoReshuffleMode,onClearAutoReshuffle,favs,addF,rmF,editF,StatsModal,windDebugEnabled,onWindDebugLog,onWindDebugPiAddress}){
 
 const[mode,setMode]=useState("shuffle");const[tc,setTc]=useState(savedTeams?savedTeams.length:2);
 const[courtCount,setCourtCount]=useState(1);const[courtTeamCounts,setCourtTeamCounts]=useState({1:2,2:2,3:2});const[activeCourt,setActiveCourt]=useState(1);
@@ -26,6 +27,7 @@ const[windSensorEnabled,setWindSensorEnabled]=useState(()=>{try{return localStor
 const[windSensorPiAddr,setWindSensorPiAddr]=useState(()=>{try{return localStorage.getItem("windSensorPiAddress")||"";}catch(e){return"";}});
 const[windTestStatus,setWindTestStatus]=useState(null);
 const[windTestDetail,setWindTestDetail]=useState("");
+useEffect(()=>{if(onWindDebugPiAddress)onWindDebugPiAddress(windSensorPiAddr);},[]);
 const[locationList,setLocationList]=useState([]);
 const setupSyncCode=getSyncCode();
 useEffect(()=>{if(setupSyncCode){getLocations(setupSyncCode).then(l=>setLocationList(l||[])).catch(()=>{});}},[]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -48,7 +50,7 @@ useEffect(()=>{if(courtCount>=2)return;const minT=pCountSetup>=13?4:pCountSetup>
 /* Trim mems when maxShufForCourt decreases (e.g. team count reduced) */
 const maxShufRef=courtCount===1?tc*MAX_PL:[1,2,3].filter(c=>c<=courtCount).reduce((s,c)=>s+courtTeamCounts[c],0)*MAX_PL;
 useEffect(()=>{if(reshuffleGuard.current){reshuffleGuard.current=false;return;}if(mode!=="shuffle")return;setMems(prev=>{if(prev.length<=maxShufRef)return prev;const trimmed=prev.slice(0,maxShufRef);return trimmed.length>=2?trimmed:["",""];});setSp(null);setAllCourtData(null);},[maxShufRef]);
-const testWindConnection=()=>{const addr=windSensorPiAddr.trim();if(!addr)return;setWindTestStatus("testing");setWindTestDetail("");let ws=null;let done=false;const cleanup=()=>{done=true;if(ws){try{ws.onclose=null;ws.onerror=null;ws.onmessage=null;ws.close();}catch(e){}ws=null;}};const timer=setTimeout(()=>{if(!done){cleanup();setWindTestStatus("fail");setWindTestDetail("5秒以内に応答なし");}},5000);try{ws=new WebSocket("ws://"+addr+":8765");ws.onmessage=(event)=>{if(done)return;clearTimeout(timer);try{const data=JSON.parse(event.data);const speed=data.wind_speed!=null?data.wind_speed.toFixed(1):"?";const compass=data.compass_valid?"OK":"NG";setWindTestStatus("ok");setWindTestDetail("風速 "+speed+" m/s / コンパス "+compass);}catch(e){setWindTestStatus("ok");setWindTestDetail("データ受信OK");}cleanup();};ws.onerror=()=>{if(done)return;clearTimeout(timer);cleanup();setWindTestStatus("fail");setWindTestDetail("接続エラー");};ws.onclose=()=>{if(done)return;};}catch(e){clearTimeout(timer);cleanup();setWindTestStatus("fail");setWindTestDetail("WebSocket作成エラー");}};
+const testWindConnection=()=>{const addr=windSensorPiAddr.trim();if(!addr)return;setWindTestStatus("testing");setWindTestDetail("");const manager=new WindSensorManager();if(windDebugEnabled&&onWindDebugLog){manager.onDebugLogCallback=(logs)=>{onWindDebugLog(logs);};}manager.testConnection(addr).then((result)=>{setWindTestStatus(result.ok?"ok":"fail");setWindTestDetail(result.detail);});};
 const uN=(i,v)=>setTeams(p=>p.map((t,j)=>j===i?{...t,name:v}:t));
 const uP=(ti,pi,v)=>setTeams(p=>p.map((t,i)=>i===ti?{...t,players:t.players.map((pl,j)=>j===pi?v.slice(0,MAX_NAME):pl)}:t));
 const aP=ti=>setTeams(p=>p.map((t,i)=>i===ti&&t.players.length<MAX_PL?{...t,players:[...t.players,""]}:t));
@@ -336,7 +338,7 @@ return(
 </div>
 {windSensorEnabled&&(<div style={{marginTop:8,background:"rgba(255,255,255,0.96)",borderRadius:12,padding:"12px 14px"}}>
 <div style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:6}}>Raspberry Pi アドレス</div>
-<input value={windSensorPiAddr} onChange={e=>{const v=e.target.value;setWindSensorPiAddr(v);setWindTestStatus(null);setWindTestDetail("");try{localStorage.setItem("windSensorPiAddress",v);}catch(ex){}}} placeholder="例: 192.168.1.100" style={{width:"100%",padding:"10px 14px",border:"1px solid var(--border-input)",borderRadius:10,fontSize:17,outline:"none",background:"#fafafa",boxSizing:"border-box"}}/>
+<input value={windSensorPiAddr} onChange={e=>{const v=e.target.value;setWindSensorPiAddr(v);setWindTestStatus(null);setWindTestDetail("");try{localStorage.setItem("windSensorPiAddress",v);}catch(ex){}if(onWindDebugPiAddress)onWindDebugPiAddress(v);}} placeholder="例: 192.168.1.100" style={{width:"100%",padding:"10px 14px",border:"1px solid var(--border-input)",borderRadius:10,fontSize:17,outline:"none",background:"#fafafa",boxSizing:"border-box"}}/>
 <button onClick={testWindConnection} disabled={!windSensorPiAddr.trim()||windTestStatus==="testing"} style={{width:"100%",padding:"10px 0",border:"none",borderRadius:8,background:windTestStatus==="testing"?"#6b7280":"#2b7de9",color:"#fff",fontSize:15,fontWeight:700,cursor:windSensorPiAddr.trim()&&windTestStatus!=="testing"?"pointer":"default",marginTop:8,opacity:windSensorPiAddr.trim()?1:0.3}}>{windTestStatus==="testing"?"接続テスト中...":"接続テスト"}</button>
 {windTestStatus==="ok"&&<div style={{marginTop:6,padding:"8px 12px",borderRadius:8,background:"rgba(34,181,102,0.12)",border:"1px solid rgba(34,181,102,0.3)"}}><span style={{fontSize:14,fontWeight:700,color:"#22b566"}}>OK</span><span style={{fontSize:13,color:"#333",marginLeft:8}}>{windTestDetail}</span></div>}
 {windTestStatus==="fail"&&<div style={{marginTop:6,padding:"8px 12px",borderRadius:8,background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)"}}><span style={{fontSize:14,fontWeight:700,color:"#ef4444"}}>NG</span><span style={{fontSize:13,color:"#333",marginLeft:8}}>{windTestDetail}</span></div>}
