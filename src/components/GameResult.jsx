@@ -3,6 +3,7 @@ import { Trophy, BarChart3, Camera, ClipboardList, MessageCircle, RefreshCw } fr
 
 import { WIN, MF, C, MAX_NAME } from "../constants.js";
 import { loadFavs, saveWindData } from "../db.js";
+import { pushWindData } from "../sync.js";
 import { buildGameRecord } from "../stats.js";
 import { scoreOf } from "../gameLogic.js";
 import { ScoreTable } from "./common.jsx";
@@ -61,6 +62,7 @@ turnWindData:turnWindData,
 windSummary:manager?manager.calcSummary(turnWindData):null,
 };
 saveWindData(gameId,windDataToSave).catch(e=>console.error("wind save error",e));
+pushWindData(gameId,windDataToSave).catch(e=>console.warn("wind sync error",e));
 },[]);
 return(
 <div className="mk-slide-up" style={{position:"fixed",inset:0,background:"var(--bg-surface-alt)",zIndex:100,display:"flex",flexDirection:"column",overflow:"hidden",overscrollBehavior:"none"}}>

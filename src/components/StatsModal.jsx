@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Target, BarChart3, Lock, Bot, RefreshCw, Star, ClipboardList, AlertTriangle, Trash2 } from "lucide-react";
 
 import { PC, MASCOT_R, ANALYSIS_DAILY_MAX, LEVEL_NAMES, CONFIDENCE_LEVELS, PERIOD_OPTIONS, DEFAULT_PERIOD_MS, getWeatherInfo, FIELD_TYPES, ROOF_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS, WIND_CATEGORY_COLORS, WIND_CATEGORY_LABELS, ABSOLUTE_DIRECTION_LABELS, WIND_SPEED_CAP, getWindDirectionLabel } from "../constants.js";
-import { loadStats, loadReplays, loadFavs, loadPlayerLevels, loadWindData } from "../db.js";
+import { loadStats, loadReplays, loadFavs, loadPlayerLevels, loadWindData, saveWindData } from "../db.js";
+import { pullWindData } from "../sync.js";
 import { deleteStatsByPeriod, deleteGameByKey, getAvailableGames, getGameDates, filterGamesByDates, filterGamesByPeriod, calcMetrics, fmtMD, fmtHM, estimatePlayerLevel } from "../stats.js";
 import { makeAnalysisKey, getAnalysisCached, fetchPlayerAnalysis, getPlayerAnalysisCount, calcNewIndicators, getTopScores } from "../analysis.js";
 import { ScoreTable } from "./common.jsx";
@@ -193,6 +194,33 @@ return(<div style={{marginBottom:16}}>
 
 /* ═══ Team colors for score lines ═══ */
 const TEAM_LINE_COLORS=["#f97316","#a78bfa","#22d3ee","#f472b6"];
+
+/* Convert Supabase row (snake_case) to IndexedDB format (camelCase) */
+function normalizeWindData(raw){
+if(!raw)return null;
+/* Already in camelCase (from IndexedDB) */
+if(raw.windSensor||raw.turnWindData)return raw;
+/* Supabase row format */
+if(raw.wind_sensor||raw.turn_wind_data){
+return{windSensor:raw.wind_sensor||null,turnWindData:raw.turn_wind_data||null,windSummary:raw.wind_summary||null};
+}
+return null;
+}
+
+/* Load wind data with Supabase fallback */
+async function loadWindDataWithFallback(gameKey){
+let d=await loadWindData(gameKey);
+if(d)return d;
+try{
+const pulled=await pullWindData(gameKey);
+const normalized=normalizeWindData(pulled);
+if(normalized&&normalized.turnWindData&&normalized.turnWindData.length>0){
+await saveWindData(gameKey,normalized);
+return normalized;
+}
+}catch(e){console.warn("wind pull error",e);}
+return null;
+}
 
 /* ═══ Wind Chart Component ═══ */
 function WindChart({windData,history,teams}){
@@ -493,7 +521,7 @@ if(!gameKey)return;
 const replays=loadReplays();
 const r=replays[gameKey]||null;
 setReplay(r);
-loadWindData(gameKey).then(d=>{setWindData(d);setLoaded(true);});
+loadWindDataWithFallback(gameKey).then(d=>{setWindData(d);setLoaded(true);});
 },[gameKey]);
 if(!loaded)return null;
 /* Only show if wind data exists with enabled sensor and turnWindData */
@@ -647,7 +675,7 @@ useEffect(()=>{
 let cancelled=false;
 const toLoad=[...visibleGameKeys].filter(k=>!(k in windDataCache));
 if(toLoad.length===0)return;
-Promise.all(toLoad.map(k=>loadWindData(k).then(d=>({k,d})))).then(results=>{
+Promise.all(toLoad.map(k=>loadWindDataWithFallback(k).then(d=>({k,d})))).then(results=>{
 if(cancelled)return;
 const patch={};
 results.forEach(({k,d})=>{patch[k]=d||null;});

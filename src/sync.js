@@ -1,5 +1,5 @@
 import { SYNC_CODE_KEY, PIN_LOCKOUT_KEY, PIN_AUTH_TS_KEY, MAX_SYNC_CODES, API_BASE } from "./constants.js";
-import { _cache, _persistStats, _persistReplays, loadFavs, _saveFavsRaw } from "./db.js";
+import { _cache, _persistStats, _persistReplays, loadFavs, _saveFavsRaw, loadWindData, saveWindData } from "./db.js";
 
 // ═══ Cloud Sync — Supabase via /api/sync ═══
 export function getSyncCode(){try{return localStorage.getItem(SYNC_CODE_KEY)||"";}catch(e){return "";}}
@@ -109,12 +109,45 @@ _persistReplays();
 _syncBusy=false;
 /* Push merged data back so both sides are identical */
 await pushToServer();
+/* Sync wind data for all games with replays (fire-and-forget) */
+syncAllWindData(Object.keys(localReplays)).catch(e=>console.warn("wind sync error",e));
 return{merged:true,added,favs:serverFavs};
 
 }catch(e){_syncBusy=false;return{merged:false,reason:"network",error:e.message};}
 }
 
 // ═══ Wind Data Sync (separate from main sync — uses game_wind_data table) ═══
+
+/* Sync wind data for all known game keys.
+   - Local wind data exists → push to server
+   - No local wind data → pull from server and cache to IndexedDB */
+async function syncAllWindData(gameKeys) {
+  const code = getSyncCode();
+  if (!code || !gameKeys || gameKeys.length === 0) return;
+  for (const key of gameKeys) {
+    try {
+      const local = await loadWindData(key);
+      if (local && local.turnWindData && local.turnWindData.length > 0) {
+        /* Local data exists — push to server */
+        await pushWindData(key, local);
+      } else {
+        /* No local data — try pull from server */
+        const pulled = await pullWindData(key);
+        if (pulled) {
+          /* Normalize snake_case (Supabase) to camelCase (IndexedDB) */
+          const normalized = (pulled.windSensor || pulled.turnWindData) ? pulled
+            : (pulled.wind_sensor || pulled.turn_wind_data) ? { windSensor: pulled.wind_sensor || null, turnWindData: pulled.turn_wind_data || null, windSummary: pulled.wind_summary || null }
+            : null;
+          if (normalized && normalized.turnWindData && normalized.turnWindData.length > 0) {
+            await saveWindData(key, normalized);
+          }
+        }
+      }
+    } catch (e) {
+      /* Per-game errors should not block other games */
+    }
+  }
+}
 
 export async function pushWindData(gameId, windData) {
   const code = getSyncCode();
