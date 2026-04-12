@@ -195,6 +195,29 @@ return(<div style={{marginBottom:16}}>
 /* ═══ Team colors for score lines ═══ */
 const TEAM_LINE_COLORS=["#f97316","#a78bfa","#22d3ee","#f472b6"];
 
+/* ═══ HSL utilities for player color generation ═══ */
+function hexToHsl(hex){
+const r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;
+const max=Math.max(r,g,b),min=Math.min(r,g,b);
+let h=0,s=0,l=(max+min)/2;
+if(max!==min){const d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);
+if(max===r)h=((g-b)/d+(g<b?6:0))/6;else if(max===g)h=((b-r)/d+2)/6;else h=((r-g)/d+4)/6;}
+return[h*360,s*100,l*100];
+}
+function hslToHex(h,s,l){
+s/=100;l/=100;const a=s*Math.min(l,1-l);
+const f=n=>{const k=(n+h/30)%12;const c=l-a*Math.max(Math.min(k-3,9-k,1),-1);return Math.round(255*c).toString(16).padStart(2,"0");};
+return"#"+f(0)+f(8)+f(4);
+}
+function generatePlayerColors(teamHex,count){
+if(count<=1)return[teamHex];
+const[h,s,l]=hexToHsl(teamHex);
+const offsets=[{dh:0,dl:0},{dh:30,dl:10},{dh:-25,dl:-8},{dh:55,dl:5}];
+const colors=[];
+for(let i=0;i<count;i++){const o=offsets[i%offsets.length];colors.push(hslToHex((h+o.dh+360)%360,Math.max(40,Math.min(100,s)),Math.max(30,Math.min(75,l+o.dl))));}
+return colors;
+}
+
 /* Convert Supabase row (snake_case) to IndexedDB format (camelCase) */
 function normalizeWindData(raw){
 if(!raw)return null;
@@ -479,7 +502,7 @@ const summary=windData.windSummary||{};
 const vh=typeof window!=="undefined"?window.innerHeight:800;
 const headerH=isTab?52:48;
 const summaryH=isTab?72:64;
-const legendH=28;
+const legendH=48;
 const padV=12;
 const chartH=Math.max(300,vh-headerH-summaryH-legendH-padV);
 return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={onClose}>
@@ -493,7 +516,7 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
 <button onClick={onClose} style={{padding:"6px 14px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"transparent",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>✕ 閉じる</button>
 </div>
 {/* Content */}
-<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"var(--bg-surface)",padding:"4px 4px 0"}} onClick={e=>e.stopPropagation()}>
+<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"var(--bg-surface)",padding:"4px 0 0"}} onClick={e=>e.stopPropagation()}>
 {/* Summary row */}
 <div style={{display:"flex",gap:6,marginBottom:4,padding:"0 2px",flexShrink:0}}>
 {[
@@ -521,18 +544,17 @@ if(totalTurns===0)return null;
 const[selectedIdx,setSelectedIdx]=useState(null);
 
 /* Layout constants - dynamic height from viewport */
-const marginL=30,marginR=4,marginT=6,marginB=20;
+const marginL=26,marginR=2,marginT=6,marginB=20;
 const gapBetween=10;
 const svgAvail=(chartH||500)-marginT-marginB-gapBetween;
-const halfH=Math.max(100,Math.floor(svgAvail/2));
-const upperH=halfH;
-const lowerH=halfH;
+const upperH=Math.max(150,Math.floor(svgAvail*0.75));
+const lowerH=Math.max(80,Math.floor(svgAvail*0.25));
 const totalH=marginT+upperH+gapBetween+lowerH+marginB;
 
 /* Horizontal scroll: >=40 turns */
 const useScroll=totalTurns>=40;
 const minPxPerTurn=useScroll?(isTab?16:12):0;
-const chartInnerW=useScroll?totalTurns*minPxPerTurn:Math.max(280,totalTurns*(isTab?20:14));
+const chartInnerW=useScroll?totalTurns*minPxPerTurn:Math.max(280,totalTurns*(isTab?20:16));
 const svgW=marginL+chartInnerW+marginR;
 
 /* Y axis: upper (wind speed) */
@@ -584,6 +606,9 @@ const isMiss=turn.type==="miss"||turn.type==="fault"||turn.score===0;
 return{turn,wind,ti,teamName,playerName,scores,isMiss,x:xForTurn(selectedIdx)};
 })():null;
 
+/* Player colors per team */
+const playerColorsMap=teams.map((team,ti)=>{const pc=(team.players||[]).length;return generatePlayerColors(TEAM_LINE_COLORS[ti%4],pc);});
+
 return(<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
 {/* Chart */}
 <div style={{flex:1,overflowX:useScroll?"auto":"hidden",overflowY:"hidden",WebkitOverflowScrolling:"touch",background:"var(--bg-surface)"}}>
@@ -603,13 +628,14 @@ const wind=turnWind[i];
 if(!wind||wind.windSpeed==null)return null;
 const cx=xForTurn(i);
 const cy=yWindForVal(wind.windSpeed);
-const r=4+(wind.windSpeed/yWindMax)*7;
+const r=16+(wind.windSpeed/yWindMax)*19;
+const arrowScale=(r/5).toFixed(2);
 const color=wind.compassValid===false?"#9ca3af":(WIND_CATEGORY_COLORS[wind.windCategory]||"#9ca3af");
 const isSelected=selectedIdx===i;
 return(<g key={"wd"+i} onClick={e=>{e.stopPropagation();handleTap(i);}} style={{cursor:"pointer"}}>
 <circle cx={cx} cy={cy} r={r} fill={color} opacity={isSelected?1:0.8} stroke={isSelected?"#fff":"none"} strokeWidth={isSelected?2:0}/>
-{wind.compassValid!==false&&wind.relativeDirection!=null&&r>=5&&(
-<g transform={`translate(${cx},${cy}) rotate(${wind.relativeDirection})`}>
+{wind.compassValid!==false&&wind.relativeDirection!=null&&(
+<g transform={`translate(${cx},${cy}) rotate(${wind.relativeDirection}) scale(${arrowScale})`}>
 <path d={arrowPath} fill="rgba(255,255,255,0.85)" stroke="none"/>
 </g>
 )}
@@ -617,10 +643,10 @@ return(<g key={"wd"+i} onClick={e=>{e.stopPropagation();handleTap(i);}} style={{
 })}
 
 {/* Lower: cumulative score lines */}
-{[0,10,20,30,40,50].map(v=>(<line key={"sg"+v} x1={marginL} x2={marginL+chartInnerW} y1={yScoreForVal(v)} y2={yScoreForVal(v)} stroke="#e5e7eb" strokeWidth={v===50?0:0.5}/>))}
+{[0,25,50].map(v=>(<line key={"sg"+v} x1={marginL} x2={marginL+chartInnerW} y1={yScoreForVal(v)} y2={yScoreForVal(v)} stroke="#e5e7eb" strokeWidth={0.5}/>))}
 <line x1={marginL} x2={marginL+chartInnerW} y1={yScoreForVal(50)} y2={yScoreForVal(50)} stroke="#eab308" strokeWidth={1.5} strokeDasharray="6,3"/>
-{[0,10,20,30,40,50].map(v=>(<text key={"sl"+v} x={marginL-6} y={yScoreForVal(v)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="#9ca3af">{v}</text>))}
-<text x={8} y={marginT+upperH+gapBetween+lowerH/2} textAnchor="middle" dominantBaseline="middle" fontSize={10} fill="#9ca3af" transform={`rotate(-90,8,${marginT+upperH+gapBetween+lowerH/2})`}>点</text>
+{[0,50].map(v=>(<text key={"sl"+v} x={marginL-6} y={yScoreForVal(v)} textAnchor="end" dominantBaseline="middle" fontSize={9} fill="#9ca3af">{v}</text>))}
+<text x={8} y={marginT+upperH+gapBetween+lowerH/2} textAnchor="middle" dominantBaseline="middle" fontSize={9} fill="#9ca3af" transform={`rotate(-90,8,${marginT+upperH+gapBetween+lowerH/2})`}>点</text>
 
 {/* Score lines per team */}
 {Array.from({length:teamCount}).map((_,ti)=>{
@@ -646,7 +672,9 @@ return(<polyline key={"tl"+ti} points={points.join(" ")} fill="none" stroke={TEA
 const x=xForTurn(i);
 const y=yScoreForVal(cumScores[i][turn.teamIndex]);
 const isSelected=selectedIdx===i;
-return(<circle key={"sd"+i} cx={x} cy={y} r={isSelected?4:2.5} fill={TEAM_LINE_COLORS[turn.teamIndex%4]} stroke={isSelected?"#fff":"none"} strokeWidth={isSelected?1.5:0} onClick={e=>{e.stopPropagation();handleTap(i);}} style={{cursor:"pointer"}}/>);
+const pColors=playerColorsMap[turn.teamIndex]||[];
+const dotColor=pColors[turn.playerIndex]||TEAM_LINE_COLORS[turn.teamIndex%4];
+return(<circle key={"sd"+i} cx={x} cy={y} r={isSelected?4:2.5} fill={dotColor} stroke={isSelected?"#fff":"none"} strokeWidth={isSelected?1.5:0} onClick={e=>{e.stopPropagation();handleTap(i);}} style={{cursor:"pointer"}}/>);
 })}
 
 {/* Connector line for selected */}
@@ -669,12 +697,22 @@ return(<text key={"xl"+i} x={xForTurn(i)} y={totalH-4} textAnchor="middle" fontS
 </svg>
 </div>
 
-{/* Team legend */}
-<div style={{display:"flex",gap:6,justifyContent:"center",flexWrap:"wrap",padding:"4px 0",flexShrink:0}}>
-{teams.map((team,ti)=>(<div key={ti} style={{display:"flex",alignItems:"center",gap:3}}>
-<div style={{width:8,height:8,borderRadius:4,background:TEAM_LINE_COLORS[ti%4]}}/>
+{/* Team legend with player colors */}
+<div style={{display:"flex",gap:4,justifyContent:"center",flexWrap:"wrap",padding:"4px 4px",flexShrink:0}}>
+{teams.map((team,ti)=>{
+const pColors=playerColorsMap[ti]||[];
+const players=team.players||[];
+return(<div key={ti} style={{display:"flex",alignItems:"center",gap:3,flexWrap:"wrap"}}>
 <span style={{fontSize:11,fontWeight:700,color:"#555"}}>{team.name||("Team "+(ti+1))}</span>
-</div>))}
+{players.map((p,pi)=>{
+const pName=typeof p==="string"?p:(p&&p.name?p.name:"");
+return(<span key={pi} style={{display:"inline-flex",alignItems:"center",gap:2,marginLeft:2}}>
+<span style={{width:8,height:8,borderRadius:4,background:pColors[pi]||TEAM_LINE_COLORS[ti%4],display:"inline-block"}}/>
+<span style={{fontSize:10,fontWeight:600,color:"#666"}}>{pName}</span>
+</span>);
+})}
+</div>);
+})}
 </div>
 
 {/* Popup overlay */}
