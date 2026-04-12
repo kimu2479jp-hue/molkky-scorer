@@ -553,7 +553,7 @@ const[containerW,setContainerW]=useState(0);
 useEffect(()=>{if(chartContainerRef.current)setContainerW(chartContainerRef.current.clientWidth);},[]);
 
 /* Layout constants - dynamic height from viewport */
-const marginL=20,marginR=1,marginT=6,marginB=20;
+const marginL=20,marginR=isTab?1:20,marginT=6,marginB=20;
 const gapBetween=10;
 const svgAvail=(chartH||500)-marginT-marginB-gapBetween;
 const upperH=Math.max(150,Math.floor(svgAvail*0.75));
@@ -637,7 +637,7 @@ const wind=turnWind[i];
 if(!wind||wind.windSpeed==null)return null;
 const cx=xForTurn(i);
 const cy=yWindForVal(wind.windSpeed);
-const r=16+(wind.windSpeed/yWindMax)*19;
+const r=isTab?(16+(wind.windSpeed/yWindMax)*19):(6+(wind.windSpeed/yWindMax)*8);
 const arrowScale=(r/5).toFixed(2);
 const color=playerColorsMap[turn.teamIndex]?.[turn.playerIndex]||TEAM_PLAYER_PALETTE[turn.teamIndex%4][0];
 const isSelected=selectedIdx===i;
@@ -682,7 +682,7 @@ const x=xForTurn(i);
 const y=yScoreForVal(cumScores[i][turn.teamIndex]);
 const isSelected=selectedIdx===i;
 const dotColor=playerColorsMap[turn.teamIndex]?.[turn.playerIndex]||TEAM_PLAYER_PALETTE[turn.teamIndex%4][0];
-return(<circle key={"sd"+i} cx={x} cy={y} r={isSelected?8:6} fill={dotColor} stroke={isSelected?"#fff":"none"} strokeWidth={isSelected?2:0} onClick={e=>{e.stopPropagation();handleTap(i);}} style={{cursor:"pointer"}}/>);
+return(<circle key={"sd"+i} cx={x} cy={y} r={isSelected?(isTab?8:5):(isTab?6:3.5)} fill={dotColor} stroke={isSelected?"#fff":"none"} strokeWidth={isSelected?2:0} onClick={e=>{e.stopPropagation();handleTap(i);}} style={{cursor:"pointer"}}/>);
 })}
 
 {/* Connector line for selected */}
@@ -711,12 +711,12 @@ return(<text key={"xl"+i} x={xForTurn(i)} y={totalH-4} textAnchor="middle" fontS
 const pColors=playerColorsMap[ti]||[];
 const players=team.players||[];
 return(<div key={ti} style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
-<span style={{fontSize:22,fontWeight:700,color:"#555"}}>{team.name||("Team "+(ti+1))}</span>
+<span style={{fontSize:isTab?22:14,fontWeight:700,color:"#555"}}>{team.name||("Team "+(ti+1))}</span>
 {players.map((p,pi)=>{
 const pName=typeof p==="string"?p:(p&&p.name?p.name:"");
 return(<span key={pi} style={{display:"inline-flex",alignItems:"center",gap:4,marginLeft:4}}>
-<span style={{width:16,height:16,borderRadius:8,background:pColors[pi]||TEAM_PLAYER_PALETTE[ti%4][0],display:"inline-block"}}/>
-<span style={{fontSize:20,fontWeight:600,color:"#666"}}>{pName}</span>
+<span style={{width:isTab?16:12,height:isTab?16:12,borderRadius:isTab?8:6,background:pColors[pi]||TEAM_PLAYER_PALETTE[ti%4][0],display:"inline-block"}}/>
+<span style={{fontSize:isTab?20:13,fontWeight:600,color:"#666"}}>{pName}</span>
 </span>);
 })}
 </div>);
