@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Target, BarChart3, Lock, Bot, RefreshCw, Star, ClipboardList, AlertTriangle, Trash2 } from "lucide-react";
 
 import { PC, MASCOT_R, ANALYSIS_DAILY_MAX, LEVEL_NAMES, CONFIDENCE_LEVELS, PERIOD_OPTIONS, DEFAULT_PERIOD_MS, getWeatherInfo, FIELD_TYPES, ROOF_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS, WIND_CATEGORY_COLORS, WIND_CATEGORY_LABELS, ABSOLUTE_DIRECTION_LABELS, WIND_SPEED_CAP, getWindDirectionLabel } from "../constants.js";
@@ -548,6 +548,9 @@ const totalTurns=history.length;
 if(totalTurns===0)return null;
 
 const[selectedIdx,setSelectedIdx]=useState(null);
+const chartContainerRef=useRef(null);
+const[containerW,setContainerW]=useState(0);
+useEffect(()=>{if(chartContainerRef.current)setContainerW(chartContainerRef.current.clientWidth);},[]);
 
 /* Layout constants - dynamic height from viewport */
 const marginL=20,marginR=1,marginT=6,marginB=20;
@@ -560,7 +563,7 @@ const totalH=marginT+upperH+gapBetween+lowerH+marginB;
 /* Horizontal scroll: >=40 turns */
 const useScroll=totalTurns>=40;
 const minPxPerTurn=useScroll?(isTab?16:12):0;
-const chartInnerW=useScroll?totalTurns*minPxPerTurn:Math.max(280,totalTurns*(isTab?20:16));
+const chartInnerW=useScroll?totalTurns*minPxPerTurn:(containerW>0?containerW-marginL-marginR:Math.max(280,totalTurns*(isTab?20:16)));
 const svgW=marginL+chartInnerW+marginR;
 
 /* Y axis: upper (wind speed) */
@@ -617,8 +620,8 @@ const playerColorsMap=teams.map((team,ti)=>{const palette=TEAM_PLAYER_PALETTE[ti
 
 return(<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
 {/* Chart */}
-<div style={{flex:1,overflowX:useScroll?"auto":"hidden",overflowY:"hidden",WebkitOverflowScrolling:"touch",background:"var(--bg-surface)"}}>
-<svg width={useScroll?svgW:"100%"} height={totalH} viewBox={useScroll?undefined:`0 0 ${svgW} ${totalH}`} style={{display:"block"}} onClick={handleBgTap}>
+<div ref={chartContainerRef} style={{flex:1,overflowX:useScroll?"auto":"hidden",overflowY:"hidden",WebkitOverflowScrolling:"touch",background:"var(--bg-surface)"}}>
+<svg width={useScroll?svgW:"100%"} height={totalH} viewBox={`0 0 ${svgW} ${totalH}`} style={{display:"block"}} onClick={handleBgTap}>
 
 {/* Upper: wind speed dots */}
 {yWindTicks.map(v=>(<line key={"wg"+v} x1={marginL} x2={marginL+chartInnerW} y1={yWindForVal(v)} y2={yWindForVal(v)} stroke="#e5e7eb" strokeWidth={0.5}/>))}
