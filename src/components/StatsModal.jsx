@@ -475,9 +475,16 @@ if(!replay||!replay.history||replay.history.length===0)return null;
 const dt=new Date(gameKey);
 const dateStr=(dt.getMonth()+1)+"/"+dt.getDate()+" "+fmtHM(dt);
 const summary=windData.windSummary||{};
+/* Calculate available chart height: viewport - header - summary - padding - legend */
+const vh=typeof window!=="undefined"?window.innerHeight:800;
+const headerH=isTab?52:48;
+const summaryH=isTab?72:64;
+const legendH=28;
+const padV=12;
+const chartH=Math.max(300,vh-headerH-summaryH-legendH-padV);
 return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={onClose}>
 {/* Header */}
-<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(10px + env(safe-area-inset-top, 0px)) 16px 8px",background:"var(--bg-secondary)",flexShrink:0}} onClick={e=>e.stopPropagation()}>
+<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(8px + env(safe-area-inset-top, 0px)) 12px 6px",background:"var(--bg-secondary)",flexShrink:0}} onClick={e=>e.stopPropagation()}>
 <div style={{display:"flex",alignItems:"center",gap:8}}>
 <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg>
 <span style={{fontSize:isTab?22:18,fontWeight:800,color:"var(--text-inverse)"}}>風速データ</span>
@@ -486,26 +493,26 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
 <button onClick={onClose} style={{padding:"6px 14px",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,background:"transparent",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>✕ 閉じる</button>
 </div>
 {/* Content */}
-<div style={{flex:1,overflow:"auto",WebkitOverflowScrolling:"touch",background:"var(--bg-surface)",padding:"8px 6px"}} onClick={e=>e.stopPropagation()}>
+<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:"var(--bg-surface)",padding:"4px 4px 0"}} onClick={e=>e.stopPropagation()}>
 {/* Summary row */}
-<div style={{display:"flex",gap:6,marginBottom:8,padding:"0 2px"}}>
+<div style={{display:"flex",gap:6,marginBottom:4,padding:"0 2px",flexShrink:0}}>
 {[
 {label:"平均風速",value:(summary.avgWindSpeed||0).toFixed(1)+" m/s",color:"#3b82f6"},
 {label:"最大風速",value:(summary.maxWindSpeed||0).toFixed(1)+" m/s",color:"#f97316"},
 {label:"投擲数",value:String(summary.sampleCount||windData.turnWindData.length),color:"#6b7280"},
-].map(item=>(<div key={item.label} style={{flex:1,textAlign:"center",background:"var(--bg-surface)",borderRadius:10,padding:"10px 4px",border:"1px solid var(--border-input)"}}>
-<div style={{fontSize:isTab?14:12,fontWeight:600,color:"#9ca3af"}}>{item.label}</div>
-<div style={{fontSize:isTab?28:24,fontWeight:800,color:item.color,marginTop:4}}>{item.value}</div>
+].map(item=>(<div key={item.label} style={{flex:1,textAlign:"center",background:"var(--bg-surface)",borderRadius:8,padding:"6px 4px",border:"1px solid var(--border-input)"}}>
+<div style={{fontSize:isTab?13:11,fontWeight:600,color:"#9ca3af"}}>{item.label}</div>
+<div style={{fontSize:isTab?24:20,fontWeight:800,color:item.color,marginTop:2}}>{item.value}</div>
 </div>))}
 </div>
 {/* Large Wind Chart */}
-<WindChartLarge windData={windData} history={replay.history} teams={replay.teams} isTab={isTab}/>
+<WindChartLarge windData={windData} history={replay.history} teams={replay.teams} isTab={isTab} chartH={chartH}/>
 </div>
 </div>);
 }
 
 /* ═══ Wind Chart Large (for modal - expanded sizes) ═══ */
-function WindChartLarge({windData,history,teams,isTab}){
+function WindChartLarge({windData,history,teams,isTab,chartH}){
 const turnWind=windData.turnWindData||[];
 const summary=windData.windSummary||{};
 const totalTurns=history.length;
@@ -513,11 +520,13 @@ if(totalTurns===0)return null;
 
 const[selectedIdx,setSelectedIdx]=useState(null);
 
-/* Layout constants - expanded for full-screen modal */
-const marginL=36,marginR=6,marginT=8,marginB=24;
-const gapBetween=14;
-const upperH=isTab?260:200;
-const lowerH=isTab?200:150;
+/* Layout constants - dynamic height from viewport */
+const marginL=30,marginR=4,marginT=6,marginB=20;
+const gapBetween=10;
+const svgAvail=(chartH||500)-marginT-marginB-gapBetween;
+const halfH=Math.max(100,Math.floor(svgAvail/2));
+const upperH=halfH;
+const lowerH=halfH;
 const totalH=marginT+upperH+gapBetween+lowerH+marginB;
 
 /* Horizontal scroll: >=40 turns */
@@ -575,9 +584,9 @@ const isMiss=turn.type==="miss"||turn.type==="fault"||turn.score===0;
 return{turn,wind,ti,teamName,playerName,scores,isMiss,x:xForTurn(selectedIdx)};
 })():null;
 
-return(<div style={{minHeight:totalH+160}}>
+return(<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
 {/* Chart */}
-<div style={{overflowX:useScroll?"auto":"hidden",WebkitOverflowScrolling:"touch",borderRadius:8,background:"var(--bg-surface)"}}>
+<div style={{flex:1,overflowX:useScroll?"auto":"hidden",overflowY:"hidden",WebkitOverflowScrolling:"touch",background:"var(--bg-surface)"}}>
 <svg width={useScroll?svgW:"100%"} height={totalH} viewBox={useScroll?undefined:`0 0 ${svgW} ${totalH}`} style={{display:"block"}} onClick={handleBgTap}>
 
 {/* Upper: wind speed dots */}
@@ -661,33 +670,32 @@ return(<text key={"xl"+i} x={xForTurn(i)} y={totalH-4} textAnchor="middle" fontS
 </div>
 
 {/* Team legend */}
-<div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap",marginTop:8}}>
-{teams.map((team,ti)=>(<div key={ti} style={{display:"flex",alignItems:"center",gap:4}}>
-<div style={{width:10,height:10,borderRadius:5,background:TEAM_LINE_COLORS[ti%4]}}/>
-<span style={{fontSize:12,fontWeight:700,color:"#555"}}>{team.name||("Team "+(ti+1))}</span>
+<div style={{display:"flex",gap:6,justifyContent:"center",flexWrap:"wrap",padding:"4px 0",flexShrink:0}}>
+{teams.map((team,ti)=>(<div key={ti} style={{display:"flex",alignItems:"center",gap:3}}>
+<div style={{width:8,height:8,borderRadius:4,background:TEAM_LINE_COLORS[ti%4]}}/>
+<span style={{fontSize:11,fontWeight:700,color:"#555"}}>{team.name||("Team "+(ti+1))}</span>
 </div>))}
 </div>
 
-{/* Popup */}
-{popup&&(<div style={{position:"relative",marginTop:10}}>
-<div style={{background:"#1a1a2e",borderRadius:12,padding:14,color:"#fff",fontSize:14,maxWidth:360,margin:"0 auto"}}>
-<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
-<span style={{background:TEAM_LINE_COLORS[popup.ti%4],color:"#fff",padding:"2px 8px",borderRadius:6,fontSize:13,fontWeight:700}}>{popup.teamName}</span>
-<span style={{fontWeight:700,fontSize:15}}>{typeof popup.playerName==="string"?popup.playerName:(popup.playerName?.name||"")}</span>
+{/* Popup overlay */}
+{popup&&(<div style={{position:"absolute",bottom:30,left:0,right:0,zIndex:10,display:"flex",justifyContent:"center",pointerEvents:"none"}}>
+<div style={{background:"rgba(26,26,46,0.95)",borderRadius:10,padding:"10px 14px",color:"#fff",fontSize:13,maxWidth:340,pointerEvents:"auto",boxShadow:"0 4px 16px rgba(0,0,0,0.3)"}}>
+<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+<span style={{background:TEAM_LINE_COLORS[popup.ti%4],color:"#fff",padding:"2px 8px",borderRadius:5,fontSize:12,fontWeight:700}}>{popup.teamName}</span>
+<span style={{fontWeight:700,fontSize:14}}>{typeof popup.playerName==="string"?popup.playerName:(popup.playerName?.name||"")}</span>
 </div>
-{popup.wind&&popup.wind.windSpeed!=null&&(<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+<div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+{popup.wind&&popup.wind.windSpeed!=null&&(<>
 <span style={{fontWeight:700}}>{popup.wind.windSpeed.toFixed(1)} m/s</span>
 {popup.wind.compassValid!==false?
-<span style={{background:WIND_CATEGORY_COLORS[popup.wind.windCategory]||"#9ca3af",color:"#fff",padding:"1px 8px",borderRadius:5,fontSize:12,fontWeight:700}}>{WIND_CATEGORY_LABELS[popup.wind.windCategory]||"不明"}</span>
-:<span style={{background:"#9ca3af",color:"#fff",padding:"1px 8px",borderRadius:5,fontSize:12,fontWeight:700}}>風向き: データなし</span>}
-</div>)}
-<div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-<span style={{fontSize:13,color:"#ccc"}}>得点:</span>
-{popup.isMiss?<span style={{background:"#ef4444",color:"#fff",padding:"1px 8px",borderRadius:5,fontSize:13,fontWeight:700}}>F</span>
-:<span style={{background:"#eab308",color:"#000",padding:"1px 8px",borderRadius:5,fontSize:13,fontWeight:700}}>{popup.turn.score}</span>}
+<span style={{background:WIND_CATEGORY_COLORS[popup.wind.windCategory]||"#9ca3af",color:"#fff",padding:"1px 6px",borderRadius:4,fontSize:11,fontWeight:700}}>{WIND_CATEGORY_LABELS[popup.wind.windCategory]||"不明"}</span>
+:<span style={{background:"#9ca3af",color:"#fff",padding:"1px 6px",borderRadius:4,fontSize:11,fontWeight:700}}>風向き: データなし</span>}
+</>)}
+{popup.isMiss?<span style={{background:"#ef4444",color:"#fff",padding:"1px 6px",borderRadius:4,fontSize:12,fontWeight:700}}>F</span>
+:<span style={{background:"#eab308",color:"#000",padding:"1px 6px",borderRadius:4,fontSize:12,fontWeight:700}}>{popup.turn.score}点</span>}
 </div>
-<div style={{fontSize:12,color:"#aaa",marginTop:4}}>
-{teams.map((team,ti)=>(<span key={ti} style={{marginRight:8}}><span style={{color:TEAM_LINE_COLORS[ti%4],fontWeight:700}}>{team.name||("T"+(ti+1))}</span>: {popup.scores[ti]}点</span>))}
+<div style={{fontSize:11,color:"#aaa",marginTop:3}}>
+{teams.map((team,ti)=>(<span key={ti} style={{marginRight:6}}><span style={{color:TEAM_LINE_COLORS[ti%4],fontWeight:700}}>{team.name||("T"+(ti+1))}</span>:{popup.scores[ti]}</span>))}
 </div>
 </div>
 </div>)}
