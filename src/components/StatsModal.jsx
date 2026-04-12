@@ -194,6 +194,12 @@ return(<div style={{marginBottom:16}}>
 
 /* ═══ Team colors for score lines ═══ */
 const TEAM_LINE_COLORS=["#f97316","#a78bfa","#22d3ee","#f472b6"];
+const TEAM_PLAYER_PALETTE=[
+["#f97316","#fb923c","#fdba74","#ea580c"],
+["#3b82f6","#60a5fa","#93c5fd","#2563eb"],
+["#22c55e","#4ade80","#86efac","#16a34a"],
+["#ef4444","#f87171","#fca5a5","#dc2626"],
+];
 
 /* ═══ HSL utilities for player color generation ═══ */
 function hexToHsl(hex){
@@ -502,7 +508,7 @@ const summary=windData.windSummary||{};
 const vh=typeof window!=="undefined"?window.innerHeight:800;
 const headerH=isTab?52:48;
 const summaryH=isTab?72:64;
-const legendH=48;
+const legendH=80;
 const padV=12;
 const chartH=Math.max(300,vh-headerH-summaryH-legendH-padV);
 return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:300,display:"flex",flexDirection:"column",overflow:"hidden"}} onClick={onClose}>
@@ -544,7 +550,7 @@ if(totalTurns===0)return null;
 const[selectedIdx,setSelectedIdx]=useState(null);
 
 /* Layout constants - dynamic height from viewport */
-const marginL=26,marginR=2,marginT=6,marginB=20;
+const marginL=20,marginR=1,marginT=6,marginB=20;
 const gapBetween=10;
 const svgAvail=(chartH||500)-marginT-marginB-gapBetween;
 const upperH=Math.max(150,Math.floor(svgAvail*0.75));
@@ -607,7 +613,7 @@ return{turn,wind,ti,teamName,playerName,scores,isMiss,x:xForTurn(selectedIdx)};
 })():null;
 
 /* Player colors per team */
-const playerColorsMap=teams.map((team,ti)=>{const pc=(team.players||[]).length;return generatePlayerColors(TEAM_LINE_COLORS[ti%4],pc);});
+const playerColorsMap=teams.map((team,ti)=>{const palette=TEAM_PLAYER_PALETTE[ti%4];return(team.players||[]).map((_,pi)=>palette[pi%4]);});
 
 return(<div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
 {/* Chart */}
@@ -630,7 +636,7 @@ const cx=xForTurn(i);
 const cy=yWindForVal(wind.windSpeed);
 const r=16+(wind.windSpeed/yWindMax)*19;
 const arrowScale=(r/5).toFixed(2);
-const color=wind.compassValid===false?"#9ca3af":(WIND_CATEGORY_COLORS[wind.windCategory]||"#9ca3af");
+const color=playerColorsMap[turn.teamIndex]?.[turn.playerIndex]||TEAM_PLAYER_PALETTE[turn.teamIndex%4][0];
 const isSelected=selectedIdx===i;
 return(<g key={"wd"+i} onClick={e=>{e.stopPropagation();handleTap(i);}} style={{cursor:"pointer"}}>
 <circle cx={cx} cy={cy} r={r} fill={color} opacity={isSelected?1:0.8} stroke={isSelected?"#fff":"none"} strokeWidth={isSelected?2:0}/>
@@ -664,7 +670,7 @@ if(lastY!==null)points.push(`${x},${lastY}`);
 }
 }
 if(points.length<2)return null;
-return(<polyline key={"tl"+ti} points={points.join(" ")} fill="none" stroke={TEAM_LINE_COLORS[ti%4]} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" opacity={0.85}/>);
+return(<polyline key={"tl"+ti} points={points.join(" ")} fill="none" stroke={TEAM_PLAYER_PALETTE[ti%4][0]} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" opacity={0.85}/>);
 })}
 
 {/* Score dots at team's own turns */}
@@ -672,9 +678,8 @@ return(<polyline key={"tl"+ti} points={points.join(" ")} fill="none" stroke={TEA
 const x=xForTurn(i);
 const y=yScoreForVal(cumScores[i][turn.teamIndex]);
 const isSelected=selectedIdx===i;
-const pColors=playerColorsMap[turn.teamIndex]||[];
-const dotColor=pColors[turn.playerIndex]||TEAM_LINE_COLORS[turn.teamIndex%4];
-return(<circle key={"sd"+i} cx={x} cy={y} r={isSelected?4:2.5} fill={dotColor} stroke={isSelected?"#fff":"none"} strokeWidth={isSelected?1.5:0} onClick={e=>{e.stopPropagation();handleTap(i);}} style={{cursor:"pointer"}}/>);
+const dotColor=playerColorsMap[turn.teamIndex]?.[turn.playerIndex]||TEAM_PLAYER_PALETTE[turn.teamIndex%4][0];
+return(<circle key={"sd"+i} cx={x} cy={y} r={isSelected?8:6} fill={dotColor} stroke={isSelected?"#fff":"none"} strokeWidth={isSelected?2:0} onClick={e=>{e.stopPropagation();handleTap(i);}} style={{cursor:"pointer"}}/>);
 })}
 
 {/* Connector line for selected */}
@@ -698,17 +703,17 @@ return(<text key={"xl"+i} x={xForTurn(i)} y={totalH-4} textAnchor="middle" fontS
 </div>
 
 {/* Team legend with player colors */}
-<div style={{display:"flex",gap:4,justifyContent:"center",flexWrap:"wrap",padding:"4px 4px",flexShrink:0}}>
+<div style={{display:"flex",gap:8,justifyContent:"center",flexWrap:"wrap",padding:"6px 4px",flexShrink:0}}>
 {teams.map((team,ti)=>{
 const pColors=playerColorsMap[ti]||[];
 const players=team.players||[];
-return(<div key={ti} style={{display:"flex",alignItems:"center",gap:3,flexWrap:"wrap"}}>
-<span style={{fontSize:11,fontWeight:700,color:"#555"}}>{team.name||("Team "+(ti+1))}</span>
+return(<div key={ti} style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+<span style={{fontSize:22,fontWeight:700,color:"#555"}}>{team.name||("Team "+(ti+1))}</span>
 {players.map((p,pi)=>{
 const pName=typeof p==="string"?p:(p&&p.name?p.name:"");
-return(<span key={pi} style={{display:"inline-flex",alignItems:"center",gap:2,marginLeft:2}}>
-<span style={{width:8,height:8,borderRadius:4,background:pColors[pi]||TEAM_LINE_COLORS[ti%4],display:"inline-block"}}/>
-<span style={{fontSize:10,fontWeight:600,color:"#666"}}>{pName}</span>
+return(<span key={pi} style={{display:"inline-flex",alignItems:"center",gap:4,marginLeft:4}}>
+<span style={{width:16,height:16,borderRadius:8,background:pColors[pi]||TEAM_PLAYER_PALETTE[ti%4][0],display:"inline-block"}}/>
+<span style={{fontSize:20,fontWeight:600,color:"#666"}}>{pName}</span>
 </span>);
 })}
 </div>);
@@ -719,21 +724,21 @@ return(<span key={pi} style={{display:"inline-flex",alignItems:"center",gap:2,ma
 {popup&&(<div style={{position:"absolute",bottom:30,left:0,right:0,zIndex:10,display:"flex",justifyContent:"center",pointerEvents:"none"}}>
 <div style={{background:"rgba(26,26,46,0.95)",borderRadius:10,padding:"10px 14px",color:"#fff",fontSize:13,maxWidth:340,pointerEvents:"auto",boxShadow:"0 4px 16px rgba(0,0,0,0.3)"}}>
 <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
-<span style={{background:TEAM_LINE_COLORS[popup.ti%4],color:"#fff",padding:"2px 8px",borderRadius:5,fontSize:12,fontWeight:700}}>{popup.teamName}</span>
+<span style={{background:TEAM_PLAYER_PALETTE[popup.ti%4][0],color:"#fff",padding:"2px 8px",borderRadius:5,fontSize:12,fontWeight:700}}>{popup.teamName}</span>
 <span style={{fontWeight:700,fontSize:14}}>{typeof popup.playerName==="string"?popup.playerName:(popup.playerName?.name||"")}</span>
 </div>
 <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
 {popup.wind&&popup.wind.windSpeed!=null&&(<>
 <span style={{fontWeight:700}}>{popup.wind.windSpeed.toFixed(1)} m/s</span>
 {popup.wind.compassValid!==false?
-<span style={{background:WIND_CATEGORY_COLORS[popup.wind.windCategory]||"#9ca3af",color:"#fff",padding:"1px 6px",borderRadius:4,fontSize:11,fontWeight:700}}>{WIND_CATEGORY_LABELS[popup.wind.windCategory]||"不明"}</span>
+<span style={{background:"#6b7280",color:"#fff",padding:"1px 6px",borderRadius:4,fontSize:11,fontWeight:700}}>{WIND_CATEGORY_LABELS[popup.wind.windCategory]||"不明"}</span>
 :<span style={{background:"#9ca3af",color:"#fff",padding:"1px 6px",borderRadius:4,fontSize:11,fontWeight:700}}>風向き: データなし</span>}
 </>)}
 {popup.isMiss?<span style={{background:"#ef4444",color:"#fff",padding:"1px 6px",borderRadius:4,fontSize:12,fontWeight:700}}>F</span>
 :<span style={{background:"#eab308",color:"#000",padding:"1px 6px",borderRadius:4,fontSize:12,fontWeight:700}}>{popup.turn.score}点</span>}
 </div>
 <div style={{fontSize:11,color:"#aaa",marginTop:3}}>
-{teams.map((team,ti)=>(<span key={ti} style={{marginRight:6}}><span style={{color:TEAM_LINE_COLORS[ti%4],fontWeight:700}}>{team.name||("T"+(ti+1))}</span>:{popup.scores[ti]}</span>))}
+{teams.map((team,ti)=>(<span key={ti} style={{marginRight:6}}><span style={{color:TEAM_PLAYER_PALETTE[ti%4][0],fontWeight:700}}>{team.name||("T"+(ti+1))}</span>:{popup.scores[ti]}</span>))}
 </div>
 </div>
 </div>)}
