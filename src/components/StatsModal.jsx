@@ -495,7 +495,7 @@ if(!gameKey)return;
 const replays=loadReplays();
 const r=replays[gameKey]||null;
 setReplay(r);
-loadWindData(gameKey).then(d=>{setWindData(d);setLoaded(true);});
+loadWindDataWithFallback(gameKey).then(d=>{setWindData(d);setLoaded(true);});
 },[gameKey]);
 if(!gameKey||!loaded)return null;
 if(!windData||!windData.windSensor||!windData.windSensor.enabled)return null;
@@ -960,15 +960,18 @@ const tabBtnStyle=(k)=>({padding:isTab?"10px 24px":"8px 16px",border:"none",bord
 const calFilteredGames=(calStart&&calEnd)?filterGamesByDates(allGames,calStart,calEnd):calStart?filterGamesByDates(allGames,calStart,calStart):[];
 
 /* Load wind data for visible games (lazy) */
-const visibleGameKeys=React.useMemo(()=>{
-const keys=new Set();
-if(tab==="calendar"){calFilteredGames.forEach(g=>keys.add(g.d));}
-else if(tab==="recent"){recentGamesAll.forEach(g=>keys.add(g.d));}
-return keys;
+/* visibleGameKeysStr: 内容ベースの文字列にして、参照の違いによるuseEffect再実行を防止 */
+const visibleGameKeysStr=React.useMemo(()=>{
+const keys=[];
+if(tab==="calendar"){calFilteredGames.forEach(g=>keys.push(g.d));}
+else if(tab==="recent"){recentGamesAll.forEach(g=>keys.push(g.d));}
+return keys.sort().join(",");
 },[tab,calFilteredGames,recentGamesAll]);
 useEffect(()=>{
+if(!visibleGameKeysStr)return;
 let cancelled=false;
-const toLoad=[...visibleGameKeys].filter(k=>!(k in windDataCache));
+const allKeys=visibleGameKeysStr.split(",");
+const toLoad=allKeys.filter(k=>!(k in windDataCache));
 if(toLoad.length===0)return;
 Promise.all(toLoad.map(k=>loadWindDataWithFallback(k).then(d=>({k,d})))).then(results=>{
 if(cancelled)return;
@@ -977,7 +980,7 @@ results.forEach(({k,d})=>{patch[k]=d||null;});
 setWindDataCache(prev=>({...prev,...patch}));
 });
 return()=>{cancelled=true;};
-},[visibleGameKeys]);
+},[visibleGameKeysStr]);
 
 return(<div className="mk-fade-scale-in" style={{position:"fixed",inset:0,background:"var(--bg-surface-alt)",zIndex:200,display:"flex",flexDirection:"column",overflow:"hidden",overscrollBehavior:"none"}}>
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(10px + env(safe-area-inset-top, 0px)) 20px 10px",background:"var(--bg-secondary)",flexShrink:0}}>
