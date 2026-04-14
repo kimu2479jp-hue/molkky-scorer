@@ -8,6 +8,9 @@ import asyncio
 import json
 import logging
 import math
+import os
+import tempfile
+import time
 from datetime import datetime, timezone
 
 from bleak import BleakClient, BleakScanner
@@ -23,6 +26,13 @@ DEFAULT_WS_PORT = 8765
 DEFAULT_LOG_LEVEL = "INFO"
 BATTERY_READ_INTERVAL = 300  # 5分間隔
 
+# ブロードキャスト / キャリブレーション関連
+BROADCAST_INTERVAL = 1.0            # 1Hz で wind_data をブロードキャスト
+CALIBRATE_TIMEOUT_SEC = 60          # キャリブレーション最大時間（秒）
+CALIBRATE_COVERAGE_THRESHOLD = 500  # x/y range の目標値（これに到達で coverage=1.0）
+CALIBRATE_SAMPLE_INTERVAL = 0.1     # 10Hz で QMC5883L を読む
+CALIBRATE_PROGRESS_INTERVAL = 0.5   # 0.5秒毎にクライアントへ進捗送信
+
 # QMC5883Lセンサー（I2C）
 compass_sensor = None
 compass_offset_x = 0
@@ -31,17 +41,31 @@ compass_valid = False
 
 # グローバル: 最新の風速データ
 latest_wind_data = {
+    "type": "wind_data",          # メッセージ識別子（固定値）
     "wind_speed": 0.0,
     "wind_direction": 0,
     "compass_heading": 0,
     "compass_valid": False,
     "battery": None,
+    "throw_direction": None,      # test_connection受信時に現在のcompass_headingで更新
     "timestamp": None,
     "connected": False,
 }
 
 ws_clients = set()
 ble_client_ref = None
+
+# キャリブレーション実行中の state
+calibration_state = {
+    "active": False,
+    "requester_ws": None,
+    "x_min": float("inf"),
+    "x_max": float("-inf"),
+    "y_min": float("inf"),
+    "y_max": float("-inf"),
+    "start_time": 0.0,
+    "task": None,
+}
 
 
 def load_config():
@@ -70,6 +94,9 @@ def read_compass():
     global compass_valid
     if compass_sensor is None:
         return 0
+    # キャリブレーション中は I2C 競合回避のため直近値を返す
+    if calibration_state["active"]:
+        return latest_wind_data.get("compass_heading", 0)
     try:
         x, y, z = compass_sensor.get_magnet()
         x -= compass_offset_x
@@ -162,19 +189,241 @@ async def battery_task():
                 logging.debug(f"バッテリー読み取り失敗: {e}")
 
 
+def save_compass_offsets(offset_x, offset_y):
+    """config.json に compass_offset_x/y を原子的に保存（SDカード電源断対策）"""
+    try:
+        with open("config.json") as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        config = {}
+    config["compass_offset_x"] = float(offset_x)
+    config["compass_offset_y"] = float(offset_y)
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=".", prefix="config.", suffix=".tmp")
+    try:
+        with os.fdopen(tmp_fd, "w") as f:
+            json.dump(config, f, indent=2)
+        os.replace(tmp_path, "config.json")
+    except Exception:
+        if os.path.exists(tmp_path):
+            try:
+                os.unlink(tmp_path)
+            except Exception:
+                pass
+        raise
+
+
+async def _safe_send(ws, payload):
+    """WebSocket send の例外をキャッチして bool を返すヘルパー"""
+    try:
+        await ws.send(json.dumps(payload))
+        return True
+    except (websockets.ConnectionClosed,
+            websockets.ConnectionClosedOK,
+            websockets.ConnectionClosedError):
+        return False
+    except Exception as e:
+        logging.warning(f"WebSocket送信エラー: {e}")
+        return False
+
+
+async def handle_test_connection(ws):
+    """test_connection コマンド受信時: throw_direction を更新してレスポンス送信"""
+    # BLE接続 + コンパス有効時のみ throw_direction を現在値で更新
+    # 未接続時は過去値を維持する
+    ble_ok = bool(latest_wind_data.get("connected"))
+    compass_ok = bool(latest_wind_data.get("compass_valid"))
+    if ble_ok and compass_ok:
+        latest_wind_data["throw_direction"] = latest_wind_data.get("compass_heading")
+    status = "ok" if ble_ok else "no_ble"
+    response = {
+        "type": "test_result",
+        "status": status,
+        "wind_speed": latest_wind_data.get("wind_speed", 0.0),
+        "wind_direction": latest_wind_data.get("wind_direction", 0),
+        "compass_heading": latest_wind_data.get("compass_heading", 0),
+        "compass_valid": latest_wind_data.get("compass_valid", False),
+        "battery": latest_wind_data.get("battery"),
+        "throw_direction": latest_wind_data.get("throw_direction"),
+    }
+    await _safe_send(ws, response)
+    logging.info(
+        f"test_connection 応答: status={status}, throw_direction={response['throw_direction']}"
+    )
+
+
+async def calibration_loop(ws):
+    """QMC5883L キャリブレーション実行ループ。進捗送信と完了処理を担当"""
+    global compass_offset_x, compass_offset_y
+
+    last_progress_sent = 0.0
+    calibration_state["x_min"] = float("inf")
+    calibration_state["x_max"] = float("-inf")
+    calibration_state["y_min"] = float("inf")
+    calibration_state["y_max"] = float("-inf")
+    calibration_state["start_time"] = time.time()
+
+    try:
+        while calibration_state["active"]:
+            # タイムアウト判定
+            elapsed = time.time() - calibration_state["start_time"]
+            if elapsed > CALIBRATE_TIMEOUT_SEC:
+                await _safe_send(ws, {"type": "calibrate_error", "reason": "timeout"})
+                logging.info("キャリブレーションタイムアウト")
+                return
+
+            # サンプル収集（calibrate.py と一貫して get_magnet_raw を使用）
+            try:
+                x, y, z = compass_sensor.get_magnet_raw()
+            except Exception as e:
+                logging.warning(f"キャリブレーション中の読み取りエラー: {e}")
+                await asyncio.sleep(CALIBRATE_SAMPLE_INTERVAL)
+                continue
+
+            calibration_state["x_min"] = min(calibration_state["x_min"], x)
+            calibration_state["x_max"] = max(calibration_state["x_max"], x)
+            calibration_state["y_min"] = min(calibration_state["y_min"], y)
+            calibration_state["y_max"] = max(calibration_state["y_max"], y)
+
+            x_range = calibration_state["x_max"] - calibration_state["x_min"]
+            y_range = calibration_state["y_max"] - calibration_state["y_min"]
+            coverage = min(x_range, y_range) / CALIBRATE_COVERAGE_THRESHOLD
+            coverage = min(max(coverage, 0.0), 1.0)
+
+            # 進捗送信（0.5秒毎）
+            now = time.time()
+            if now - last_progress_sent >= CALIBRATE_PROGRESS_INTERVAL:
+                sent_ok = await _safe_send(
+                    ws, {"type": "calibrate_progress", "coverage": round(coverage, 2)}
+                )
+                if not sent_ok:
+                    logging.info("キャリブレーション要求元クライアント切断")
+                    return
+                last_progress_sent = now
+
+            # 完了判定
+            if coverage >= 1.0:
+                offset_x = (calibration_state["x_max"] + calibration_state["x_min"]) / 2
+                offset_y = (calibration_state["y_max"] + calibration_state["y_min"]) / 2
+                try:
+                    save_compass_offsets(offset_x, offset_y)
+                except Exception:
+                    logging.exception("config.json保存失敗")
+                    await _safe_send(
+                        ws, {"type": "calibrate_error", "reason": "config_write_failed"}
+                    )
+                    return
+                # Runtime globals を更新
+                compass_offset_x = offset_x
+                compass_offset_y = offset_y
+                logging.info(
+                    f"キャリブレーション完了 (offset: x={offset_x:.1f}, y={offset_y:.1f})"
+                )
+                await _safe_send(
+                    ws,
+                    {
+                        "type": "calibrate_done",
+                        "offset_x": round(offset_x, 1),
+                        "offset_y": round(offset_y, 1),
+                    },
+                )
+                return
+
+            await asyncio.sleep(CALIBRATE_SAMPLE_INTERVAL)
+    except asyncio.CancelledError:
+        logging.info("キャリブレーションループキャンセル")
+        raise
+    except Exception:
+        logging.exception("キャリブレーションループ例外")
+        await _safe_send(ws, {"type": "calibrate_error", "reason": "exception"})
+    finally:
+        calibration_state["active"] = False
+        calibration_state["requester_ws"] = None
+        calibration_state["task"] = None
+
+
 async def ws_handler(websocket):
     ws_clients.add(websocket)
     peer = websocket.remote_address
     logging.info(f"WebSocketクライアント接続: {peer}")
     try:
-        await websocket.send(json.dumps(latest_wind_data))
-        async for _ in websocket:
-            pass
+        # 初回スナップショット送信（既存互換のため継続）
+        await _safe_send(websocket, latest_wind_data)
+
+        # コマンドループ
+        async for raw in websocket:
+            try:
+                msg = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(msg, dict):
+                continue
+            command = msg.get("command")
+            if command == "test_connection":
+                await handle_test_connection(websocket)
+            elif command == "calibrate_start":
+                if calibration_state["active"]:
+                    await _safe_send(
+                        websocket,
+                        {"type": "calibrate_error", "reason": "already_running"},
+                    )
+                elif compass_sensor is None:
+                    await _safe_send(
+                        websocket, {"type": "calibrate_error", "reason": "no_compass"}
+                    )
+                else:
+                    calibration_state["active"] = True
+                    calibration_state["requester_ws"] = websocket
+                    task = asyncio.create_task(calibration_loop(websocket))
+                    # 未捕捉例外の握りつぶし防止
+                    task.add_done_callback(
+                        lambda t: t.exception() if not t.cancelled() else None
+                    )
+                    calibration_state["task"] = task
+                    logging.info(f"キャリブレーション開始 (requester={peer})")
     except websockets.ConnectionClosed:
         pass
     finally:
         ws_clients.discard(websocket)
+        # 切断クライアントがキャリブレーション要求元の場合キャンセル
+        if calibration_state["requester_ws"] is websocket:
+            calibration_state["active"] = False
+            if (
+                calibration_state["task"] is not None
+                and not calibration_state["task"].done()
+            ):
+                calibration_state["task"].cancel()
         logging.info(f"WebSocketクライアント切断: {peer}")
+
+
+async def broadcast_task():
+    """1Hz で全クライアントに latest_wind_data をブロードキャスト"""
+    while True:
+        await asyncio.sleep(BROADCAST_INTERVAL)
+        if not ws_clients:
+            continue
+        payload = json.dumps(latest_wind_data)
+        dead = []
+        # list() でスナップショット（イテレーション中の変更回避）
+        for ws in list(ws_clients):
+            # キャリブレーション中の要求元クライアントには送らない（混線防止）
+            if (
+                calibration_state["active"]
+                and ws is calibration_state["requester_ws"]
+            ):
+                continue
+            try:
+                await ws.send(payload)
+            except (
+                websockets.ConnectionClosed,
+                websockets.ConnectionClosedOK,
+                websockets.ConnectionClosedError,
+            ):
+                dead.append(ws)
+            except Exception as e:
+                logging.debug(f"broadcast send例外: {e}")
+                dead.append(ws)
+        for ws in dead:
+            ws_clients.discard(ws)
 
 
 async def ws_server_task(config):
@@ -202,6 +451,7 @@ async def main():
         ble_task(config),
         ws_server_task(config),
         battery_task(),
+        broadcast_task(),
     )
 
 
