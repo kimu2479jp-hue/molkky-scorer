@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { AlertTriangle, BarChart3, RefreshCw, Settings, Target, Undo2 } from "lucide-react";
 
-import { C, MASCOT_S, MAX_NAME, MAX_PL, MAX_TEAMS, MF, PEN, WIN, LOCATION_FIELD_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS } from "../constants.js";
+import { C, MASCOT_S, MAX_NAME, MAX_PL, MAX_TEAMS, MF, PEN, WIN, LOCATION_FIELD_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS, getWindDirectionLabel } from "../constants.js";
 import { _db, idbDel, idbSet, loadFavs, loadStats } from "../db.js";
 import { getSyncCode } from "../sync.js";
 import { getLocations } from "../locationSync.js";
 import { shuf } from "../gameLogic.js";
 import { WindSensorManager } from "../windSensor.js";
 import { CourtOverview, FavDropdown, MultiCourtShuffleManager, SettingsPage, ShuffleAnimation, SmartFavPicker } from "./common.jsx";
+import { CalibrationModal } from "./CalibrationModal.jsx";
+import { WindMonitorModal } from "./WindMonitorModal.jsx";
 
 export function SetupScreen({onStart,savedTeams,isAdmin,onAdminToggle,aiEnabled,onAIToggle,shufAnim,onShufAnimToggle,courtAllocation,onClearCourtAllocation,setupDraft,onClearSetupDraft,autoReshuffleMode,onClearAutoReshuffle,favs,addF,rmF,editF,StatsModal,windDebugEnabled,onWindDebugLog,onWindDebugPiAddress}){
 
@@ -25,8 +27,12 @@ const[selectedLocation,setSelectedLocation]=useState(null);
 const selectedLocationRestoredRef=useRef(false);
 const[windSensorEnabled,setWindSensorEnabled]=useState(()=>{try{return localStorage.getItem("mk-wind-sensor-enabled")==="true";}catch(e){return false;}});
 const[windSensorPiAddr,setWindSensorPiAddr]=useState(()=>{try{return localStorage.getItem("windSensorPiAddress")||"";}catch(e){return"";}});
-const[windTestStatus,setWindTestStatus]=useState(null);
-const[windTestDetail,setWindTestDetail]=useState("");
+const[windTestStatus,setWindTestStatus]=useState(null);           /* null | "testing" | "ok" | "fail" */
+const[windTestResult,setWindTestResult]=useState(null);           /* test_result オブジェクト（成功時） */
+const[windTestError,setWindTestError]=useState("");               /* 失敗時のメッセージ */
+const[windSensorManagerForModal,setWindSensorManagerForModal]=useState(null); /* キャリブレーション/モニターモーダル共有 */
+const[showCalibration,setShowCalibration]=useState(false);
+const[showWindMonitor,setShowWindMonitor]=useState(false);
 useEffect(()=>{if(onWindDebugPiAddress)onWindDebugPiAddress(windSensorPiAddr);},[]);
 const[locationList,setLocationList]=useState([]);
 const setupSyncCode=getSyncCode();
@@ -50,7 +56,44 @@ useEffect(()=>{if(courtCount>=2)return;const minT=pCountSetup>=13?4:pCountSetup>
 /* Trim mems when maxShufForCourt decreases (e.g. team count reduced) */
 const maxShufRef=courtCount===1?tc*MAX_PL:[1,2,3].filter(c=>c<=courtCount).reduce((s,c)=>s+courtTeamCounts[c],0)*MAX_PL;
 useEffect(()=>{if(reshuffleGuard.current){reshuffleGuard.current=false;return;}if(mode!=="shuffle")return;setMems(prev=>{if(prev.length<=maxShufRef)return prev;const trimmed=prev.slice(0,maxShufRef);return trimmed.length>=2?trimmed:["",""];});setSp(null);setAllCourtData(null);},[maxShufRef]);
-const testWindConnection=()=>{const addr=windSensorPiAddr.trim();if(!addr)return;setWindTestStatus("testing");setWindTestDetail("");const manager=new WindSensorManager();if(windDebugEnabled&&onWindDebugLog){manager.onDebugLogCallback=(logs)=>{onWindDebugLog(logs);};}manager.testConnection(addr).then((result)=>{setWindTestStatus(result.ok?"ok":"fail");setWindTestDetail(result.detail);});};
+const testWindConnection=()=>{
+  const addr=windSensorPiAddr.trim();
+  if(!addr)return;
+  setWindTestStatus("testing");
+  setWindTestResult(null);
+  setWindTestError("");
+  const manager=new WindSensorManager();
+  if(windDebugEnabled&&onWindDebugLog){manager.onDebugLogCallback=(logs)=>{onWindDebugLog(logs);};}
+  manager.testConnection(addr).then((result)=>{
+    if(result&&result.status==="ok"){
+      setWindTestStatus("ok");
+      setWindTestResult(result);
+    }else{
+      /* status === "no_ble" 等: BLE 側で風速計が見えていない */
+      setWindTestStatus("fail");
+      setWindTestError("風速計本体が接続されていません（BLE 未接続）");
+    }
+  }).catch((err)=>{
+    setWindTestStatus("fail");
+    setWindTestError(err&&err.message?err.message:"接続失敗");
+  });
+};
+const openCalibration=()=>{
+  const addr=windSensorPiAddr.trim();
+  if(!addr)return;
+  const manager=new WindSensorManager();
+  if(windDebugEnabled&&onWindDebugLog){manager.onDebugLogCallback=(logs)=>{onWindDebugLog(logs);};}
+  manager.connect(addr);
+  setWindSensorManagerForModal(manager);
+  setShowCalibration(true);
+};
+const closeCalibration=()=>{
+  setShowCalibration(false);
+  if(windSensorManagerForModal){
+    try{windSensorManagerForModal.disconnect();}catch(e){}
+    setWindSensorManagerForModal(null);
+  }
+};
 const uN=(i,v)=>setTeams(p=>p.map((t,j)=>j===i?{...t,name:v}:t));
 const uP=(ti,pi,v)=>setTeams(p=>p.map((t,i)=>i===ti?{...t,players:t.players.map((pl,j)=>j===pi?v.slice(0,MAX_NAME):pl)}:t));
 const aP=ti=>setTeams(p=>p.map((t,i)=>i===ti&&t.players.length<MAX_PL?{...t,players:[...t.players,""]}:t));
@@ -338,10 +381,34 @@ return(
 </div>
 {windSensorEnabled&&(<div style={{marginTop:8,background:"rgba(255,255,255,0.96)",borderRadius:12,padding:"12px 14px"}}>
 <div style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:6}}>Raspberry Pi アドレス</div>
-<input value={windSensorPiAddr} onChange={e=>{const v=e.target.value;setWindSensorPiAddr(v);setWindTestStatus(null);setWindTestDetail("");try{localStorage.setItem("windSensorPiAddress",v);}catch(ex){}if(onWindDebugPiAddress)onWindDebugPiAddress(v);}} placeholder="例: 192.168.1.100" style={{width:"100%",padding:"10px 14px",border:"1px solid var(--border-input)",borderRadius:10,fontSize:17,outline:"none",background:"#fafafa",boxSizing:"border-box"}}/>
+<input value={windSensorPiAddr} onChange={e=>{const v=e.target.value;setWindSensorPiAddr(v);setWindTestStatus(null);setWindTestResult(null);setWindTestError("");try{localStorage.setItem("windSensorPiAddress",v);}catch(ex){}if(onWindDebugPiAddress)onWindDebugPiAddress(v);}} placeholder="例: 192.168.1.100" style={{width:"100%",padding:"10px 14px",border:"1px solid var(--border-input)",borderRadius:10,fontSize:17,outline:"none",background:"#fafafa",boxSizing:"border-box"}}/>
+<button onClick={openCalibration} disabled={!windSensorPiAddr.trim()} style={{width:"100%",padding:"9px 0",border:"1px solid #9ca3af",borderRadius:8,background:"transparent",color:"#4b5563",fontSize:14,fontWeight:700,cursor:windSensorPiAddr.trim()?"pointer":"default",marginTop:8,opacity:windSensorPiAddr.trim()?1:0.4}}>🧭 コンパスキャリブレーション</button>
 <button onClick={testWindConnection} disabled={!windSensorPiAddr.trim()||windTestStatus==="testing"} style={{width:"100%",padding:"10px 0",border:"none",borderRadius:8,background:windTestStatus==="testing"?"#6b7280":"#2b7de9",color:"#fff",fontSize:15,fontWeight:700,cursor:windSensorPiAddr.trim()&&windTestStatus!=="testing"?"pointer":"default",marginTop:8,opacity:windSensorPiAddr.trim()?1:0.3}}>{windTestStatus==="testing"?"接続テスト中...":"接続テスト"}</button>
-{windTestStatus==="ok"&&<div style={{marginTop:6,padding:"8px 12px",borderRadius:8,background:"rgba(34,181,102,0.12)",border:"1px solid rgba(34,181,102,0.3)"}}><span style={{fontSize:14,fontWeight:700,color:"#22b566"}}>OK</span><span style={{fontSize:13,color:"#333",marginLeft:8}}>{windTestDetail}</span></div>}
-{windTestStatus==="fail"&&<div style={{marginTop:6,padding:"8px 12px",borderRadius:8,background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)"}}><span style={{fontSize:14,fontWeight:700,color:"#ef4444"}}>NG</span><span style={{fontSize:13,color:"#333",marginLeft:8}}>{windTestDetail}</span></div>}
+{windTestStatus==="ok"&&windTestResult&&(()=>{
+  const absDeg=(((windTestResult.wind_direction||0)+(windTestResult.compass_heading||0))%360+360)%360;
+  const dirLabel=getWindDirectionLabel(absDeg);
+  const compassOk=!!windTestResult.compass_valid;
+  const battPct=windTestResult.battery;
+  const battLow=battPct!=null&&battPct<=20;
+  const battText=battPct==null?"🔋 --":"🔋 "+Math.round(battPct)+"%";
+  const speedText=typeof windTestResult.wind_speed==="number"?windTestResult.wind_speed.toFixed(1):"?";
+  return(
+    <div style={{marginTop:6,padding:"10px 12px",borderRadius:8,background:"rgba(34,181,102,0.12)",border:"1px solid rgba(34,181,102,0.3)",display:"flex",flexWrap:"wrap",alignItems:"center",gap:"4px 10px"}}>
+      <span style={{fontSize:14,fontWeight:800,color:"#22b566"}}>OK</span>
+      <span style={{fontSize:13,color:"#333",fontWeight:700}}>風速 {speedText} m/s</span>
+      <span style={{fontSize:13,color:"#6b7280"}}>/</span>
+      <span style={{fontSize:13,color:"#333",fontWeight:700}}>{dirLabel||"--"}</span>
+      <span style={{fontSize:13,color:"#6b7280"}}>/</span>
+      <span style={{fontSize:13,color:compassOk?"#333":"#ef4444",fontWeight:700}}>🧭 {compassOk?"OK":"NG"}</span>
+      <span style={{fontSize:13,color:"#6b7280"}}>/</span>
+      <span style={{fontSize:13,color:battLow?"#f97316":"#333",fontWeight:700}}>{battText}</span>
+    </div>
+  );
+})()}
+{windTestStatus==="fail"&&<div style={{marginTop:6,padding:"8px 12px",borderRadius:8,background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.3)"}}><span style={{fontSize:14,fontWeight:700,color:"#ef4444"}}>NG</span><span style={{fontSize:13,color:"#333",marginLeft:8}}>{windTestError}</span></div>}
+{windTestStatus==="ok"&&(
+  <button onClick={()=>setShowWindMonitor(true)} style={{width:"100%",padding:"12px 0",border:"none",borderRadius:10,background:"linear-gradient(135deg,#34d399,#14b8a6)",color:"#053426",fontSize:15,fontWeight:900,cursor:"pointer",marginTop:10,letterSpacing:1,boxShadow:"0 3px 12px rgba(52,211,153,0.28)"}}>🌬 風速モニター</button>
+)}
 </div>)}
 </div>
 {mode==="manual"&&courtCount===1&&(<>
@@ -394,6 +461,8 @@ return(
 </>)}
 </div>
 {showSetupStats&&<StatsModal onClose={()=>setShowSetupStats(false)} source="setup" isAdmin={isAdmin} aiEnabled={aiEnabled}/>}
+<CalibrationModal isOpen={showCalibration} onClose={closeCalibration} windSensorManager={windSensorManagerForModal}/>
+<WindMonitorModal isOpen={showWindMonitor} onClose={()=>setShowWindMonitor(false)}/>
 {showSmartFav&&<SmartFavPicker favs={favs} stats={loadStats()} usedNames={used} maxMembers={maxShufForCourt} currentCount={used.length} minMembers={courtCount===1?tc:totalTeamsMulti} onAdd={({toAdd,toRemove})=>{setMems(prev=>{let updated=[...prev];if(toRemove&&toRemove.length>0){updated=updated.filter(m=>!toRemove.includes(m));}let ai=0;for(let i=0;i<updated.length&&ai<toAdd.length;i++){if(!updated[i].trim()){updated[i]=toAdd[ai++];}}while(ai<toAdd.length&&updated.length<maxShufForCourt){updated.push(toAdd[ai++]);}const filled=updated.filter(m=>m.trim()).length;const minReq=courtCount===1?tc:totalTeamsMulti;if(filled<minReq){window.alert("最低"+minReq+"人必要です");return prev;}return updated;});setSp(null);setAllCourtData(null);}} onClose={()=>setShowSmartFav(false)}/>}
 {showSettings&&<SettingsPage onClose={()=>setShowSettings(false)} isAdmin={isAdmin} onAdminToggle={onAdminToggle} aiEnabled={aiEnabled} onAIToggle={onAIToggle} shufAnim={shufAnim} onShufAnimToggle={onShufAnimToggle} favs={favs}/>}
 {shufAnimData&&<ShuffleAnimation names={shufAnimData.names} teams={shufAnimData.teams} onDone={()=>{if(shufAnimData.goData){const{ft,ord}=shufAnimData.goData;setShufAnimData(null);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats,courtCount,courtCount>=2&&allCourtData?{courtCount,courtTeamCounts,courtData:allCourtData}:null,selectedLocation,windSensorEnabled?windSensorPiAddr.trim():null);}else{setSp(shufAnimData.teams);setShufAnimData(null);}}} onStartGame={shufAnimData.goData?null:()=>{const ft=shufAnimData.teams;const ord=Array.from({length:ft.length},(_,i)=>i);setShufAnimData(null);onStart(ft,ord,numGames,bestOf,dqEnd,saveToStats,courtCount,null,selectedLocation,windSensorEnabled?windSensorPiAddr.trim():null);}} onReshuffle={shufAnimData.goData?null:()=>{setShufAnimData(null);setTimeout(()=>doShuf(),100);}}/>}

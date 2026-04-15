@@ -67,6 +67,13 @@ export class WindSensorManager {
     this.compassHeadingInitial = null;
     this.debugLogs = [];
     this._firstMessageLogged = false;
+    // キャリブレーション用コールバック（type ディスパッチで呼ばれる）
+    this.onCalibrateProgressCallback = null;  // (coverage: number) => void
+    this.onCalibrateDoneCallback = null;      // (data: {offset_x, offset_y}) => void
+    this.onCalibrateErrorCallback = null;     // (reason: string) => void
+    // test_result 受信用（_connectWs 経由の安全策）
+    this._testResolve = null;
+    this._testReject = null;
   }
 
   _log(message) {
@@ -112,25 +119,27 @@ export class WindSensorManager {
     return this.setInitialCompassHeading();
   }
 
-  /** 接続テスト: 一時的にWebSocket接続して結果を返す */
+  /** 接続テスト: 一時的にWebSocket接続してtest_connectionコマンドを送り、test_resultを待つ
+   *  成功時は test_result オブジェクト ({type, status, wind_speed, wind_direction, compass_heading, compass_valid, battery, throw_direction}) を resolve
+   *  失敗時は new Error(...) で reject
+   */
   testConnection(address, timeout = 5000) {
     this._log("testConnection() called with: " + address);
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      let settled = false;
       let ws = null;
-      let done = false;
       const cleanup = () => {
-        done = true;
+        settled = true;
         if (ws) {
           try { ws.onclose = null; ws.onerror = null; ws.onmessage = null; ws.close(); } catch (e) {}
           ws = null;
         }
       };
       const timer = setTimeout(() => {
-        if (!done) {
-          this._log("testConnection timeout (" + timeout + "ms)");
-          cleanup();
-          resolve({ ok: false, detail: "5秒以内に応答なし" });
-        }
+        if (settled) return;
+        this._log("testConnection timeout (" + timeout + "ms)");
+        cleanup();
+        reject(new Error("5秒以内に応答なし"));
       }, timeout);
       try {
         const wsUrl = address.startsWith("wss://") || address.startsWith("ws://") ? address : "ws://" + address + ":" + WIND_WS_PORT;
@@ -138,42 +147,69 @@ export class WindSensorManager {
         ws = new WebSocket(wsUrl);
         this._log("testConnection WebSocket created");
         ws.onopen = () => {
-          this._log("testConnection onopen");
+          this._log("testConnection onopen - sending test_connection command");
+          try {
+            ws.send(JSON.stringify({ command: "test_connection" }));
+          } catch (e) {
+            // 送信失敗は onerror / onclose で処理される
+            this._log("testConnection send error: " + e.message);
+          }
         };
         ws.onmessage = (event) => {
-          if (done) return;
-          clearTimeout(timer);
-          const preview = typeof event.data === "string" ? event.data.slice(0, 100) : "";
-          this._log("testConnection message: " + preview);
+          if (settled) return;
           try {
             const data = JSON.parse(event.data);
-            const speed = data.wind_speed != null ? data.wind_speed.toFixed(1) : "?";
-            const compass = data.compass_valid ? "OK" : "NG";
-            cleanup();
-            resolve({ ok: true, detail: "風速 " + speed + " m/s / コンパス " + compass });
+            if (data && data.type === "test_result") {
+              this._log("testConnection test_result received: status=" + data.status);
+              clearTimeout(timer);
+              cleanup();
+              resolve(data);
+            }
+            // wind_data（初回スナップショットやブロードキャスト）は無視して test_result を待つ
           } catch (e) {
-            cleanup();
-            resolve({ ok: true, detail: "データ受信OK" });
+            // JSON パースエラーは無視
           }
         };
         ws.onerror = (event) => {
-          if (done) return;
+          if (settled) return;
           this._log("testConnection onerror - type: " + event.type);
           clearTimeout(timer);
           cleanup();
-          resolve({ ok: false, detail: "接続エラー" });
+          reject(new Error("接続エラー"));
         };
         ws.onclose = (event) => {
-          if (done) return;
+          if (settled) return;
           this._log("testConnection onclose - code: " + event.code + ", reason: " + event.reason);
+          clearTimeout(timer);
+          cleanup();
+          reject(new Error("接続が切断されました"));
         };
       } catch (e) {
         this._log("testConnection catch error: " + e.message);
         clearTimeout(timer);
         cleanup();
-        resolve({ ok: false, detail: "WebSocket作成エラー" });
+        reject(new Error("WebSocket作成エラー"));
       }
     });
+  }
+
+  /** キャリブレーション開始コマンドを送信。
+   *  WebSocketがOPEN状態ならtrue、それ以外はfalseを返す。
+   *  進捗・完了・エラーはonCalibrate*Callback経由で通知される。
+   */
+  startCalibration() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      try {
+        this.ws.send(JSON.stringify({ command: "calibrate_start" }));
+        this._log("calibrate_start sent");
+        return true;
+      } catch (e) {
+        this._log("startCalibration send error: " + e.message);
+        return false;
+      }
+    }
+    this._log("startCalibration aborted: ws not open");
+    return false;
   }
 
   _connectWs() {
@@ -201,11 +237,31 @@ export class WindSensorManager {
             this._log("WS first message received: " + preview);
           }
           const data = JSON.parse(event.data);
-          this.currentWind = data;
-          this.compassValid = !!data.compass_valid;
-          this.windBuffer.push(data);
-          if (this.windBuffer.length > WIND_BUFFER_SIZE) this.windBuffer.shift();
-          if (this.onDataCallback) this.onDataCallback(data);
+          const type = data && data.type;
+
+          if (type === "wind_data" || !type) {
+            // 通常の風データ（type 未設定の旧 bridge.py との互換も維持）
+            this.currentWind = data;
+            this.compassValid = !!data.compass_valid;
+            this.windBuffer.push(data);
+            if (this.windBuffer.length > WIND_BUFFER_SIZE) this.windBuffer.shift();
+            if (this.onDataCallback) this.onDataCallback(data);
+          } else if (type === "test_result") {
+            // 安全策: _connectWs 経由で test_result を受けることは通常ないが、
+            // 万が一に備えて _testResolve があれば解決する
+            if (this._testResolve) {
+              this._testResolve(data);
+              this._testResolve = null;
+              this._testReject = null;
+            }
+          } else if (type === "calibrate_progress") {
+            if (this.onCalibrateProgressCallback) this.onCalibrateProgressCallback(data.coverage);
+          } else if (type === "calibrate_done") {
+            if (this.onCalibrateDoneCallback) this.onCalibrateDoneCallback(data);
+          } else if (type === "calibrate_error") {
+            if (this.onCalibrateErrorCallback) this.onCalibrateErrorCallback(data.reason);
+          }
+          // 未知の type は無視（将来の拡張に対応）
         } catch (e) {
           // JSONパースエラーは無視
         }
