@@ -378,4 +378,56 @@ export class WindSensorManager {
   }
 }
 
+// ═══ Molkky Wind Display Helpers ═══
+
+/**
+ * モルック相対方位を計算する
+ * @param {number} windDirection - Calypso が報告する風向き（センサー三角マーク基準、度）
+ * @param {number} compassHeading - QMC5883L の現在の方位（度）
+ * @param {number} throwDirection - スキットル方向の方位（度）
+ * @returns {{ label: string, color: string, degrees: number }}
+ */
+export function calcMolkkyWind(windDirection, compassHeading, throwDirection) {
+  // 絶対風向（風が吹いてくる方向）
+  const absoluteWindFrom = (windDirection + compassHeading) % 360;
+  // 風が流れていく方向
+  const windFlowDirection = (absoluteWindFrom + 180) % 360;
+  // スキットル方向を基準とした相対角度
+  const relativeAngle = ((windFlowDirection - throwDirection) % 360 + 360) % 360;
+  // 8方位インデックス
+  const index = Math.round(relativeAngle / 45) % 8;
+
+  const labels = ["追", "追右", "右", "向右", "向", "向左", "左", "追左"];
+  const colors = [
+    "#34d399", // 追（緑）
+    "#6ee7b7", // 追右（薄緑）
+    "#fbbf24", // 右（黄）
+    "#f97316", // 向右（オレンジ）
+    "#ef4444", // 向（赤）
+    "#f97316", // 向左（オレンジ）
+    "#fbbf24", // 左（黄）
+    "#6ee7b7", // 追左（薄緑）
+  ];
+
+  return {
+    label: labels[index],
+    color: colors[index],
+    degrees: relativeAngle,
+  };
+}
+
+/**
+ * 風表示ウィジェットに必要なデータが揃っているか判定する
+ * @param {object|null} currentWind - windSensorManager.currentWind
+ * @returns {boolean}
+ */
+export function isWindDisplayReady(currentWind) {
+  if (!currentWind) return false;
+  if (!currentWind.connected) return false;
+  if (currentWind.throw_direction == null) return false;
+  if (currentWind.wind_speed == null) return false;
+  if (currentWind.wind_direction == null) return false;
+  return true;
+}
+
 export default WindSensorManager;
