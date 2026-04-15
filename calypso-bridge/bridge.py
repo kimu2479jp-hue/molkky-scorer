@@ -98,7 +98,8 @@ def read_compass():
     if calibration_state["active"]:
         return latest_wind_data.get("compass_heading", 0)
     try:
-        x, y, z = compass_sensor.get_magnet()
+        result = compass_sensor.get_magnet()
+        x, y = result[0], result[1]
         x -= compass_offset_x
         y -= compass_offset_y
         heading = math.degrees(math.atan2(y, x))
@@ -273,7 +274,8 @@ async def calibration_loop(ws):
 
             # サンプル収集（calibrate.py と一貫して get_magnet_raw を使用）
             try:
-                x, y, z = compass_sensor.get_magnet_raw()
+                result = compass_sensor.get_magnet_raw()
+                x, y = result[0], result[1]
             except Exception as e:
                 logging.warning(f"キャリブレーション中の読み取りエラー: {e}")
                 await asyncio.sleep(CALIBRATE_SAMPLE_INTERVAL)
