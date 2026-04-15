@@ -24,7 +24,8 @@ samples = 0
 
 try:
     while True:
-        x, y, z = sensor.get_magnet_raw()
+        result = sensor.get_magnet_raw()
+        x, y = result[0], result[1]
         x_min = min(x_min, x)
         x_max = max(x_max, x)
         y_min = min(y_min, y)
