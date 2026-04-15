@@ -9,6 +9,7 @@ import { fetchPlayerAnalysis, getAnalysisCached, getPlayerAnalysisCount, makeAna
 import { failsOf, getPI, reducer, scoreOf, shuf } from "../gameLogic.js";
 import { WindSensorManager } from "../windSensor.js";
 import { CSSConfetti, Confirm, FavDropdown, GameSheet, ScoreTable, ShuffleAnimation } from "./common.jsx";
+import GameWindWidget from "./GameWindWidget.jsx";
 
 // ═══ Weather fetch via OpenMeteo API ═══
 // Primary: use stored coordinates from location profile
@@ -437,6 +438,7 @@ return(<div style={{flexShrink:0,background:"#14365a",borderBottom:"1px solid rg
 {cp&&<span style={{fontSize:acFS,fontWeight:700,color:"#ffc107",whiteSpace:"nowrap",flexShrink:1,minWidth:0}}>{cp.name}</span>}
 <span style={{fontSize:isTablet?38:20,fontWeight:900,color:isReset?"#e74c3c":"#fff",fontVariantNumeric:"tabular-nums",lineHeight:1,flexShrink:0,animation:scAnim}}>{sc}<span style={{fontSize:isTablet?20:11,fontWeight:700}}>点</span></span>
 <MissDots f={f} size={isTablet?20:9}/>
+<GameWindWidget currentWind={windConnected?currentWind:null}/>
 </div>
 </div>);};
 /* Inactive teams row */
