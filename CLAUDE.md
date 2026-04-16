@@ -107,3 +107,15 @@ npx vite build
 - 求められていないリファクタリング・改善・フォーマット変更はしない
 - 日本語テキストは直接文字で書く。Unicodeエスケープは絶対に使わない
 - 太一さんの指示が太一さん自身の目的に反する場合は、そのまま実行せず改善案を提案する
+
+## 詳細ルールの外部化
+
+プロジェクト固有の詳細ルールは `.claude/rules/` に外出し済み。該当トピックに触れる作業時はまず該当ファイルを参照する:
+
+- `.claude/rules/iron-rules.md` -- 絶対ルール(リファクタ禁止、Unicode escape禁止、1機能1ブランチ等)
+- `.claude/rules/ui-design.md` -- UI v2 設計思想(画面別優先度、情報ブロック、視線誘導)
+- `.claude/rules/git-workflow.md` -- ブランチ運用、Conventional Commits、PR ルール
+- `.claude/rules/security.md` -- APIキー管理、Supabase RLS、CORS、XSS防止
+- `.claude/rules/supabase-patterns.md` -- Migration 命名、テーブル設計、クエリ、型生成
+
+また `.claude/skills/molkky-verify/` は、実装完了後の機械的検証(ビルド / セキュリティ / Iron Rule / diff)を体系化したスキル。コミット前に参照する。
