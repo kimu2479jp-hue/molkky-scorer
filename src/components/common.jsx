@@ -60,6 +60,7 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
   </div>);
 }
 
+/* 装飾紙吹雪の 10 色配列。装飾配列として hex 直書きを維持（変数化するほどの意味論を持たない） */
 export function CSSConfetti(){const colors=["#2b7de9","#d93a5e","#22b566","#d9a83a","#9b59b6","#e67e22","#1abc9c","#e74c3c","#ffd700","#ff69b4"];const pieces=Array.from({length:25},(_,i)=>({id:i,left:Math.random()*100,delay:Math.random()*2,color:colors[i%colors.length],size:8+Math.random()*12,shape:Math.random()>0.5?"50%":"0"}));return(<div className="mk-confetti-container">{pieces.map(p=>(<div key={p.id} className="mk-confetti-piece" style={{left:p.left+"%",width:p.size,height:p.size,background:p.color,borderRadius:p.shape,animationDelay:p.delay+"s"}}/>))}</div>);}
 
 /* ═══ Shuffle Card Animation ═══ */
@@ -265,6 +266,7 @@ const showDevMaster=(()=>{try{if(localStorage.getItem("mk-dev-master")==="1")ret
 const classify=(name)=>{if(showDevMaster&&DEV_MASTER_LIST.includes(name))return"master";if(!showDevMaster&&DEV_MASTER_LIST.includes(name))return"regular";const gs=stats[name]||[];const gc=gs.length;if(gc===0)return"never";const lastDate=gs.reduce((lat,g)=>{const d=new Date(g.d);return d>lat?d:lat;},new Date(0));const days=Math.floor((new Date()-lastDate)/(1000*60*60*24));if(days<=14&&gc>=5)return"regular";if(days<=30&&gc>=2)return"semi";return"occasional";};
 const grouped={};favs.forEach(name=>{const g=classify(name);if(!grouped[g])grouped[g]=[];const gs=stats[name]||[];grouped[g].push({name,gameCount:gs.length});});
 Object.values(grouped).forEach(arr=>arr.sort((a,b)=>b.gameCount-a.gameCount));
+/* 隠し機能 Master グループの意図的ハードコード（#1a1a2e / #ffd700 の金色アクセント） */
 const GC=[{key:"master",label:"master",color:"#1a1a2e",accent:"#ffd700",show:showDevMaster},{key:"regular",label:"常連",color:"#22b566"},{key:"semi",label:"準レギュラー",color:"#2b7de9"},{key:"occasional",label:"たまに参加",color:"#f0a030"},{key:"never",label:"未参加",color:"#999"}];
 const toggle=(name)=>{if(usedSet.has(name)){setDeselected(p=>{const n=new Set(p);if(n.has(name))n.delete(name);else n.add(name);return n;});return;}setSelected(p=>{const n=new Set(p);if(n.has(name))n.delete(name);else n.add(name);return n;});};
 const toggleGroup=(members)=>{const selectable=members.filter(f=>!usedSet.has(f.name)).map(f=>f.name);const allSel=selectable.length>0&&selectable.every(n=>selected.has(n));setSelected(p=>{const n=new Set(p);if(allSel)selectable.forEach(nm=>n.delete(nm));else selectable.forEach(nm=>n.add(nm));return n;});const addedInGroup=members.filter(f=>usedSet.has(f.name)).map(f=>f.name);const allDesel=addedInGroup.length>0&&addedInGroup.every(n=>deselected.has(n));setDeselected(p=>{const n=new Set(p);if(allDesel)addedInGroup.forEach(nm=>n.delete(nm));else addedInGroup.forEach(nm=>n.add(nm));return n;});};

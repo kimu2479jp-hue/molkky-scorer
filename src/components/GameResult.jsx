@@ -17,6 +17,7 @@ const CW=56,RW=40,RH=34,HDR=30,NMH=84,PAD=20;
 const totalW=RW+ordered.reduce((s,o)=>s+(o.ap.length+1)*CW,0)+PAD*2;
 const tableH=HDR+NMH+Math.max(maxT,1)*RH+4;const commentH=comments.length>0?(34+comments.length*28+10):0;
 const totalH=PAD+36+10+tableH+commentH+PAD;
+/* Canvas API は CSS 変数非対応のため、本関数内の hex 直書きは意図的に維持 */
 const c=document.createElement("canvas");c.width=totalW*2;c.height=totalH*2;
 const ctx=c.getContext("2d");ctx.scale(2,2);ctx.fillStyle="#fff";ctx.fillRect(0,0,totalW,totalH);
 ctx.fillStyle="#14365a";ctx.font="bold 20px sans-serif";ctx.textAlign="center";ctx.fillText("Game "+gameNumber+" スコア表",totalW/2,PAD+24);
