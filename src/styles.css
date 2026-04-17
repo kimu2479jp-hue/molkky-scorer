@@ -6,7 +6,6 @@
   --bg-surface-alt: #f0f3f8;
   --bg-surface-dim: #f8f9fa;
   --bg-overlay: rgba(0,0,0,0.55);
-  --bg-overlay-light: rgba(0,0,0,0.4);
   --text-primary: #14365a;
   --text-secondary: #888;
   --text-muted: #aaa;
@@ -19,7 +18,6 @@
   --accent-green: #22b566;
   --accent-yellow: #e6a817;
   --accent-orange: #bf6900;
-  --accent-gold: #ffd700;
   --border-light: #e0e0e0;
   --border-lighter: #eee;
   --border-input: #ddd;
