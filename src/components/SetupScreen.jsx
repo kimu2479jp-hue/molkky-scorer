@@ -334,7 +334,7 @@ const CH={flex:1,padding:"16px 0",border:"2px solid rgba(255,255,255,0.25)",bord
 const CHA={background:"var(--accent-blue)",borderColor:"var(--accent-blue)"};
 const SEL={width:"100%",padding:"14px 16px",border:"1px solid rgba(255,255,255,0.25)",borderRadius:12,background:"rgba(255,255,255,0.92)",color:"var(--text-primary)",fontSize:18,fontWeight:600,cursor:"pointer",outline:"none",WebkitAppearance:"none",appearance:"none",backgroundImage:"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M0 0l6 7 6-7z' fill='%23999'/%3E%3C/svg%3E\")",backgroundRepeat:"no-repeat",backgroundPosition:"right 14px center",paddingRight:"34px"};
 const CARD={background:"rgba(255,255,255,0.96)",borderRadius:14,padding:"16px 18px 14px",marginBottom:12};
-const PIN={flex:1,border:"1px solid var(--border-light)",borderRadius:10,padding:"12px 14px",fontSize:20,outline:"none",background:"#fafafa"};
+const PIN={flex:1,border:"1px solid var(--neutral-200)",borderRadius:10,padding:"12px 14px",fontSize:20,outline:"none",background:"#fafafa"};
 const TIN={flex:1,border:"none",borderBottom:"2px solid var(--border-input)",padding:"6px 4px",fontSize:22,fontWeight:700,outline:"none",background:"transparent"};
 return(
 <div style={{height:"100dvh",display:"flex",flexDirection:"column",overflow:"auto",background:"linear-gradient(170deg,var(--bg-tertiary),var(--bg-secondary))",WebkitOverflowScrolling:"touch",overscrollBehavior:"none"}}>
