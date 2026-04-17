@@ -48,7 +48,7 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 </div></div>}
 {editTarget&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setEditTarget(null)}><div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%"}} onClick={e=>e.stopPropagation()}>
 <div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:12}}>名前を編集</div>
-<div style={{fontSize:14,color:"var(--text-muted)",marginBottom:8}}>{"\u300C"}{editTarget}{"\u300D\u2192"}</div>
+<div style={{fontSize:14,color:"var(--text-muted)",marginBottom:8}}>「{editTarget}」→</div>
 <input value={editName} onChange={e=>setEditName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} style={{width:"100%",padding:"12px",border:"1px solid var(--border-input)",borderRadius:8,fontSize:18,outline:"none",marginBottom:12,boxSizing:"border-box"}} autoFocus/>
 {editName.trim()&&editName.trim()!==editTarget&&favs.includes(editName.trim())&&<div style={{fontSize:13,color:"var(--text-danger)",marginBottom:8}}>この名前は既に登録されています</div>}
 <div style={{display:"flex",gap:8}}>
