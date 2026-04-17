@@ -117,3 +117,55 @@
 3. **プロジェクト設計思想の話か？** → `.claude/rules/` の該当ファイルに追加
 
 このファイルは肥大化しないよう、年1回程度で「もう発生しなくなった罠」を削除する（git log で復元可能）。
+
+## DESIGN.md 違反パターン
+
+以下は DESIGN.md §10 Don'ts に基づく典型的な違反パターン。PR 作成前にセルフチェックすること。
+
+### インラインで生値を書かない
+
+**違反例**:
+```jsx
+<div style={{ color: "#14365a", padding: "16px", borderRadius: "12px" }}>
+```
+
+**修正例**:
+```jsx
+<div style={{ color: "var(--text-primary)", padding: "var(--space-4)", borderRadius: "var(--radius-lg)" }}>
+```
+
+### プレイヤー色を UI 要素に流用しない（§10.2）
+
+**違反例**: ボタン背景に `--team-1-accent` を使う
+
+**修正例**: ボタン背景は `--blue-500`（ブランド色）や `--success`（状態色）を使う
+
+### Wind Ramp 色をスコア可視化に流用しない（§10.2）
+
+**違反例**: スコア分布ヒートマップに `--wind-calm`〜`--wind-severe` を使う
+
+**修正例**: スコアヒートマップは独自の色体系を使う（構造を借りるのは OK だが色は別）
+
+### `--font-instrument` を本文・見出し・日本語テキストに使わない（§3.5, §10.2）
+
+**違反例**: セクション見出しに `font-family: var(--font-instrument)` を使う
+
+**修正例**: `--font-instrument` は主要数値（KPI・レーダー軸・試合スコア・風速数値・同期コード・Pi アドレス）のみに使用
+
+### `--weight-medium` より軽いウェイト（400 等）を使わない（§3.3）
+
+**違反例**: `font-weight: 400` や `font-weight: normal` を指定
+
+**修正例**: `font-weight: var(--weight-medium)` (500) 以上を使用。本アプリの下限は 500
+
+### Tailwind 系グレーを新規使用しない（§2.1, §2.9）
+
+**違反例**: `bg-gray-500`, `text-gray-400` の直書き
+
+**修正例**: Neutral Scale (`--neutral-0`〜`--neutral-950`) を使用
+
+### Step 4 第1弾時点の保留項目を認識せずに実装する
+
+**違反例**: `--accent-red` が `#e74c3c` に変わっていると仮定した実装をする
+
+**修正例**: DESIGN.md §2.10.3 で Step 4 第1弾時点の保留項目を確認し、現状値で動作することを前提に実装する
