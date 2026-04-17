@@ -16,7 +16,7 @@ return(<div style={SS.ov}><div className="mk-fade-scale-in" style={{background:"
 <div style={{display:"flex",gap:10,flexDirection:"column"}}><div style={{display:"flex",gap:10}}>
 <button onClick={onOk} style={{flex:1,padding:"16px 0",border:"none",borderRadius:12,background:"var(--bg-secondary)",color:"var(--text-inverse)",fontSize:18,fontWeight:700,cursor:"pointer"}}>{okLabel||"確定"}</button>
 <button onClick={onCancel} style={{flex:1,padding:"16px 0",border:"2px solid var(--bg-secondary)",borderRadius:12,background:"transparent",color:"var(--text-primary)",fontSize:18,fontWeight:700,cursor:"pointer"}}>{cancelLabel||"キャンセル"}</button>
-</div>{onThird&&<button onClick={onThird} style={{padding:"14px 0",border:"2px solid var(--border-input)",borderRadius:12,background:"transparent",color:"var(--text-secondary)",fontSize:16,fontWeight:600,cursor:"pointer"}}>{thirdLabel||"戻る"}</button>}</div>
+</div>{onThird&&<button onClick={onThird} style={{padding:"14px 0",border:"2px solid var(--neutral-200)",borderRadius:12,background:"transparent",color:"var(--text-secondary)",fontSize:16,fontWeight:600,cursor:"pointer"}}>{thirdLabel||"戻る"}</button>}</div>
 
   </div></div>);
 }
@@ -32,34 +32,35 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 <div className="mk-fade-scale-in" style={{...SS.mod,maxWidth:360}} onClick={e=>e.stopPropagation()}>
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}><span style={{fontSize:18,fontWeight:800,color:"var(--text-primary)"}}>お気に入り</span><button onClick={()=>{setOpen(false);setDelTarget(null);}} style={SS.clsB}>✕</button></div>
 {available.length===0&&<div style={{padding:12,textAlign:"center",color:"var(--text-muted)",fontSize:16}}>{favs.length===0?"登録なし":"全員配置済み"}</div>}
-<div style={{maxHeight:300,overflow:"auto",WebkitOverflowScrolling:"touch"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid var(--border-lighter)",background:delTarget===f?"#fde8e8":"transparent",fontSize:18,fontWeight:600,color:"var(--text-primary)",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<div style={{display:"flex",gap:4}} onClick={e=>e.stopPropagation()}>
+<div style={{maxHeight:300,overflow:"auto",WebkitOverflowScrolling:"touch"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid var(--neutral-100)",background:delTarget===f?"#fde8e8":"transparent",fontSize:18,fontWeight:600,color:"var(--text-primary)",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<div style={{display:"flex",gap:4}} onClick={e=>e.stopPropagation()}>
 <span onClick={()=>{setEditTarget(f);setEditName(f);setDelTarget(null);}} style={{padding:"5px 10px",background:"var(--accent-blue)",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>編集</span>
 <span onClick={()=>{setDelConf(f);}} style={{padding:"5px 10px",background:"#e74c3c",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>削除</span>
 </div>}</button></div>))}</div>
-<div style={{borderTop:"1px solid var(--border-lighter)",paddingTop:10,marginTop:4,flexShrink:0}}><div style={{display:"flex",gap:6}}>
-<input value={newN} onChange={e=>setNewN(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder={"新規("+MAX_NAME+"文字)"} style={{flex:1,padding:"10px 12px",border:"1px solid var(--border-input)",borderRadius:8,fontSize:16,outline:"none"}}/>
+<div style={{borderTop:"1px solid var(--neutral-100)",paddingTop:10,marginTop:4,flexShrink:0}}><div style={{display:"flex",gap:6}}>
+<input value={newN} onChange={e=>setNewN(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder={"新規("+MAX_NAME+"文字)"} style={{flex:1,padding:"10px 12px",border:"1px solid var(--neutral-200)",borderRadius:8,fontSize:16,outline:"none"}}/>
 <button onClick={()=>{if(newN.trim()&&favs.length<MAX_FAV){addF(newN.trim());setNewN("");}}} style={{padding:"10px 16px",border:"none",borderRadius:8,background:"var(--accent-blue)",color:"var(--text-inverse)",fontWeight:700,fontSize:15,cursor:"pointer",opacity:newN.trim()?1:0.3}}>登録</button>
 </div>{favs.length>=MAX_FAV&&<div style={{fontSize:12,color:"var(--text-danger)",marginTop:4,textAlign:"center"}}>登録上限({MAX_FAV}人)に達しています</div>}</div>
 </div></div>)}
 {delConf&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setDelConf(null)}><div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}} onClick={e=>e.stopPropagation()}>
 <div style={{fontSize:18,fontWeight:800,color:"var(--text-danger)",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}><AlertTriangle size={18}/> お気に入り削除</div>
 <div style={{fontSize:16,marginBottom:16}}>「{delConf}」をお気に入りから削除しますか？</div>
-<div style={{display:"flex",gap:8}}><button onClick={()=>{rmF(delConf);setDelConf(null);setDelTarget(null);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>削除する</button><button onClick={()=>setDelConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
+<div style={{display:"flex",gap:8}}><button onClick={()=>{rmF(delConf);setDelConf(null);setDelTarget(null);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>削除する</button><button onClick={()=>setDelConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--neutral-200)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
 </div></div>}
 {editTarget&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setEditTarget(null)}><div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%"}} onClick={e=>e.stopPropagation()}>
 <div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:12}}>名前を編集</div>
 <div style={{fontSize:14,color:"var(--text-muted)",marginBottom:8}}>「{editTarget}」→</div>
-<input value={editName} onChange={e=>setEditName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} style={{width:"100%",padding:"12px",border:"1px solid var(--border-input)",borderRadius:8,fontSize:18,outline:"none",marginBottom:12,boxSizing:"border-box"}} autoFocus/>
+<input value={editName} onChange={e=>setEditName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} style={{width:"100%",padding:"12px",border:"1px solid var(--neutral-200)",borderRadius:8,fontSize:18,outline:"none",marginBottom:12,boxSizing:"border-box"}} autoFocus/>
 {editName.trim()&&editName.trim()!==editTarget&&favs.includes(editName.trim())&&<div style={{fontSize:13,color:"var(--text-danger)",marginBottom:8}}>この名前は既に登録されています</div>}
 <div style={{display:"flex",gap:8}}>
 <button onClick={()=>{const ok=editF(editTarget,editName);if(ok){setEditTarget(null);setDelTarget(null);}}} disabled={!editName.trim()||editName.trim()===editTarget||favs.includes(editName.trim())} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--accent-blue)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer",opacity:(!editName.trim()||editName.trim()===editTarget||favs.includes(editName.trim()))?0.3:1}}>変更する</button>
-<button onClick={()=>setEditTarget(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
+<button onClick={()=>setEditTarget(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--neutral-200)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
 </div>
 </div></div>}
 
   </div>);
 }
 
+/* 装飾紙吹雪の 10 色配列。装飾配列として hex 直書きを維持（変数化するほどの意味論を持たない） */
 export function CSSConfetti(){const colors=["#2b7de9","#d93a5e","#22b566","#d9a83a","#9b59b6","#e67e22","#1abc9c","#e74c3c","#ffd700","#ff69b4"];const pieces=Array.from({length:25},(_,i)=>({id:i,left:Math.random()*100,delay:Math.random()*2,color:colors[i%colors.length],size:8+Math.random()*12,shape:Math.random()>0.5?"50%":"0"}));return(<div className="mk-confetti-container">{pieces.map(p=>(<div key={p.id} className="mk-confetti-piece" style={{left:p.left+"%",width:p.size,height:p.size,background:p.color,borderRadius:p.shape,animationDelay:p.delay+"s"}}/>))}</div>);}
 
 /* ═══ Shuffle Card Animation ═══ */
@@ -265,6 +266,7 @@ const showDevMaster=(()=>{try{if(localStorage.getItem("mk-dev-master")==="1")ret
 const classify=(name)=>{if(showDevMaster&&DEV_MASTER_LIST.includes(name))return"master";if(!showDevMaster&&DEV_MASTER_LIST.includes(name))return"regular";const gs=stats[name]||[];const gc=gs.length;if(gc===0)return"never";const lastDate=gs.reduce((lat,g)=>{const d=new Date(g.d);return d>lat?d:lat;},new Date(0));const days=Math.floor((new Date()-lastDate)/(1000*60*60*24));if(days<=14&&gc>=5)return"regular";if(days<=30&&gc>=2)return"semi";return"occasional";};
 const grouped={};favs.forEach(name=>{const g=classify(name);if(!grouped[g])grouped[g]=[];const gs=stats[name]||[];grouped[g].push({name,gameCount:gs.length});});
 Object.values(grouped).forEach(arr=>arr.sort((a,b)=>b.gameCount-a.gameCount));
+/* 隠し機能 Master グループの意図的ハードコード（#1a1a2e / #ffd700 の金色アクセント） */
 const GC=[{key:"master",label:"master",color:"#1a1a2e",accent:"#ffd700",show:showDevMaster},{key:"regular",label:"常連",color:"#22b566"},{key:"semi",label:"準レギュラー",color:"#2b7de9"},{key:"occasional",label:"たまに参加",color:"#f0a030"},{key:"never",label:"未参加",color:"#999"}];
 const toggle=(name)=>{if(usedSet.has(name)){setDeselected(p=>{const n=new Set(p);if(n.has(name))n.delete(name);else n.add(name);return n;});return;}setSelected(p=>{const n=new Set(p);if(n.has(name))n.delete(name);else n.add(name);return n;});};
 const toggleGroup=(members)=>{const selectable=members.filter(f=>!usedSet.has(f.name)).map(f=>f.name);const allSel=selectable.length>0&&selectable.every(n=>selected.has(n));setSelected(p=>{const n=new Set(p);if(allSel)selectable.forEach(nm=>n.delete(nm));else selectable.forEach(nm=>n.add(nm));return n;});const addedInGroup=members.filter(f=>usedSet.has(f.name)).map(f=>f.name);const allDesel=addedInGroup.length>0&&addedInGroup.every(n=>deselected.has(n));setDeselected(p=>{const n=new Set(p);if(allDesel)addedInGroup.forEach(nm=>n.delete(nm));else addedInGroup.forEach(nm=>n.add(nm));return n;});};
@@ -398,20 +400,20 @@ return(<table style={{width:"100%",borderCollapse:"collapse",tableLayout:"fixed"
 <th style={{background:col?"#3d5a80":"#0d2a48",color:col?"#fff":"rgba(255,200,100,0.85)",fontWeight:900,textAlign:"center",verticalAlign:"top",borderLeft:col?bl+"#4b5563":"2px solid rgba(255,180,50,0.45)",position:forCapture?"static":"sticky",top:H1,zIndex:7,borderTop:"none",borderBottom:"2px solid #0d2a48",padding:hp,textShadow:"0 1px 3px rgba(0,0,0,0.4)",cursor:col?"pointer":"default"}} onClick={col?()=>setExpandedTeam(expandedTeam===o.idx?null:o.idx):undefined}><span style={{...VT,fontSize:col?fs*0.78:fs*0.78-1,maxHeight:nh,fontWeight:900,letterSpacing:col?0:1}}>{col?o.team.name.slice(0,3):"計"}</span></th>
 </React.Fragment>);})}
 </tr></thead>
-<tbody>{showRows===0?(<tr><td colSpan={totalCols} style={{color:"#bbb",padding:24,fontSize:fs*0.8,textAlign:"center",borderBottom:"1px solid var(--border-lighter)"}}>スコアを入力してください</td></tr>):(
+<tbody>{showRows===0?(<tr><td colSpan={totalCols} style={{color:"#bbb",padding:24,fontSize:fs*0.8,textAlign:"center",borderBottom:"1px solid var(--neutral-100)"}}>スコアを入力してください</td></tr>):(
 Array.from({length:showRows},(_,i)=>i+1).map(turn=>{
 const isLast=highlightLast&&turn===maxT;
 return(<tr key={turn} style={isLast?{background:"#fffde6"}:{}}>
-<td style={{padding:cp,textAlign:"center",borderBottom:"1px solid var(--border-input)",fontWeight:800,color:"#666",fontSize:fs*0.85}}>{turn}</td>
+<td style={{padding:cp,textAlign:"center",borderBottom:"1px solid var(--neutral-200)",fontWeight:800,color:"#666",fontSize:fs*0.85}}>{turn}</td>
 {ordered.map(o=>{const e=history.find(h=>h.turn===turn&&h.teamIndex===o.idx);const cf=e?getFA(history,o.idx,turn):0;const col=isCollapsed(o.idx);
 return(<React.Fragment key={o.idx}>{!col&&o.ap.map((p,pi)=>{
 const isP=e&&e.playerIndex===pi;const isAct=activeCell&&activeCell.turn===turn&&activeCell.teamIndex===o.idx&&activeCell.playerIndex===pi&&!e;
 let txt="",clr="#333",bg="transparent",fw=600;
 if(isP){if((e.type==="miss"||e.type==="fault")&&cf===1)bg="#fff9db";if((e.type==="miss"||e.type==="fault")&&cf>=2)bg="#ffe0e0";if(e.type==="miss"){txt="−";clr="var(--accent-orange)";fw=800;}else if(e.type==="fault"&&e.faultReset){txt=e.consecutiveFails>=MF?"F":"F↓";clr="var(--text-danger)";fw=800;}else if(e.type==="fault"){txt="F";clr="var(--text-danger)";fw=800;}else if(e.reset25){txt=e.score+"↓";clr="#d93a5e";fw=800;}else{txt=e.score;clr=C[o.idx].tx;fw=700;}if(e.consecutiveFails>=MF)txt+="✕";}
-const cs={padding:cp,textAlign:"center",borderBottom:"1px solid var(--border-input)",color:clr,fontWeight:fw,background:bg,borderLeft:pi===0?bl+C[o.idx].ac+"33":"1px solid var(--border-lighter)",fontSize:fs};
+const cs={padding:cp,textAlign:"center",borderBottom:"1px solid var(--neutral-200)",color:clr,fontWeight:fw,background:bg,borderLeft:pi===0?bl+C[o.idx].ac+"33":"1px solid var(--neutral-100)",fontSize:fs};
 if(isAct)cs.animation="mk-blink 1s ease-in-out infinite";
 return <td key={pi} style={cs}>{txt}</td>;
-})}<td style={{padding:cp,textAlign:"center",borderBottom:"1px solid var(--border-input)",fontWeight:900,color:C[o.idx].tx,background:e?"#f0f3f8":"transparent",borderLeft:col?bl+"#4b5563":"2px solid rgba(255,180,50,0.45)",fontSize:fs}}>{e?(dqWinnerIdx!=null&&o.idx===dqWinnerIdx&&turn===dqWinLastTurn?WIN:e.runningTotal):""}</td></React.Fragment>);
+})}<td style={{padding:cp,textAlign:"center",borderBottom:"1px solid var(--neutral-200)",fontWeight:900,color:C[o.idx].tx,background:e?"#f0f3f8":"transparent",borderLeft:col?bl+"#4b5563":"2px solid rgba(255,180,50,0.45)",fontSize:fs}}>{e?(dqWinnerIdx!=null&&o.idx===dqWinnerIdx&&turn===dqWinLastTurn?WIN:e.runningTotal):""}</td></React.Fragment>);
 })}
 </tr>);
 })
@@ -467,12 +469,12 @@ return(<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex
 <div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:18,padding:28,maxWidth:340,width:"100%",textAlign:"center"}}>
 <div style={{fontSize:22,fontWeight:800,color:"var(--text-primary)",marginBottom:6}}>{mode==="create"?<><Lock size={20} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 管理者PINを作成</>:<><Lock size={20} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 管理者PIN入力</>}</div>
 <div style={{fontSize:14,color:"var(--text-secondary)",marginBottom:16}}>{mode==="create"?(step===1?"4〜6桁の数字を設定":"もう一度入力してください"):(isLocked?"ロック中です":"PINを入力してください")}</div>
-<input type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={step===2?pin2:pin} onChange={e=>{const v=e.target.value.replace(/\D/g,"").slice(0,6);step===2?setPin2(v):setPin(v);setErr("");}} placeholder="●●●●" disabled={isLocked||busy} style={{width:"100%",padding:"16px",border:"2px solid "+(err?"var(--text-danger)":isLocked?"var(--accent-yellow)":"var(--border-input)"),borderRadius:12,fontSize:28,fontWeight:700,textAlign:"center",letterSpacing:12,outline:"none",marginBottom:8,opacity:isLocked?0.4:1}}/>
+<input type="password" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={step===2?pin2:pin} onChange={e=>{const v=e.target.value.replace(/\D/g,"").slice(0,6);step===2?setPin2(v):setPin(v);setErr("");}} placeholder="●●●●" disabled={isLocked||busy} style={{width:"100%",padding:"16px",border:"2px solid "+(err?"var(--text-danger)":isLocked?"var(--accent-yellow)":"var(--neutral-200)"),borderRadius:12,fontSize:28,fontWeight:700,textAlign:"center",letterSpacing:12,outline:"none",marginBottom:8,opacity:isLocked?0.4:1}}/>
 {err&&<div style={{color:"var(--text-danger)",fontSize:14,fontWeight:600,marginBottom:8}}>{err}</div>}
 {isLocked&&<div style={{color:"var(--accent-yellow)",fontSize:13,fontWeight:600,marginBottom:8}}><Lock size={13} style={{display:"inline",verticalAlign:"middle",marginRight:2}}/> 残り{Math.ceil(lockInfo.remaining)}秒でロック解除</div>}
 <div style={{display:"flex",gap:8,marginTop:8}}>
 <button onClick={submit} disabled={isLocked||busy} style={{flex:1,padding:"14px 0",border:"none",borderRadius:12,background:isLocked?"#ccc":"var(--bg-secondary)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:isLocked?"not-allowed":"pointer"}}>{busy?"確認中...":mode==="create"?(step===1?"次へ":"設定する"):"解除"}</button>
-<button onClick={onCancel} style={{flex:1,padding:"14px 0",border:"2px solid var(--border-input)",borderRadius:12,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
+<button onClick={onCancel} style={{flex:1,padding:"14px 0",border:"2px solid var(--neutral-200)",borderRadius:12,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
 </div></div></div>);
 }
 
@@ -604,7 +606,7 @@ return(<div className="mk-fade-scale-in" style={{position:"fixed",inset:0,backgr
 {!syncConfirmed?(<>
 <div style={{fontSize:13,color:"var(--text-secondary)",marginBottom:10}}>初回セットアップ: 同期コードを入力してください。</div>
 <div style={{display:"flex",gap:8,marginBottom:8}}>
-<input value={syncInput} onChange={e=>setSyncInput(e.target.value.trim().slice(0,30))} placeholder="同期コード（3文字以上）" style={{flex:1,border:"1px solid var(--border-input)",borderRadius:8,padding:"10px 12px",fontSize:16,outline:"none"}}/>
+<input value={syncInput} onChange={e=>setSyncInput(e.target.value.trim().slice(0,30))} placeholder="同期コード（3文字以上）" style={{flex:1,border:"1px solid var(--neutral-200)",borderRadius:8,padding:"10px 12px",fontSize:16,outline:"none"}}/>
 <button onClick={()=>{
 if(syncInput.length<3){setSyncStatus("❌ 3文字以上");return;}
 setSyncCodeLS(syncInput);setSyncStatus("⏳ 同期中...");
@@ -618,10 +620,10 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 <div style={{fontSize:12,color:"#bbb",marginTop:4}}>同期コードを入力して同期ボタンを押してください。</div>
 </>):(<>
 <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-<div style={{flex:1,padding:"10px 12px",border:"1px solid var(--border-input)",borderRadius:8,fontSize:16,color:"var(--text-secondary)",background:"var(--bg-surface-dim)",letterSpacing:2}}>{maskSyncCode(savedCode)}</div>
+<div style={{flex:1,padding:"10px 12px",border:"1px solid var(--neutral-200)",borderRadius:8,fontSize:16,color:"var(--text-secondary)",background:"var(--bg-surface-dim)",letterSpacing:2}}>{maskSyncCode(savedCode)}</div>
 <span style={{fontSize:13,color:"var(--text-success)",fontWeight:700}}>設定済み</span>
 </div>
-{isAdmin&&<button onClick={()=>{setSyncStatus("⏳ アップロード中...");pushToServer().then(r=>{setSyncStatus(r.ok?"✅ アップロード完了":"❌ "+(r.error||"失敗"));});}} style={{width:"100%",padding:"10px",border:"1px solid var(--border-input)",borderRadius:8,background:"var(--bg-surface-dim)",color:"#555",fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:8}}><Upload size={14} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 手動アップロード</button>}
+{isAdmin&&<button onClick={()=>{setSyncStatus("⏳ アップロード中...");pushToServer().then(r=>{setSyncStatus(r.ok?"✅ アップロード完了":"❌ "+(r.error||"失敗"));});}} style={{width:"100%",padding:"10px",border:"1px solid var(--neutral-200)",borderRadius:8,background:"var(--bg-surface-dim)",color:"#555",fontSize:14,fontWeight:600,cursor:"pointer",marginBottom:8}}><Upload size={14} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> 手動アップロード</button>}
 <div style={{fontSize:12,color:"#bbb"}}>{isAdmin?"同期コードの変更はSupabaseダッシュボードから行えます。":"同じコードを全端末で設定してください。"}</div>
 </>)}
 {syncStatus&&<div style={{fontSize:14,color:syncStatus.startsWith("✅")?"var(--text-success)":syncStatus.startsWith("❌")?"var(--text-danger)":"var(--accent-blue)",fontWeight:600,marginTop:6}}>{syncStatus}</div>}
@@ -662,7 +664,7 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 <div style={{marginBottom:12}}>
 <label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>場所を検索</label>
 <div style={{display:"flex",gap:8}}>
-<input value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")handleLocSearch();}} placeholder="公園名で検索..." style={{flex:1,border:"1px solid var(--border-input)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none"}}/>
+<input value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")handleLocSearch();}} placeholder="公園名で検索..." style={{flex:1,border:"1px solid var(--neutral-200)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none"}}/>
 <button onClick={handleLocSearch} disabled={searching} style={{padding:"10px 16px",border:"none",borderRadius:8,background:"var(--accent-blue)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{searching?"...":"検索"}</button>
 </div>
 </div>
@@ -674,17 +676,17 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 </button>))}
 </div>}
 <div style={{textAlign:"center",margin:"12px 0",color:"var(--text-secondary)",fontSize:13}}>---- または ----</div>
-<button onClick={()=>setRegStep(2)} style={{width:"100%",padding:"10px",border:"1px solid var(--border-input)",borderRadius:8,background:"#f8f9fa",color:"var(--text-secondary)",fontSize:14,fontWeight:600,cursor:"pointer"}}>手動で入力する</button>
+<button onClick={()=>setRegStep(2)} style={{width:"100%",padding:"10px",border:"1px solid var(--neutral-200)",borderRadius:8,background:"#f8f9fa",color:"var(--text-secondary)",fontSize:14,fontWeight:600,cursor:"pointer"}}>手動で入力する</button>
 </>}
 {regStep===2&&<>
 {/* Step 2: Field info */}
 <div style={{marginBottom:12}}>
 <label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>場所名{!editLoc&&" *"}</label>
-<input value={regPlaceName} onChange={e=>setRegPlaceName(e.target.value)} placeholder="例: 富士市中央公園" disabled={!!editLoc} style={{width:"100%",border:"1px solid var(--border-input)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none",background:editLoc?"#f0f0f0":"#fff",boxSizing:"border-box"}}/>
+<input value={regPlaceName} onChange={e=>setRegPlaceName(e.target.value)} placeholder="例: 富士市中央公園" disabled={!!editLoc} style={{width:"100%",border:"1px solid var(--neutral-200)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none",background:editLoc?"#f0f0f0":"#fff",boxSizing:"border-box"}}/>
 </div>
 <div style={{marginBottom:12}}>
 <label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>サブロケーション名 *</label>
-<input value={regSubName} onChange={e=>setRegSubName(e.target.value)} placeholder="例: 芝エリア" style={{width:"100%",border:"1px solid var(--border-input)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none",boxSizing:"border-box"}}/>
+<input value={regSubName} onChange={e=>setRegSubName(e.target.value)} placeholder="例: 芝エリア" style={{width:"100%",border:"1px solid var(--neutral-200)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none",boxSizing:"border-box"}}/>
 <div style={{fontSize:11,color:"#999",marginTop:2}}>同じ場所内のエリアを区別する名前</div>
 </div>
 <div style={{marginBottom:12}}>
@@ -703,19 +705,19 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 <div style={{display:"flex",gap:8,marginBottom:12}}>
 <div style={{flex:1}}>
 <label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>緯度 *</label>
-<input value={regLat} onChange={e=>setRegLat(e.target.value)} placeholder="35.xxxx" type="text" inputMode="decimal" disabled={!!regPlaceId} style={{width:"100%",border:"1px solid var(--border-input)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none",background:regPlaceId?"#f0f0f0":"#fff",boxSizing:"border-box"}}/>
+<input value={regLat} onChange={e=>setRegLat(e.target.value)} placeholder="35.xxxx" type="text" inputMode="decimal" disabled={!!regPlaceId} style={{width:"100%",border:"1px solid var(--neutral-200)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none",background:regPlaceId?"#f0f0f0":"#fff",boxSizing:"border-box"}}/>
 </div>
 <div style={{flex:1}}>
 <label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>経度 *</label>
-<input value={regLng} onChange={e=>setRegLng(e.target.value)} placeholder="139.xxxx" type="text" inputMode="decimal" disabled={!!regPlaceId} style={{width:"100%",border:"1px solid var(--border-input)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none",background:regPlaceId?"#f0f0f0":"#fff",boxSizing:"border-box"}}/>
+<input value={regLng} onChange={e=>setRegLng(e.target.value)} placeholder="139.xxxx" type="text" inputMode="decimal" disabled={!!regPlaceId} style={{width:"100%",border:"1px solid var(--neutral-200)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none",background:regPlaceId?"#f0f0f0":"#fff",boxSizing:"border-box"}}/>
 </div>
 </div>
 </>}
 {locErr&&<div style={{color:"var(--text-danger)",fontSize:13,fontWeight:600,marginBottom:8}}>{locErr}</div>}
 <div style={{display:"flex",gap:8,marginTop:16}}>
-{!editLoc&&<button onClick={()=>{setRegStep(1);setLocErr("");}} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:15,fontWeight:700,cursor:"pointer"}}>戻る</button>}
+{!editLoc&&<button onClick={()=>{setRegStep(1);setLocErr("");}} style={{flex:1,padding:"12px 0",border:"2px solid var(--neutral-200)",borderRadius:10,background:"transparent",color:"#666",fontSize:15,fontWeight:700,cursor:"pointer"}}>戻る</button>}
 <button onClick={handleLocSave} disabled={locBusy} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--accent-blue)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",opacity:locBusy?0.5:1}}>{locBusy?"処理中...":editLoc?"更新":"登録"}</button>
-{editLoc&&<button onClick={()=>{setShowLocModal(false);resetLocForm();setLocErr("");}} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:15,fontWeight:700,cursor:"pointer"}}>キャンセル</button>}
+{editLoc&&<button onClick={()=>{setShowLocModal(false);resetLocForm();setLocErr("");}} style={{flex:1,padding:"12px 0",border:"2px solid var(--neutral-200)",borderRadius:10,background:"transparent",color:"#666",fontSize:15,fontWeight:700,cursor:"pointer"}}>キャンセル</button>}
 </div>
 </>}
 </div>
@@ -727,7 +729,7 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 <div style={{fontSize:14,color:"var(--text-secondary)",marginBottom:16}}>「{delConfirm.place_name} - {delConfirm.sub_name}」を削除しますか？</div>
 <div style={{display:"flex",gap:8}}>
 <button onClick={()=>handleLocDelete(delConfirm.id)} disabled={locBusy} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",opacity:locBusy?0.5:1}}>{locBusy?"削除中...":"削除する"}</button>
-<button onClick={()=>setDelConfirm(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--border-input)",borderRadius:10,background:"transparent",color:"#666",fontSize:15,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
+<button onClick={()=>setDelConfirm(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--neutral-200)",borderRadius:10,background:"transparent",color:"#666",fontSize:15,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
 </div>
 </div>
 </div>}
