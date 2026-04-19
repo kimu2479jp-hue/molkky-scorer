@@ -100,7 +100,7 @@ return(
 <div style={{width:ACT_W,display:"flex",flexDirection:"column",gap:isNarrow?4:(isTabletSI?10:6),flexShrink:0}}>
 <button style={{flex:1,border:"none",borderRadius:isNarrow?10:(isTabletSI?16:14),background:sel!=null?"var(--bg-secondary)":"#ccc",color:"var(--text-inverse)",fontSize:isNarrow?20:(isTabletSI?34:26),fontWeight:900,cursor:"pointer",boxShadow:sel!=null?"0 2px 8px rgba(20,54,90,0.3)":"none",display:"flex",alignItems:"center",justifyContent:"center"}} onPointerDown={doScore}>決定</button>
 <button style={{padding:isNarrow?"10px 0":(isTabletSI?"16px 0":"12px 0"),border:"2px solid #f0b0b0",borderRadius:isNarrow?8:(isTabletSI?12:10),background:"var(--danger-bg)",color:"var(--text-danger)",fontSize:isNarrow?13:(isTabletSI?20:15),fontWeight:900,cursor:"pointer",flexShrink:0}} onPointerDown={doFault}>x フォルト</button>
-<button style={{flex:1,border:"2px solid #f0d4a0",borderRadius:isNarrow?10:(isTabletSI?16:14),background:"var(--warning-bg)",color:"var(--accent-orange)",fontSize:isNarrow?15:(isTabletSI?24:17),fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onPointerDown={doMiss}>{"－"} ミス</button>
+<button style={{flex:1,border:"2px solid #f0d4a0",borderRadius:isNarrow?10:(isTabletSI?16:14),background:"var(--warning-bg)",color:"var(--warning-dark)",fontSize:isNarrow?15:(isTabletSI?24:17),fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onPointerDown={doMiss}>{"－"} ミス</button>
 </div>
 </div>
 </div>
@@ -424,7 +424,7 @@ const doBack=save=>{setSaveDialog(false);setShowRes(false);goBack(save?extractTe
 const doBackNoSaveWithCA=()=>{setSaveDialog(false);if(hasCourtAllocation){setCaKeepDialog(true);}else{setShowRes(false);goBack(null);}};
 const gsVw=typeof window!=="undefined"?window.innerWidth:375;const isTablet=gsVw>=768;const nTeams=teamOrder.length;
 /* Miss dot component: filled circle = miss, empty circle = no miss */
-const MissDots=({f,size})=>{const s=size||8;return(<div style={{display:"flex",gap:2,alignItems:"center"}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:s,height:s,borderRadius:"50%",display:"inline-block",background:j<f?(f>=2?"#c0392b":"#e6a817"):"rgba(120,120,120,0.25)",border:j>=f?"1px solid rgba(120,120,120,0.3)":"none"}}/>))}</div>);};
+const MissDots=({f,size})=>{const s=size||8;return(<div style={{display:"flex",gap:2,alignItems:"center"}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:s,height:s,borderRadius:"50%",display:"inline-block",background:j<f?(f>=2?"#c0392b":"var(--warning)"):"rgba(120,120,120,0.25)",border:j>=f?"1px solid rgba(120,120,120,0.3)":"none"}}/>))}</div>);};
 /* Active team card: full-width info card with team color */
 const ActiveCard=()=>{const t=teams[ti];const sc=scoreOf(history,ti);const f=failsOf(history,ti);const el=eliminated[ti];
 const isBounce=animState.bounce===ti;const isWarn=animState.warn===ti;const isFlash=animState.flash===ti;const isReset=animState.reset===ti;const isShake=animState.shake===ti;
