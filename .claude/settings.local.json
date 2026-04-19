@@ -25,7 +25,8 @@
       "Bash(gh --version)",
       "Bash(gh pr create --base main --head feature/step4-phase2b --title '第2弾B-α: DESIGN.md セマンティックカラー整理 + --danger 追加' --body ':*)",
       "Bash(gh pr create --title '第2弾B-β: セマンティックカラーの実コード展開' --body ':*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(gh pr create --base main --head docs/pitfalls-phase2b-lessons --title 'docs\\(pitfalls\\): 第2弾B で得た運用知見4項目を known-pitfalls.md に追加' --body ':*)"
     ]
   },
   "hooks": {
