@@ -23,7 +23,9 @@
       "Bash(git check-ignore:*)",
       "Bash(echo \"\\(終了コード: $?\\)\")",
       "Bash(gh --version)",
-      "Bash(gh pr create --base main --head feature/step4-phase2b --title '第2弾B-α: DESIGN.md セマンティックカラー整理 + --danger 追加' --body ':*)"
+      "Bash(gh pr create --base main --head feature/step4-phase2b --title '第2弾B-α: DESIGN.md セマンティックカラー整理 + --danger 追加' --body ':*)",
+      "Bash(gh pr create --title '第2弾B-β: セマンティックカラーの実コード展開' --body ':*)",
+      "Bash(git commit:*)"
     ]
   },
   "hooks": {
