@@ -886,10 +886,10 @@ Stats画面で採用されるフル展開セットを、他画面も参照可能
 | 状態 | スタイル |
 |---|---|
 | 通常 | 背景 `--danger`、文字 `--neutral-0` |
-| hover | 背景 `--danger-dark` |
+| hover | Primary/Secondary と整合させ固定トークン方式を採用する方針（具体値は将来タスクで確定、下記注記参照） |
 | active | `transform: scale(0.98)` |
 
-※ `--danger-dark` は α で §2.4 から廃止されたが、本行は β での Danger ボタン hover 設計決定まで暫定的に記述を残す。β未確定事項として扱う。（候補: --text-danger 流用 / --danger-dark 再設 / color-mix() 代替 / hover表現変更）
+**hover 設計方針（第2弾B-β 確定）**: Primary/Secondary と整合させ固定トークン方式を採用する方針。具体値（`--danger-hover` 新設 or `--danger-dark` 再定義）と hover 実装方式は β 完遂後の独立タスク『ボタン hover 実装統一』で確定する。現時点では Danger ボタンに hover 実装は存在しない（全てインラインスタイル）。
 
 **使用制限**: 削除・リセット・不可逆的な操作にのみ使用。キャンセル・閉じる等の通常操作に使わない。
 
