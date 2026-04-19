@@ -75,6 +75,14 @@
   - 症状: Claude.ai で決めたことが Claude Code で忘れられる・逆も然り
   - 対処: `/save-session` の「Claude.ai 側との同期」セクションで伝達事項を明示。必要なら memory 更新を依頼
 
+### Git 操作
+
+- **ブランチ切り替え前の `.claude/settings.local.json` 状態確認**
+  - 症状: `git checkout` 時に「Your local changes would be overwritten by checkout」でブロックされる
+  - 原因: セッション中に Claude Code が新しいコマンドの承認を取ると `.claude/settings.local.json` が modified 状態になる。本ファイルは ECC 導入時の設計判断で git 追跡済みのため、未コミットのまま切り替えができない
+  - 対処: ブランチ作成・切り替え直前に `git status` で本ファイルの状態を確認し、modified ならセッション中の承認分を main に独立コミットとして保存してから切り替える
+  - 前例: `ab1968b`（第2弾B-α 冒頭）、`4c22dd0`（第2弾B-α 後クリーンアップ時）
+
 ---
 
 ## Supabase
