@@ -801,7 +801,7 @@ return(<div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 
 </div>
 {hasReplay&&<button onClick={e=>{e.stopPropagation();onShowScore&&onShowScore(game.d);}} style={{padding:"6px 10px",border:"1px solid #2b7de9",borderRadius:8,background:"#f0f6ff",color:"var(--accent-blue)",fontSize:isTab?14:12,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}><ClipboardList size={14}/></button>}
 {windData&&windData.turnWindData&&windData.turnWindData.length>0&&<button onClick={e=>{e.stopPropagation();onShowWind&&onShowWind(game.d);}} style={{padding:"6px 10px",border:"1px solid #0d9488",borderRadius:8,background:"#f0fdfa",color:"#0d9488",fontSize:isTab?14:12,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>風</button>}
-{isAdmin&&onDelete&&<button onClick={e=>{e.stopPropagation();onDelete(game.d,game);}} style={{padding:"6px 10px",border:"1px solid #e74c3c",borderRadius:8,background:"#fef2f2",color:"#e74c3c",fontSize:isTab?14:12,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}><Trash2 size={14}/></button>}
+{isAdmin&&onDelete&&<button onClick={e=>{e.stopPropagation();onDelete(game.d,game);}} style={{padding:"6px 10px",border:"1px solid var(--danger)",borderRadius:8,background:"#fef2f2",color:"var(--danger)",fontSize:isTab?14:12,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}><Trash2 size={14}/></button>}
   </div>);
 }
 

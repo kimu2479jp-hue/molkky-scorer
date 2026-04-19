@@ -81,7 +81,7 @@ return(
 <span style={{fontSize:pnFS,fontWeight:700,color:"var(--text-primary)",whiteSpace:"nowrap"}}>{playerName||""}</span>
 <span style={{fontSize:scFS,fontWeight:900,color:"var(--text-primary)",lineHeight:1,fontVariantNumeric:"tabular-nums"}}>{teamScore}<span style={{fontSize:Math.round(scFS*0.55),fontWeight:700}}>点</span></span>
 </div>
-<div style={{display:"flex",gap:isTabletSI?6:3,alignItems:"center",marginTop:isTabletSI?6:2}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:isTabletSI?30:(isNarrow?10:13),height:isTabletSI?30:(isNarrow?10:13),borderRadius:"50%",display:"inline-block",background:j<fails?"#e74c3c":"#ddd"}}/>))}</div>
+<div style={{display:"flex",gap:isTabletSI?6:3,alignItems:"center",marginTop:isTabletSI?6:2}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:isTabletSI?30:(isNarrow?10:13),height:isTabletSI?30:(isNarrow?10:13),borderRadius:"50%",display:"inline-block",background:j<fails?"var(--danger)":"#ddd"}}/>))}</div>
 </div>
 <button onPointerDown={onToggleMin} style={{padding:isTabletSI?"20px 36px":"4px 8px",border:"1px solid var(--neutral-200)",borderRadius:isTabletSI?14:8,background:"transparent",color:"var(--text-muted)",fontSize:isTabletSI?44:14,fontWeight:800,cursor:"pointer",flexShrink:0}}>▼</button>
 </div>
@@ -99,8 +99,8 @@ return(
 {/* Action buttons: decide / fault / miss */}
 <div style={{width:ACT_W,display:"flex",flexDirection:"column",gap:isNarrow?4:(isTabletSI?10:6),flexShrink:0}}>
 <button style={{flex:1,border:"none",borderRadius:isNarrow?10:(isTabletSI?16:14),background:sel!=null?"var(--bg-secondary)":"#ccc",color:"var(--text-inverse)",fontSize:isNarrow?20:(isTabletSI?34:26),fontWeight:900,cursor:"pointer",boxShadow:sel!=null?"0 2px 8px rgba(20,54,90,0.3)":"none",display:"flex",alignItems:"center",justifyContent:"center"}} onPointerDown={doScore}>決定</button>
-<button style={{padding:isNarrow?"10px 0":(isTabletSI?"16px 0":"12px 0"),border:"2px solid #f0b0b0",borderRadius:isNarrow?8:(isTabletSI?12:10),background:"#fde8e8",color:"var(--text-danger)",fontSize:isNarrow?13:(isTabletSI?20:15),fontWeight:900,cursor:"pointer",flexShrink:0}} onPointerDown={doFault}>x フォルト</button>
-<button style={{flex:1,border:"2px solid #f0d4a0",borderRadius:isNarrow?10:(isTabletSI?16:14),background:"#fff3e0",color:"var(--accent-orange)",fontSize:isNarrow?15:(isTabletSI?24:17),fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onPointerDown={doMiss}>{"－"} ミス</button>
+<button style={{padding:isNarrow?"10px 0":(isTabletSI?"16px 0":"12px 0"),border:"2px solid #f0b0b0",borderRadius:isNarrow?8:(isTabletSI?12:10),background:"var(--danger-bg)",color:"var(--text-danger)",fontSize:isNarrow?13:(isTabletSI?20:15),fontWeight:900,cursor:"pointer",flexShrink:0}} onPointerDown={doFault}>x フォルト</button>
+<button style={{flex:1,border:"2px solid #f0d4a0",borderRadius:isNarrow?10:(isTabletSI?16:14),background:"var(--warning-bg)",color:"var(--warning-dark)",fontSize:isNarrow?15:(isTabletSI?24:17),fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}} onPointerDown={doMiss}>{"－"} ミス</button>
 </div>
 </div>
 </div>
@@ -189,7 +189,7 @@ return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" st
 {team.players.map((p,pi)=>(<div key={pi} style={{display:"flex",alignItems:"center",padding:"6px 12px",background:p.active?"#f8f9fa":"#f0f0f0",borderRadius:8,marginBottom:4,opacity:p.active?1:0.4}}>
 <span style={{flex:1,fontSize:17}}>{p.name}</span>
 <div style={{display:"flex",gap:5}}>
-<button onClick={()=>tog(ti,pi,!p.active)} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:p.active?"#e74c3c":"#27ae60",color:"var(--text-inverse)"}}>{p.active?"退出":"復帰"}</button>
+<button onClick={()=>tog(ti,pi,!p.active)} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:p.active?"var(--danger)":"#27ae60",color:"var(--text-inverse)"}}>{p.active?"退出":"復帰"}</button>
 <button onClick={()=>setDelConf({ti,pi,name:p.name,court:1})} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:"#888",color:"var(--text-inverse)"}}>削除</button>
 </div>
 </div>))}
@@ -424,7 +424,7 @@ const doBack=save=>{setSaveDialog(false);setShowRes(false);goBack(save?extractTe
 const doBackNoSaveWithCA=()=>{setSaveDialog(false);if(hasCourtAllocation){setCaKeepDialog(true);}else{setShowRes(false);goBack(null);}};
 const gsVw=typeof window!=="undefined"?window.innerWidth:375;const isTablet=gsVw>=768;const nTeams=teamOrder.length;
 /* Miss dot component: filled circle = miss, empty circle = no miss */
-const MissDots=({f,size})=>{const s=size||8;return(<div style={{display:"flex",gap:2,alignItems:"center"}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:s,height:s,borderRadius:"50%",display:"inline-block",background:j<f?(f>=2?"#c0392b":"#e6a817"):"rgba(120,120,120,0.25)",border:j>=f?"1px solid rgba(120,120,120,0.3)":"none"}}/>))}</div>);};
+const MissDots=({f,size})=>{const s=size||8;return(<div style={{display:"flex",gap:2,alignItems:"center"}}>{Array.from({length:MF},(_,j)=>(<span key={j} style={{width:s,height:s,borderRadius:"50%",display:"inline-block",background:j<f?(f>=2?"#c0392b":"var(--warning)"):"rgba(120,120,120,0.25)",border:j>=f?"1px solid rgba(120,120,120,0.3)":"none"}}/>))}</div>);};
 /* Active team card: full-width info card with team color */
 const ActiveCard=()=>{const t=teams[ti];const sc=scoreOf(history,ti);const f=failsOf(history,ti);const el=eliminated[ti];
 const isBounce=animState.bounce===ti;const isWarn=animState.warn===ti;const isFlash=animState.flash===ti;const isReset=animState.reset===ti;const isShake=animState.shake===ti;
@@ -436,7 +436,7 @@ return(<div style={{flexShrink:0,background:"#14365a",borderBottom:"1px solid rg
 <div style={{flex:1,padding:isTablet?"14px 18px":"7px 10px",display:"flex",alignItems:"center",gap:isTablet?16:8,flexWrap:"nowrap",minWidth:0}}>
 <span style={{fontSize:acFS,fontWeight:900,color:"#fff",whiteSpace:"nowrap",flexShrink:0,textDecoration:el?"line-through":"none"}}>{t.name}{el?" DQ":""}{(bestOf>0||numGames>1)?" "+gW[ti]+"勝":""}</span>
 {cp&&<span style={{fontSize:acFS,fontWeight:700,color:"#ffc107",whiteSpace:"nowrap",flexShrink:1,minWidth:0}}>{cp.name}</span>}
-<span style={{fontSize:isTablet?38:20,fontWeight:900,color:isReset?"#e74c3c":"#fff",fontVariantNumeric:"tabular-nums",lineHeight:1,flexShrink:0,animation:scAnim}}>{sc}<span style={{fontSize:isTablet?20:11,fontWeight:700}}>点</span></span>
+<span style={{fontSize:isTablet?38:20,fontWeight:900,color:isReset?"var(--danger)":"#fff",fontVariantNumeric:"tabular-nums",lineHeight:1,flexShrink:0,animation:scAnim}}>{sc}<span style={{fontSize:isTablet?20:11,fontWeight:700}}>点</span></span>
 <MissDots f={f} size={isTablet?20:9}/>
 <GameWindWidget currentWind={windConnected?currentWind:null}/>
 </div>
@@ -454,7 +454,7 @@ return(<React.Fragment key={oIdx}>{oi>0&&<div style={{width:1,alignSelf:"stretch
 <div style={{flex:1,minWidth:0,padding:isTablet?"8px 12px":"3px 6px",opacity:el?0.35:1,display:"flex",alignItems:"center",gap:isTablet?8:4,flexWrap:"nowrap"}}>
 <span style={{fontSize:oFS,fontWeight:800,color:"#fff",flexShrink:0}}>{oiOrder}</span>
 <span style={{fontSize:oFS,fontWeight:700,color:"#fff",whiteSpace:"nowrap",flexShrink:0,textDecoration:el?"line-through":"none"}}>{t.name}</span>
-<span style={{fontSize:isTablet?24:13,fontWeight:900,color:isReset2?"#e74c3c":"#fff",fontVariantNumeric:"tabular-nums",flexShrink:0,animation:scAnim2}}>{sc}</span>
+<span style={{fontSize:isTablet?24:13,fontWeight:900,color:isReset2?"var(--danger)":"#fff",fontVariantNumeric:"tabular-nums",flexShrink:0,animation:scAnim2}}>{sc}</span>
 {ocp&&<span style={{fontSize:oFS,fontWeight:600,color:"rgba(255,255,255,0.7)",whiteSpace:"nowrap",flexShrink:1,minWidth:0}}>{ocp.name}</span>}
 <MissDots f={f} size={isTablet?12:6}/>
 </div></React.Fragment>);})}
@@ -498,19 +498,19 @@ return(
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>コート割り当てデータの扱い</div>
 <div style={{display:"flex",flexDirection:"column",gap:10}}>
 <button onClick={()=>{setCaKeepDialog(false);setCaKeepDiscard(0);setShowRes(false);goBack(null);}} style={{padding:"14px 0",border:"none",borderRadius:10,background:"var(--accent-blue)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>コート割り当ては保持する</button>
-<button onClick={()=>setCaKeepDiscard(1)} style={{padding:"14px 0",border:"2px solid rgba(231,76,60,0.4)",borderRadius:10,background:"rgba(231,76,60,0.1)",color:"#e74c3c",fontSize:15,fontWeight:800,cursor:"pointer"}}>コート割り当ても破棄する</button>
+<button onClick={()=>setCaKeepDiscard(1)} style={{padding:"14px 0",border:"2px solid color-mix(in srgb, var(--danger) 40%, transparent)",borderRadius:10,background:"color-mix(in srgb, var(--danger) 10%, transparent)",color:"var(--danger)",fontSize:15,fontWeight:800,cursor:"pointer"}}>コート割り当ても破棄する</button>
 <button onClick={()=>{setCaKeepDialog(false);setCaKeepDiscard(0);setSaveDialog(true);}} style={{padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
 </div>
 </>):caKeepDiscard===1?(<>
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>コート割り当てを破棄しますか？</div>
 <div style={{display:"flex",gap:10}}>
-<button onClick={()=>setCaKeepDiscard(2)} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"#e74c3c",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
+<button onClick={()=>setCaKeepDiscard(2)} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--danger)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
 <button onClick={()=>setCaKeepDiscard(0)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>いいえ</button>
 </div>
 </>):(<>
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>この操作は取り消せません。破棄しますか？</div>
 <div style={{display:"flex",gap:10}}>
-<button onClick={()=>{setCaKeepDialog(false);setCaKeepDiscard(0);if(clearCourtAllocation)clearCourtAllocation();setShowRes(false);goBack(null);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"#e74c3c",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>破棄する</button>
+<button onClick={()=>{setCaKeepDialog(false);setCaKeepDiscard(0);if(clearCourtAllocation)clearCourtAllocation();setShowRes(false);goBack(null);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--danger)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>破棄する</button>
 <button onClick={()=>setCaKeepDiscard(0)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>キャンセル</button>
 </div>
 </>)}

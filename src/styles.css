@@ -12,6 +12,7 @@
   --text-inverse: #fff;
   --text-danger: #c0392b;
   --danger: #e74c3c;
+  --danger-bg: #fde8e8;
   --text-warning: #e67700;
   --text-success: #22b566;
   --accent-blue: #2b7de9;
@@ -73,16 +74,16 @@ body {
 
 @keyframes mk-danger-flash {
   0%, 100% { background: transparent; }
-  25% { background: rgba(231, 76, 60, 0.3); }
+  25% { background: color-mix(in srgb, var(--danger) 30%, transparent); }
   50% { background: transparent; }
-  75% { background: rgba(231, 76, 60, 0.3); }
+  75% { background: color-mix(in srgb, var(--danger) 30%, transparent); }
 }
 
 @keyframes mk-reset-blink {
   0%, 100% { color: inherit; }
-  25% { color: #e74c3c; }
+  25% { color: var(--danger); }
   50% { color: inherit; }
-  75% { color: #e74c3c; }
+  75% { color: var(--danger); }
 }
 
 @keyframes mk-confetti {
