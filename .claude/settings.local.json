@@ -26,7 +26,12 @@
       "Bash(gh pr create --base main --head feature/step4-phase2b --title '第2弾B-α: DESIGN.md セマンティックカラー整理 + --danger 追加' --body ':*)",
       "Bash(gh pr create --title '第2弾B-β: セマンティックカラーの実コード展開' --body ':*)",
       "Bash(git commit:*)",
-      "Bash(gh pr create --base main --head docs/pitfalls-phase2b-lessons --title 'docs\\(pitfalls\\): 第2弾B で得た運用知見4項目を known-pitfalls.md に追加' --body ':*)"
+      "Bash(gh pr create --base main --head docs/pitfalls-phase2b-lessons --title 'docs\\(pitfalls\\): 第2弾B で得た運用知見4項目を known-pitfalls.md に追加' --body ':*)",
+      "Bash(mkdir -p /tmp/css-check)",
+      "Bash(cp -r dist/assets /tmp/css-check/dist-before)",
+      "Bash(cp -r dist/assets /tmp/css-check/dist-after)",
+      "Read(//tmp/css-check/**)",
+      "Bash(gh pr create --title 'refactor: Semantic → Primitive var\\(\\) 参照化（DESIGN.md §2.11.4 解消）' --body ':*)"
     ]
   },
   "hooks": {
