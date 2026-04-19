@@ -74,9 +74,9 @@ body {
 
 @keyframes mk-danger-flash {
   0%, 100% { background: transparent; }
-  25% { background: rgba(231, 76, 60, 0.3); }
+  25% { background: color-mix(in srgb, var(--danger) 30%, transparent); }
   50% { background: transparent; }
-  75% { background: rgba(231, 76, 60, 0.3); }
+  75% { background: color-mix(in srgb, var(--danger) 30%, transparent); }
 }
 
 @keyframes mk-reset-blink {

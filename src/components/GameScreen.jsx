@@ -498,7 +498,7 @@ return(
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>コート割り当てデータの扱い</div>
 <div style={{display:"flex",flexDirection:"column",gap:10}}>
 <button onClick={()=>{setCaKeepDialog(false);setCaKeepDiscard(0);setShowRes(false);goBack(null);}} style={{padding:"14px 0",border:"none",borderRadius:10,background:"var(--accent-blue)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>コート割り当ては保持する</button>
-<button onClick={()=>setCaKeepDiscard(1)} style={{padding:"14px 0",border:"2px solid rgba(231,76,60,0.4)",borderRadius:10,background:"rgba(231,76,60,0.1)",color:"var(--danger)",fontSize:15,fontWeight:800,cursor:"pointer"}}>コート割り当ても破棄する</button>
+<button onClick={()=>setCaKeepDiscard(1)} style={{padding:"14px 0",border:"2px solid color-mix(in srgb, var(--danger) 40%, transparent)",borderRadius:10,background:"color-mix(in srgb, var(--danger) 10%, transparent)",color:"var(--danger)",fontSize:15,fontWeight:800,cursor:"pointer"}}>コート割り当ても破棄する</button>
 <button onClick={()=>{setCaKeepDialog(false);setCaKeepDiscard(0);setSaveDialog(true);}} style={{padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
 </div>
 </>):caKeepDiscard===1?(<>

@@ -646,7 +646,7 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 <span style={{display:"inline-block",marginLeft:4,padding:"2px 8px",borderRadius:6,fontSize:11,fontWeight:700,color:"#fff",background:VENUE_TYPE_BADGE_COLORS[loc.venue_type]||"#3498db"}}>{locVenueLabel(loc.venue_type||"outdoor")}</span>
 </div>
 <button onClick={()=>openLocEdit(loc)} style={{width:32,height:32,border:"none",borderRadius:6,background:"rgba(43,125,233,0.1)",color:"var(--accent-blue)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Pencil size={14}/></button>
-<button onClick={()=>setDelConfirm(loc)} style={{width:32,height:32,border:"none",borderRadius:6,background:"rgba(231,76,60,0.1)",color:"var(--text-danger)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Trash2 size={14}/></button>
+<button onClick={()=>setDelConfirm(loc)} style={{width:32,height:32,border:"none",borderRadius:6,background:"color-mix(in srgb, var(--danger) 10%, transparent)",color:"var(--text-danger)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><Trash2 size={14}/></button>
 </div>))}
 </div>))}
 {locErr&&<div style={{color:"var(--text-danger)",fontSize:13,fontWeight:600,marginTop:8}}>{locErr}</div>}
