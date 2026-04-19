@@ -34,7 +34,7 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 {available.length===0&&<div style={{padding:12,textAlign:"center",color:"var(--text-muted)",fontSize:16}}>{favs.length===0?"登録なし":"全員配置済み"}</div>}
 <div style={{maxHeight:300,overflow:"auto",WebkitOverflowScrolling:"touch"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid var(--neutral-100)",background:delTarget===f?"#fde8e8":"transparent",fontSize:18,fontWeight:600,color:"var(--text-primary)",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<div style={{display:"flex",gap:4}} onClick={e=>e.stopPropagation()}>
 <span onClick={()=>{setEditTarget(f);setEditName(f);setDelTarget(null);}} style={{padding:"5px 10px",background:"var(--accent-blue)",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>編集</span>
-<span onClick={()=>{setDelConf(f);}} style={{padding:"5px 10px",background:"#e74c3c",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>削除</span>
+<span onClick={()=>{setDelConf(f);}} style={{padding:"5px 10px",background:"var(--danger)",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>削除</span>
 </div>}</button></div>))}</div>
 <div style={{borderTop:"1px solid var(--neutral-100)",paddingTop:10,marginTop:4,flexShrink:0}}><div style={{display:"flex",gap:6}}>
 <input value={newN} onChange={e=>setNewN(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder={"新規("+MAX_NAME+"文字)"} style={{flex:1,padding:"10px 12px",border:"1px solid var(--neutral-200)",borderRadius:8,fontSize:16,outline:"none"}}/>
@@ -292,7 +292,7 @@ return(<div key={gc.key} style={{marginBottom:10}}>
 </div></div>);})}
 {maxMembers&&(selected.size+(currentCount||0)-deselected.size)>maxMembers&&<div style={{padding:"8px 12px",background:"#fff3e0",borderRadius:8,marginTop:6,fontSize:13,fontWeight:700,color:"#e65100"}}>上限を超えています（最大{maxMembers}人）</div>}
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",borderTop:"1px solid #eee",paddingTop:12,marginTop:10}}>
-<div style={{fontSize:14,fontWeight:700,color:"#1a1a2e"}}>選択中: <span style={{color:"#2b7de9"}}>{selected.size}人</span>{deselected.size>0&&<span style={{color:"#e74c3c",marginLeft:8}}>解除: {deselected.size}人</span>}</div>
+<div style={{fontSize:14,fontWeight:700,color:"#1a1a2e"}}>選択中: <span style={{color:"#2b7de9"}}>{selected.size}人</span>{deselected.size>0&&<span style={{color:"var(--danger)",marginLeft:8}}>解除: {deselected.size}人</span>}</div>
 <button onClick={()=>{const toAdd=[...selected];const toRemove=[...deselected];onAdd({toAdd,toRemove});onClose();}} disabled={maxMembers&&(selected.size+(currentCount||0)-deselected.size)>maxMembers} style={{padding:"10px 24px",border:"none",borderRadius:10,background:(selected.size>0||deselected.size>0)&&!(maxMembers&&(selected.size+(currentCount||0)-deselected.size)>maxMembers)?"#2b7de9":"#ccc",color:"#fff",fontSize:15,fontWeight:800,cursor:(selected.size>0||deselected.size>0)?"pointer":"default",opacity:maxMembers&&(selected.size+(currentCount||0)-deselected.size)>maxMembers?0.3:1}}>追加する</button>
 </div></div></div>);
 }

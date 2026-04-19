@@ -81,9 +81,9 @@ body {
 
 @keyframes mk-reset-blink {
   0%, 100% { color: inherit; }
-  25% { color: #e74c3c; }
+  25% { color: var(--danger); }
   50% { color: inherit; }
-  75% { color: #e74c3c; }
+  75% { color: var(--danger); }
 }
 
 @keyframes mk-confetti {
