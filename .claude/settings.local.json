@@ -21,7 +21,9 @@
       "Bash(git branch:*)",
       "Bash(git commit -m 'docs\\(step4\\): 第2弾B 事前確認レポートとC1データ収集結果を追加:*)",
       "Bash(git check-ignore:*)",
-      "Bash(echo \"\\(終了コード: $?\\)\")"
+      "Bash(echo \"\\(終了コード: $?\\)\")",
+      "Bash(gh --version)",
+      "Bash(gh pr create --base main --head feature/step4-phase2b --title '第2弾B-α: DESIGN.md セマンティックカラー整理 + --danger 追加' --body ':*)"
     ]
   },
   "hooks": {
