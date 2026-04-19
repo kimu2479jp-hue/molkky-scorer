@@ -83,6 +83,11 @@
   - 対処: ブランチ作成・切り替え直前に `git status` で本ファイルの状態を確認し、modified ならセッション中の承認分を main に独立コミットとして保存してから切り替える
   - 前例: `ab1968b`（第2弾B-α 冒頭）、`4c22dd0`（第2弾B-α 後クリーンアップ時）
 
+- **Squash merge 後の feature ブランチ削除は `-D` が必須**
+  - 症状: GitHub 上で Squash merge した feature ブランチをローカルで `git branch -d` しようとすると「not fully merged」で拒否される
+  - 原因: Squash merge は feature ブランチのコミット群を1つに圧縮して main に積むため、元コミットのハッシュは main に存在しない。git は「このブランチのコミットが main に含まれていない = 未マージ」と判定する
+  - 対処: PR マージ記録で実内容の取り込みが確定している場合のみ、`git diff origin/main..<branch>` で差分ゼロを確認した上で `git branch -D <branch>` で強制削除する
+
 ---
 
 ## Supabase
