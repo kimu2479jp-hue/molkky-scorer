@@ -31,7 +31,10 @@
       "Bash(cp -r dist/assets /tmp/css-check/dist-before)",
       "Bash(cp -r dist/assets /tmp/css-check/dist-after)",
       "Read(//tmp/css-check/**)",
-      "Bash(gh pr create --title 'refactor: Semantic → Primitive var\\(\\) 参照化（DESIGN.md §2.11.4 解消）' --body ':*)"
+      "Bash(gh pr create --title 'refactor: Semantic → Primitive var\\(\\) 参照化（DESIGN.md §2.11.4 解消）' --body ':*)",
+      "Bash(git update-index *)",
+      "Bash(git hash-object *)",
+      "Bash(grep -E '\\\\.env\\($|\\\\.local|\\\\.production\\)')"
     ]
   },
   "hooks": {
