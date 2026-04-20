@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { WindSensorManager } from "../windSensor.js";
+import { WindSensorManager, getWindRampColor } from "../windSensor.js";
 
 /* Phase 3 実装。航海計器風ダークテーマの風速モニターモーダル。
  * 1Hz で WebSocket から風データを受信し、コンパスローズ・風速数値・
@@ -382,7 +382,9 @@ export function WindMonitorModal({ isOpen, onClose, piAddress, windDebugEnabled,
             fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
             fontSize: isTablet ? 72 : 56,
             fontWeight: 700,
-            color: connected && currentData && typeof currentData.wind_speed === "number" ? "#f0fdf4" : "#6b7280",
+            color: (connected && currentData && typeof currentData.wind_speed === "number")
+              ? (getWindRampColor(currentData.wind_speed) || "#6b7280")
+              : "#6b7280",
             letterSpacing: -2,
             lineHeight: 1,
           }}>

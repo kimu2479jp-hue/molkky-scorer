@@ -54,6 +54,13 @@
   --wind-dir-side: #60a5fa;   /* 右・左（90° / 270°） */
   --wind-dir-far:  #818cf8;   /* 向右・向左（135° / 225°） */
   --wind-dir-head: #c084fc;   /* 向（180°） */
+
+  /* Wind Sensor Colors（風速カテゴリ、DESIGN.md §2.5 正典定義、閾値は windSensor.js getWindRampColor と共通） */
+  --wind-calm:       #34d399;  /* 0.0〜2.0 m/s、穏やか、接続成功ドット兼用 */
+  --wind-calm-light: #6ee7b7;  /* CALM の薄色派生、グラデ用 */
+  --wind-moderate:   #fbbf24;  /* 2.0〜4.0 m/s、軽〜中の風 */
+  --wind-strong:     #f97316;  /* 4.0〜6.0 m/s、明確な補正必要 */
+  --wind-severe:     #ef4444;  /* 6.0 m/s〜、戦略大幅変更レベル */
 }
 
 html, body, #root {

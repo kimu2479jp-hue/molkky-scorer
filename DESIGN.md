@@ -1729,7 +1729,7 @@ GameScreen ヘッダーに常時表示される pill 型風速ウィジェット
   - `letter-spacing: -2px`（詰め）
   - `line-height: 1`
   - 色（状態分岐）:
-    - 接続中かつ `currentData.wind_speed` が number: `#f0fdf4`（緑がかった極薄白）
+    - 接続中かつ `currentData.wind_speed` が number: Wind Ramp 色（風速値に応じて CALM `#34d399` / MODERATE `#fbbf24` / STRONG `#f97316` / SEVERE `#ef4444` の 4 色、閾値は §2.5 Wind Sensor Colors と共通）
     - それ以外（未接続 / 数値未受信）: `#6b7280`
   - 表示値: `wind_speed.toFixed(1)`、数値未受信時は `"---"`
 - **単位 `m/s`**:
@@ -1738,7 +1738,7 @@ GameScreen ヘッダーに常時表示される pill 型風速ウィジェット
   - 色: `#6b7280`（常時、状態に関わらず固定）
   - 数値との間隔: `marginLeft: 6px`
 
-**※ 風速カテゴリ（Wind Ramp）に応じた数値の色変化は実装されていない**。数値色は接続状態のみで分岐する。
+**実装メモ**: Wind Ramp 色分岐は `src/windSensor.js` の `getWindRampColor(windSpeed)` に集約（第2弾C C-f、2026-04-21）。閾値は §2.5 Wind Sensor Colors と共通（`<` 未満方式、境界値は上位カテゴリに属する）。GameScreen Wind Vector Widget（§9.2.5）でも同関数を流用する前提（C-e で実装予定）。単位 `m/s` の色（`#6b7280` 固定）は状態に関わらず Wind Ramp 連動対象外。
 
 #### 9.3.5 主役エリア — 風向コンパス
 

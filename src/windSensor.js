@@ -430,4 +430,34 @@ export function isWindDisplayReady(currentWind) {
   return true;
 }
 
+/**
+ * 風速カテゴリに応じた Wind Ramp 色を返す
+ * @param {number|null|undefined} windSpeed - 風速 (m/s)
+ * @returns {string|null} Wind Ramp の hex 色。windSpeed が number でない、
+ *                        または NaN/Infinity の場合は null を返す（呼び出し側で
+ *                        グレー等のフォールバックを適用する想定）。
+ *
+ * 閾値（DESIGN.md §2.5 Wind Sensor Colors と共通、単一の真実源）:
+ *   speed <  2.0 → CALM      (#34d399 = --wind-calm)
+ *   speed <  4.0 → MODERATE  (#fbbf24 = --wind-moderate)
+ *   speed <  6.0 → STRONG    (#f97316 = --wind-strong)
+ *   speed >= 6.0 → SEVERE    (#ef4444 = --wind-severe)
+ *
+ * 境界値（ちょうど 2.0 / 4.0 / 6.0）は上位カテゴリに属する（< 未満方式）。
+ *
+ * SVG fill 属性での var() 解決はブラウザ実装依存で不安定なため、
+ * 本関数は hex 直書きを返す。--wind-* トークン定義は styles.css 側で
+ * 管理され、将来の色変更時は両方を同時更新する運用（C-a と同方針）。
+ *
+ * WindMonitor Hero 数値（§9.3.4）および GameScreen Wind Vector Widget
+ * （§9.2.5、C-e で実装予定）の両方から呼ばれる。
+ */
+export function getWindRampColor(windSpeed) {
+  if (typeof windSpeed !== "number" || !isFinite(windSpeed)) return null;
+  if (windSpeed < 2.0) return "#34d399";
+  if (windSpeed < 4.0) return "#fbbf24";
+  if (windSpeed < 6.0) return "#f97316";
+  return "#ef4444";
+}
+
 export default WindSensorManager;
