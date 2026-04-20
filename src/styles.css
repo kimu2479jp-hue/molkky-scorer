@@ -36,9 +36,9 @@
   --warning: var(--accent-yellow);
   --warning-dark: var(--accent-orange);
   --warning-bg: #fff3e0;
-  --radius-sm: 6px;
-  --radius-lg: 14px;
-  --radius-xl: 18px;
+  --radius-sm: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --shadow-md: 0 2px 8px rgba(0,0,0,0.18);
   --shadow-lg: 0 10px 36px rgba(0,0,0,0.25);
   --transition-fast: 0.15s ease;
