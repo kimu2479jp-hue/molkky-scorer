@@ -934,7 +934,7 @@ Stats画面で採用されるフル展開セットを、他画面も参照可能
   background: 'var(--blue-500)',
   color: 'var(--neutral-0)',
   padding: 'var(--space-3) var(--space-6)',
-  borderRadius: 'var(--radius-md)',
+  borderRadius: 'var(--radius-sm)',
   fontSize: 'var(--text-md)',
   fontWeight: 'var(--weight-bold)',
   boxShadow: 'var(--shadow-sm)',
@@ -2283,7 +2283,7 @@ SetupScreen と完全共通:
 
 #### 9.6.4 タブ切替（ページ最上部）
 
-- 背景: `--neutral-900` + `--radius-md`
+- 背景: `--neutral-900` + `--radius-sm`
 - 2カラム（メンバー / 同期済）
 - アクティブ: `--blue-500` 薄背景 + 白文字 + 左端 3px プレイヤー色帯
 - 非アクティブ: 白70%文字
