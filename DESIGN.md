@@ -1628,46 +1628,219 @@ GameScreen ヘッダーに常時表示される pill 型風速ウィジェット
 
 ### 9.3 WindMonitor
 
+**本節の位置づけ（2026-04-20 時点）**: 本節は改良中の WindMonitor 画面を対象としており、正典化の強度は §9.2/§9.4 より弱い。記述している値は現行 production 実装（`src/components/WindMonitorModal.jsx`）を追認したものに留まり、実装が前進した際は本節の追従書き換えを前提とする。§9.1 の「実装優先」原則は本節にも適用される。
+
 #### 9.3.1 質感アイデンティティ
 
 **Apple Watch Ultra Industrial 美学**。Apple Watch Ultra の Wayfinder 文字盤（コンパス）と Modular Ultra 文字盤（数値・統計）を参照基準とする、暗闇に浮かぶ計器盤としての風速モニター画面。
 
-#### 9.3.2 主役（ダブル主役の例外）
+**モルック固有の主題**: コンパスは絶対風向（N/NE/E/SE/...）ではなく、**スキットル方向を基準とした相対風向（追・追右・右・向右・向・向左・左・追左）** を表示する。プレイヤーの投擲方向に対して風がどちらから吹いているかを一目で読み取れることが、この画面の戦略的価値の中核である。
+
+#### 9.3.2 画面構成と情報階層
+
+**画面上から下への構成（固定順）**:
+
+1. ヘッダーバー（sticky、接続状態インジケータ + 閉じるボタン）
+2. タイトルセクション（「風速モニター」＋「スキットル方向 = 〜」サブタイトル）
+3. 風速メイン数値（中央大型）
+4. コンパスローズ（中央）
+5. 統計カード 3列（最大・平均・バッテリー、§9.3.6 参照）
+6. 風速推移グラフ（直近5分）
+7. フッター（「1秒ごとに自動更新」）
+
+##### 情報階層（ダブル主役）
 
 **ダブル主役**:
 1. 現在風速の Hero 数値
 2. 風向コンパス
 
-この2つは垂直方向に均等分割され、どちらかが主役でどちらかが脇役、という関係ではない。「計器盤」として両立する。
+この 2 つは「計器盤」として両立する。垂直方向に並ぶが、サイズは風速数値よりコンパスの方が大きい（均等分割ではない）。
+
+##### ヘッダーバー仕様
+
+- 配置: `position: sticky; top: 0; zIndex: 2`
+- 背景: `#111827`、下ボーダー `1px solid #1e293b`
+- パディング: `12px 16px`
+- 左側: 閉じるボタン「← 閉じる」
+  - `padding: 8px 16px`、`border: 1px solid rgba(255,255,255,0.2)`、`borderRadius: 10px`
+  - `background: transparent`、文字色 `#94a3b8`、`fontSize: 15px`、`fontWeight: 700`、`minHeight: 36px`
+- 右側: 接続状態インジケータ（ドット + ラベル、ギャップ `8px`）
+  - ドット: `10×10px`、`borderRadius: 5px`
+    - 接続時: 背景 `#34d399`、`box-shadow: 0 0 8px rgba(52,211,153,0.6)`、静的
+    - 切断時: 背景 `#ef4444`、`box-shadow: 0 0 8px rgba(239,68,68,0.5)`、`animation: wind-monitor-blink 3s ease-in-out infinite`（§9.3.8 参照）
+  - ラベル: `fontSize: 13px`、`fontWeight: 700`、`letterSpacing: 0.5`
+    - 接続時: 文字「接続中」、色 `#34d399`
+    - 切断時: 文字「切断中」、色 `#ef4444`
+
+##### タイトルセクション仕様
+
+- 配置: ヘッダー直下、`marginTop: 16px`、`padding: 0 16px`、`textAlign: center`
+- タイトル「風速モニター」: `fontSize: 20px`、`fontWeight: 700`、色 `#e2e8f0`、`letterSpacing: 0.5`
+- サブタイトル「スキットル方向 = 〜」: `fontSize: 13px`、`fontWeight: 600`、`marginTop: 4px`
+  - 色とテキストは状態連動:
+    - 相対風向計算成功: その方位の色（§9.3.5 DIRECTION_ITEMS 参照）、テキスト「スキットル方向 = 追」等
+    - 未接続 / 方向未設定 / 相対風向計算不可: `#6b7280`、テキスト「スキットル方向 = ---」または「スキットル方向 = 未設定」
+    - コンパス異常: `#eab308`、テキスト「スキットル方向 = コンパス異常」
+
+##### フッター仕様
+
+- 配置: グラフ直下、`textAlign: center`、`marginTop: 16px`、`paddingBottom: 24px`
+- テキスト「1秒ごとに自動更新」: `fontSize: 12px`、色 `#475569`
 
 #### 9.3.3 背景と全体配色
 
-- 画面背景: `--wind-bg-base`（`--neutral-950` 相当）
-- 統計カード背景: `--wind-bg-card`（`--neutral-900` 相当）
-- 主グリッド: `--wind-grid-major`（rgba(255,255,255,0.18)）
-- 副グリッド: `--wind-grid-minor`（rgba(255,255,255,0.08)）
-- 主要テキスト: `--wind-text-primary`（白）
-- 補助テキスト: `--wind-text-label`（白60%）
+**実装方針**: 現行実装は §2.6 Wind Monitor 追加トークン（`--wind-bg-base` / `--wind-bg-card` / `--wind-grid-major` 等）を一切使用せず、独立 hex パレットを直書きで構築している。本節はこの現行実装を追認する。
+
+**配色パレット（実装現状値）**:
+
+| 要素 | 値 | 用途 |
+|---|---|---|
+| ページ背景 | `#0a0f1a` | 全画面最下層 |
+| ヘッダー・カード背景 | `#111827` | ヘッダーバー、統計カード（§9.3.6） |
+| ボーダー・グリッド・tick | `#1e293b` | ヘッダー下ボーダー、コンパス外周リング、方位 tick、グラフ Y軸グリッド |
+| 主要テキスト | `#e2e8f0` | タイトル「風速モニター」 |
+| 補助テキスト（グレー濃） | `#6b7280` | 単位 `m/s`、統計カードラベル、未接続時の数値・テキスト |
+| 軸ラベル・フッター（グレー淡） | `#475569` | グラフ X/Y 軸ラベル、フォールバックテキスト、フッター |
+| 閉じるボタン文字 | `#94a3b8` | ヘッダー左「← 閉じる」 |
+| 風速数値（接続時） | `#f0fdf4` | 風速メイン数値 |
+
+##### §2.6 Wind Monitor 追加トークンの扱い
+
+§2.6 に定義された `--wind-bg-base` / `--wind-bg-card` / `--wind-grid-major` / `--wind-grid-minor` / `--wind-text-primary` / `--wind-text-label` の 6 トークンは、現時点で実コードに**一切適用されていない**。実装は本節の独立 hex パレットを直書きで使用しており、§2.6 側の「`--neutral-950` 相当」「`--neutral-900` 相当」等の近似マッピング自体が現実と乖離している。
+
+本節は §9.1「実装優先」原則に従い、実装側の独立 hex パレットを第一正典として追認する。§2.6 のトークン定義は**現状の §2.10 系エイリアス統合作業と同等の扱いで、未使用トークンとして積み残し**とする。§2.6 → 実装トークン化の統合は本節のスコープ外とし、以下のいずれかの形で別タスク化する:
+
+- **案1（§2.6 を実装値に寄せる）**: §2.6 のトークン値を実装の独立 hex（`#0a0f1a` / `#111827` / `#1e293b` 等）に書き換え、実装側を `var()` 参照に変換
+- **案2（§2.6 を削除）**: §2.6 を廃止し、本節の実装値が唯一の WindMonitor 色定義となる
+- **案3（WindMonitor 改良時に再設計）**: WindMonitor 改良フェーズで配色自体を見直し、その時点で §2.6 との整合を再確定
+
+現時点でどの案を採るかは未確定。§9.3 冒頭注記の「改良中」ステータスに従い、WindMonitor 改良の進捗とあわせて判断する。
 
 #### 9.3.4 主役エリア — 風速数値
 
-- 数値: `--text-6xl`（72px）/ `--font-instrument` / `--weight-black`
-- 単位 `m/s`: `--text-xl` / `--font-instrument` / `--weight-medium` / 白60%
-- **Wind Ramp ゲージバー**: 数値下に水平バー、現在風速位置に縦線マーカー
-  - バー: CALM→MODERATE→STRONG→SEVERE のグラデーション
-  - 現在位置マーカー: 白線 2px + 微グロウ
-- **パルス**: 3秒周期、`scale(1.0→1.015→1.0)` + 数値の `text-shadow` 微拡張
+- 配置: タイトルセクション直下、`marginTop: 12px`、`textAlign: center`
+- **数値**:
+  - フォントサイズ: タブレット（`window.innerWidth >= 768`）で `72px`、モバイルで `56px`
+  - フォントファミリ: `ui-monospace, 'SF Mono', Menlo, monospace`（= `--font-mono`、等幅）
+  - フォントウェイト: `700`（`--weight-bold`）
+  - `letter-spacing: -2px`（詰め）
+  - `line-height: 1`
+  - 色（状態分岐）:
+    - 接続中かつ `currentData.wind_speed` が number: `#f0fdf4`（緑がかった極薄白）
+    - それ以外（未接続 / 数値未受信）: `#6b7280`
+  - 表示値: `wind_speed.toFixed(1)`、数値未受信時は `"---"`
+- **単位 `m/s`**:
+  - `fontSize: 18px`
+  - `fontWeight: 600`（`--weight-semibold`）
+  - 色: `#6b7280`（常時、状態に関わらず固定）
+  - 数値との間隔: `marginLeft: 6px`
+
+**※ 風速カテゴリ（Wind Ramp）に応じた数値の色変化は実装されていない**。数値色は接続状態のみで分岐する。
 
 #### 9.3.5 主役エリア — 風向コンパス
 
-**構成**: 2層同心円 + 8方位ラベル + 中央 Hero 矢印
+##### 構成（1層外周リング + 8方位 + 中央矢印 + 中央状態テキスト）
 
-- 外側円: 8方位（N/NE/E/SE/S/SW/W/NW）ラベル、`--wind-text-label`、`--font-instrument`
-- 内側円: 主グリッドライン 8分割
-- 中央矢印: 現在風向を示す大型矢印
-  - 塗り: Wind Ramp 色（風速カテゴリに応じて変化）
-  - サイズ: コンパス半径の 70%
-  - **アニメ**: 風向変化時に 0.5秒で新方向へ回転（`cubic-bezier(0.4, 0, 0.2, 1)`）
+- 配置: 風速数値直下、`display: flex; justify-content: center`、`marginTop: 16px`
+- SVG サイズ（`compassSize`）: タブレットで `280px`、モバイルで `220px`
+- SVG `viewBox="0 0 {compassSize} {compassSize}"`
+
+##### 座標系
+
+| 変数 | 式 | 用途 |
+|---|---|---|
+| `cx`, `cy` | `compassSize / 2` | 中心 |
+| `outerR` | `compassSize * 0.42` | 外周リング半径 |
+| `arrowR` | `compassSize * 0.35` | 矢印の中心から先端までの距離 |
+| `labelR` | `compassSize * 0.47` | 8方位ラベル配置半径（外周リングの外側） |
+
+##### 外周リングと tick
+
+- 外周リング: 円、`stroke="#1e293b"`、`stroke-width: 2`、`fill: none`
+- 8方位 tick: 8本の短い放射線（`outerR - 6` から `outerR` まで）、`stroke="#1e293b"`、`stroke-width: 1.5`
+
+##### 8方位ラベル（DIRECTION_ITEMS）
+
+**意味論**: スキットル方向を 0°（=「追」、追い風）として、時計回りに 45° 刻みで 8 方位。プレイヤーが「どちらに投げるか」を基準にした相対表示で、絶対風向（磁北）ではない。
+
+| index | angle | label | color |
+|---|---|---|---|
+| 0 | 0° | 追 | `#34d399` |
+| 1 | 45° | 追右 | `#6ee7b7` |
+| 2 | 90° | 右 | `#fbbf24` |
+| 3 | 135° | 向右 | `#f97316` |
+| 4 | 180° | 向 | `#ef4444` |
+| 5 | 225° | 向左 | `#f97316` |
+| 6 | 270° | 左 | `#fbbf24` |
+| 7 | 315° | 追左 | `#6ee7b7` |
+
+**配色設計の意図**: 中心の「追」（追い風 = 戦略影響軽微）を緑、反対側の「向」（向かい風 = 戦略影響大）を赤として、左右対称に温度勾配を付ける。これにより、プレイヤーがコンパスを一瞥するだけで「スキットル方向に対する風の幾何学的な戦略影響度」を読み取れる。
+
+**§10.2 禁止事項との抵触（改良候補として記録）**: DIRECTION_ITEMS の 5 色（`#34d399` / `#6ee7b7` / `#fbbf24` / `#f97316` / `#ef4444`）は §2.5 Wind Sensor Colors の CALM/MODERATE/STRONG/SEVERE トークン値と**完全同一**である。§10.2「Wind Ramp 色をスコアヒートマップに流用禁止」の原則（意味論が異なる色の共通化禁止）に照らすと、**Wind Ramp 色（風速強度の意味）を方位識別（幾何学的配置の意味）に流用している状態**であり、抵触している。
+
+実用上のリスク: 中央矢印が赤く塗られたとき、ユーザーは「風速 6 m/s 以上（SEVERE）」と「向かい風（180°）」を視覚的に区別できない。現状実装では矢印塗り色は常に方位色のため、風速カテゴリは数値表示でしか判別できない。
+
+本節は §9.1「実装優先」および §9.3 冒頭「改良中」注記に従い、現状の配色を暫定的に追認する。**WindMonitor 改良フェーズで方位識別用の独立パレット（Wind Ramp と被らない色体系）への移行を検討する**。
+
+**ラベル描画**:
+- 通常: `fontSize: 12px`、`fontWeight: 600`、`textAnchor: middle`、`dominantBaseline: middle`、色は各方位の color
+- 強調（現在の相対風向位置）: `fontSize: 14px`、`fontWeight: 800`（色は同じ）
+- フォント family 指定なし（デフォルト sans を使用）
+
+##### 中央矢印
+
+**表示条件**（全て真のとき描画）:
+- `connected === true`
+- `relativeWind !== null`（計算成功）
+- `currentData.wind_speed` が number かつ `> 0`
+
+**塗り色**: 相対風向の方位色（= `relativeWind.color`）。§2.5 Wind Sensor Colors の風速カテゴリ連動ではなく、方位に連動する。
+
+**形状**（`compassSize` 基準のスケール）:
+- `headW = compassSize * 0.055`（矢じり幅の半分）
+- `headH = compassSize * 0.07`（矢じりの高さ）
+- `shaftW = compassSize * 0.012`（シャフト幅の半分）
+- path: 真上（12時方向、角度 0°）向きで定義し、`transform: rotate({relativeWind.angle}deg)` で回転
+
+**アニメーション**: `transition: transform 0.3s ease`（§9.3.8 参照）
+
+##### 相対風向計算ロジック（`calcRelativeWind`）
+
+**入力**: `currentData` オブジェクト
+- `compass_valid`（真偽）
+- `throw_direction`（number、スキットル方向の絶対角度）
+- `wind_direction`（number、センサーローカル座標での風向き）
+- `compass_heading`（number、センサーの地理方位）
+
+**前提条件**（いずれか 1 つでも満たさなければ `null` を返す）:
+- `compass_valid === true`
+- `throw_direction != null`
+- `wind_direction` が number
+- `compass_heading` が number
+
+**計算式**:
+```
+absoluteWindFrom   = (wind_direction + compass_heading) mod 360
+windFlowDirection  = (absoluteWindFrom + 180) mod 360
+relativeAngle      = (windFlowDirection - throw_direction) mod 360
+index              = Math.round(relativeAngle / 45) mod 8
+```
+
+**出力**: `{ label, color, angle, index, absoluteWindFrom }`（`label` と `color` は `DIRECTION_ITEMS[index]` から）
+
+##### 中央状態テキスト
+
+コンパス中心に常時表示される 1 行のテキスト。矢印の描画可否と独立に、状態を必ず文字で示す。
+
+| 状態 | テキスト | 色 |
+|---|---|---|
+| 未接続 | 「切断中」 | `#6b7280` |
+| 接続済みだが `compass_valid === false` | 「⚠ コンパス異常」 | `#eab308` |
+| 接続済みだが `throw_direction == null` | 「基準方向未設定」 | `#6b7280` |
+| 接続済みかつ相対風向計算成功 | `relativeWind.label`（追/追右/等） | `relativeWind.color` |
+| 上記のいずれでもない | 「---」 | `#6b7280` |
+
+- スタイル: `fontSize: 24px`、`fontWeight: 700`、`textAnchor: middle`、`dominantBaseline: middle`
 
 #### 9.3.6 統計カード（フラット3列）
 
@@ -1692,27 +1865,103 @@ GameScreen ヘッダーに常時表示される pill 型風速ウィジェット
 
 #### 9.3.7 時系列グラフ
 
-過去数分〜数十分の風速推移をライングラフで表示。
+##### ウィンドウとサンプリング
 
-- 背景: `--wind-bg-card`、`--radius-lg`
-- 主グリッド: 水平線 5〜6本、`--wind-grid-major`
-- 副グリッド: `--wind-grid-minor`
-- ライン: 白、太さ 2px
-- 現在値マーカー: 右端にドット（Wind Ramp 色）+ **パルス** 2秒周期
-- Y軸ラベル: `--font-instrument` / 白60%
+- **時間ウィンドウ**: 直近 5 分固定（`WINDOW_MS = 5 * 60 * 1000`）
+- **サンプリング**: 履歴（1Hz で蓄積、最大 300 件 = 5分）から **3秒間隔で間引き**（`for (let i = 0; i < history.length; i += 3)`）、末尾の最新サンプルは必ず含める
+- タイムスタンプが有効でないサンプルは描画対象から除外
 
-#### 9.3.8 マイクロアニメーション 3種
+##### SVG 基本
+
+- 配置: 統計カード直下、`padding: 0 16px`、`marginTop: 20px`
+- SVG: `width="100%"`、`height={chartH}`、`viewBox="0 0 600 {chartH}"`、`preserveAspectRatio="none"`（横方向のみ自動スケール）
+- `chartH`: タブレット `140px`、モバイル `120px`
+- **カード背景なし**。ページ背景 `#0a0f1a` に直接描画する（§9.3.3 参照）
+
+##### マージン
+
+| 方向 | 値 |
+|---|---|
+| 左 `marginL` | タブレット `36px`、モバイル `32px` |
+| 右 `marginR` | `12px` |
+| 上 `marginT` | `12px` |
+| 下 `marginB` | `24px` |
+
+##### Y軸
+
+- スケール: `yMax = max(3.0, maxObservedSpeed * 1.2)`（最小 3.0 m/s、観測最大値に応じて上方拡張）
+- グリッド: 水平線 3本（上端 = `yMax`、中央 = `yMax/2`、下端 = `0`）、`stroke="#1e293b"`、`stroke-dasharray="2 4"`
+- ラベル: 2点のみ
+  - 最大値: 左端、`fill="#475569"`、`fontSize: 10px`、`textAnchor: end`、`dominantBaseline: hanging`、表示は `yMax.toFixed(1)`
+  - 0: 左端、同上で `dominantBaseline: baseline`
+
+##### 折れ線と塗り
+
+- データ点数 2 以上のとき描画
+- ライン: `stroke="#34d399"`、`stroke-width: 2`、`stroke-linecap: round`、`stroke-linejoin: round`、`fill: none`
+- 塗りつぶし: `<linearGradient id="windMonitorGrad" x1="0" y1="0" x2="0" y2="1">` で定義された緑グラデ
+  - `stop 0%`: `#34d399` opacity `0.25`
+  - `stop 100%`: `#34d399` opacity `0`
+- 両方 `<clipPath id="windMonitorClip">`（plot 領域に相当する矩形）で切り抜く
+
+##### 風向き色帯
+
+グラフ本体の直下、X軸ラベルとの間に配置する高さ 4px の帯。各サンプル時点の相対風向色（§9.3.5 DIRECTION_ITEMS の color）を連続して並べ、時間経過の中で風向きがどう変化してきたかを可視化する。
+
+- Y 位置: `chartH - marginB - 4`
+- 高さ: `4px`
+- 各セグメント: サンプル i から i+1 までの X 範囲を幅とし、サンプル i の `calcRelativeWind(sample).color` で塗る。相対風向が計算できないサンプルは `#334155` を使用
+- `<clipPath id="windMonitorBandClip">` で plot X 範囲に切り抜く
+
+##### X軸ラベル（固定 4 点）
+
+ウィンドウ内の相対時刻を日本語で表示。サンプル数に関わらず常に固定位置に描画。
+
+| 位置 | テキスト | textAnchor |
+|---|---|---|
+| `marginL`（左端） | 「5分前」 | `start` |
+| `marginL + plotW * 0.4` | 「3分前」 | `middle` |
+| `marginL + plotW * 0.8` | 「1分前」 | `middle` |
+| `marginL + plotW`（右端） | 「今」 | `end` |
+
+- 共通: `y = chartH - 6`、`fill="#475569"`、`fontSize: 10px`
+
+##### データ未取得時のフォールバック
+
+サンプル数が 2 未満の場合、グラフ中央に単一テキストを表示:
+
+| 状態 | テキスト |
+|---|---|
+| 接続中 | 「データ収集中...」 |
+| 未接続 | 「未接続」 |
+
+- 位置: plot 領域中央、`fill="#475569"`、`fontSize: 12px`、`textAnchor: middle`、`dominantBaseline: middle`
+
+**※ 現在値マーカー（右端のパルスするドット）は実装されていない**。
+
+#### 9.3.8 マイクロアニメーション 2種
 
 | 種類 | 対象 | タイミング |
 |---|---|---|
-| Hero 数値パルス | 主役風速数値 | 3秒周期、scale + text-shadow |
-| 矢印回転 | コンパス中央矢印 | 風向変化時 0.5秒、cubic-bezier |
-| 現在値マーカーパルス | 時系列グラフ右端ドット | 2秒周期 |
+| 矢印回転 | コンパス中央矢印 | 風向変化時、`transition: transform 0.3s ease` |
+| 切断時ドット blink | ヘッダー右の接続状態ドット（切断時のみ） | 3秒周期、`opacity 1 → 0.3 → 1` |
+
+**キーフレーム定義**:
+```css
+@keyframes wind-monitor-blink {
+  0%, 100% { opacity: 1 }
+  50% { opacity: 0.3 }
+}
+```
+
+**接続中のドットは静的**（`box-shadow` による微グロウのみ、アニメーションなし）。
+
+**実装配置メモ**: 現状 `@keyframes wind-monitor-blink` は `WindMonitorModal.jsx` 内でインライン `<style>` として定義されている。将来的に `styles.css` 側への移動と `<style>` タグ削除が設計的に望ましいが、本節のスコープ外として積み残し。
 
 #### 9.3.9 ✗ 使用禁止
 
 - ライト基調への切替（Industrial 美学が崩壊）
-- パルスの新規追加（§9.3.8 の3種以外、1画面1〜2箇所原則）
+- アニメーションの新規追加（§9.3.8 の2種以外、1画面1〜2箇所原則）
 - 装飾アイコン・イラストの追加（Whoop的ストイックさ崩壊）
 
 ---
@@ -2242,6 +2491,8 @@ SetupScreen と共通:
 風速は「悪化の度合い」、スコアは「戦略的重要度」。意味論が衝突するため色共通化は禁止。構造（階層の概念）だけを借りるのはOK。
 
 **該当章**: §2.5 / §9.4.9
+
+**暫定的な例外（WindMonitor DIRECTION_ITEMS）**: §9.3.5 風向コンパスの DIRECTION_ITEMS は §2.5 の 5 色と同一 hex を使用しており、本ルールに抵触している。WindMonitor が §9.3 冒頭注記の通り改良中のため、現時点では暫定的に容認する。改良フェーズで独立パレットに移行予定。詳細は §9.3.5 参照。
 
 ---
 
