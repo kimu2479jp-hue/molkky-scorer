@@ -45,6 +45,9 @@
   --transition-fast: 0.15s ease;
   --transition-normal: 0.2s ease;
   --transition-slow: 0.3s ease;
+  --font-sans: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-instrument: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
 }
 
 html, body, #root {
