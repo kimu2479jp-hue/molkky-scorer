@@ -47,6 +47,13 @@
   --font-sans: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', system-ui, sans-serif;
   --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
   --font-instrument: 'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+
+  /* Wind Direction Palette（WindMonitor DIRECTION_ITEMS 独立パレット、§2.5 Wind Sensor Colors と色相分離） */
+  --wind-dir-calm: #5eead4;   /* 追（0°） */
+  --wind-dir-near: #67e8f9;   /* 追右・追左（45° / 315°） */
+  --wind-dir-side: #60a5fa;   /* 右・左（90° / 270°） */
+  --wind-dir-far:  #818cf8;   /* 向右・向左（135° / 225°） */
+  --wind-dir-head: #c084fc;   /* 向（180°） */
 }
 
 html, body, #root {

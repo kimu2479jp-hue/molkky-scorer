@@ -7,14 +7,14 @@ import { WindSensorManager } from "../windSensor.js";
  */
 
 const DIRECTION_ITEMS = [
-  { angle:   0, text: "追",   color: "#34d399" },
-  { angle:  45, text: "追右", color: "#6ee7b7" },
-  { angle:  90, text: "右",   color: "#fbbf24" },
-  { angle: 135, text: "向右", color: "#f97316" },
-  { angle: 180, text: "向",   color: "#ef4444" },
-  { angle: 225, text: "向左", color: "#f97316" },
-  { angle: 270, text: "左",   color: "#fbbf24" },
-  { angle: 315, text: "追左", color: "#6ee7b7" },
+  { angle:   0, text: "追",   color: "#5eead4" },
+  { angle:  45, text: "追右", color: "#67e8f9" },
+  { angle:  90, text: "右",   color: "#60a5fa" },
+  { angle: 135, text: "向右", color: "#818cf8" },
+  { angle: 180, text: "向",   color: "#c084fc" },
+  { angle: 225, text: "向左", color: "#818cf8" },
+  { angle: 270, text: "左",   color: "#60a5fa" },
+  { angle: 315, text: "追左", color: "#67e8f9" },
 ];
 
 function calcRelativeWind(data) {
