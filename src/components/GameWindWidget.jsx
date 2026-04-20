@@ -46,7 +46,7 @@ export default function GameWindWidget({ currentWind }) {
       <span style={{
         fontSize: 13,
         fontWeight: 600,
-        fontFamily: "monospace",
+        fontFamily: "var(--font-instrument)",
         color: "#fff",
         lineHeight: 1,
       }}>
