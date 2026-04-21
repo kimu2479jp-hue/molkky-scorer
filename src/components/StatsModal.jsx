@@ -201,29 +201,6 @@ const TEAM_PLAYER_PALETTE=[
 ["#ef4444","#f87171","#fca5a5","#dc2626"],
 ];
 
-/* ═══ HSL utilities for player color generation ═══ */
-function hexToHsl(hex){
-const r=parseInt(hex.slice(1,3),16)/255,g=parseInt(hex.slice(3,5),16)/255,b=parseInt(hex.slice(5,7),16)/255;
-const max=Math.max(r,g,b),min=Math.min(r,g,b);
-let h=0,s=0,l=(max+min)/2;
-if(max!==min){const d=max-min;s=l>0.5?d/(2-max-min):d/(max+min);
-if(max===r)h=((g-b)/d+(g<b?6:0))/6;else if(max===g)h=((b-r)/d+2)/6;else h=((r-g)/d+4)/6;}
-return[h*360,s*100,l*100];
-}
-function hslToHex(h,s,l){
-s/=100;l/=100;const a=s*Math.min(l,1-l);
-const f=n=>{const k=(n+h/30)%12;const c=l-a*Math.max(Math.min(k-3,9-k,1),-1);return Math.round(255*c).toString(16).padStart(2,"0");};
-return"#"+f(0)+f(8)+f(4);
-}
-function generatePlayerColors(teamHex,count){
-if(count<=1)return[teamHex];
-const[h,s,l]=hexToHsl(teamHex);
-const offsets=[{dh:0,dl:0},{dh:30,dl:10},{dh:-25,dl:-8},{dh:55,dl:5}];
-const colors=[];
-for(let i=0;i<count;i++){const o=offsets[i%offsets.length];colors.push(hslToHex((h+o.dh+360)%360,Math.max(40,Math.min(100,s)),Math.max(30,Math.min(75,l+o.dl))));}
-return colors;
-}
-
 /* Convert Supabase row (snake_case) to IndexedDB format (camelCase) */
 function normalizeWindData(raw){
 if(!raw)return null;
