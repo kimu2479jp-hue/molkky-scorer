@@ -313,7 +313,7 @@ WindMonitor（Phase 3）のダーク Industrial 美学専用。
 | `--chart-7` | `#4a1f68` | アメジスト | γ（寒色深色） |
 | `--chart-8` | `#6b4b3e` | コーヒーブラウン | β（暖色） |
 
-**実装メモ**: 第2弾D D-tokens（2026-04-21、PR #88）で `src/styles.css` に CSS 変数を新規定義、D-apply（2026-04-21、PR #89）で `src/constants.js` の `PC` 配列を η パレット値に書き換え、D-cleanup（2026-04-21、PR #XX）で `src/components/StatsModal.jsx` 内のデッドコード 3 関数（`hexToHsl` / `hslToHex` / `generatePlayerColors`）の削除実施済み。第2弾D 全 3 PR 完了。
+**実装メモ**: 第2弾D D-tokens（2026-04-21、PR #88）で `src/styles.css` に CSS 変数を新規定義、D-apply（2026-04-21、PR #89）で `src/constants.js` の `PC` 配列を η パレット値に書き換え、D-cleanup（2026-04-21、PR #90）で `src/components/StatsModal.jsx` 内のデッドコード 3 関数（`hexToHsl` / `hslToHex` / `generatePlayerColors`）の削除実施済み。第2弾D 全 3 PR 完了。
 
 #### 2.8.2 Debug Colors
 
