@@ -1560,6 +1560,12 @@ GameScreen ヘッダーに常時表示される pill 型風速ウィジェット
 - 高さ 44px 維持、最小幅 72px
 - Wind Ramp 色変化は同様に適用
 
+**実装メモ**: Wind Ramp 色分岐は `src/windSensor.js` の `getWindRampColor(windSpeed)` に集約（第2弾C C-e、2026-04-21）。§9.3.4 WindMonitor Hero 数値と同一関数を流用し、`--wind-*` 5 トークン（`--wind-calm` / `--wind-calm-light` / `--wind-moderate` / `--wind-strong` / `--wind-severe`、§2.5 および styles.css で正典定義済み）を単一の真実源とする構造が完成した。閾値は §2.5 Wind Sensor Colors と共通（`<` 未満方式、境界値 2.0 / 4.0 / 6.0 は上位カテゴリに属する）。`getWindRampColor` が `null` を返した場合（NaN / Infinity 混入時のみ、通常運用では発生しない）は `#fff` へフォールバック。
+
+方向ラベル色は C-a 路線 B（DIRECTION パレット維持）から §9.2.5 正典の `rgba(255,255,255,0.6)` へ C-e で切替した。C-a 路線 B の当初根拠（矢印色と方向ラベル色を DIRECTION パレットで視覚的に統一し方位識別を優先する）は、C-e で矢印色が Wind Ramp 連動に移行したことにより失効した（矢印色が風速カテゴリで変化し方向ラベル色が方位で変化する状態では両者の色相関係が切断される）ため、正典追従へ回帰した形となる。
+
+単位 `m/s` 色と方向ラベル色は `--wind-text-label` トークン（§2.6 Wind Monitor 追加トークン）ではなく `rgba(255,255,255,0.6)` 直書きで実装している。§9.3.3 末尾で §2.6 の 6 トークン全体を「未使用のまま積み残し、WindMonitor 改良時に一括再設計」する方針が規定されているため、`--wind-text-label` のみを C-e で先行追加することは §2.6 全体方針との矛盾となる。C-d の単位 `m/s` 実装（hex 直書き）と整合する形で C-e も直書きを維持した。
+
 **✗ 使用禁止**:
 - GameScreen 以外への転用
 - 色を Team Color に連動させる

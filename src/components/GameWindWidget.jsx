@@ -1,5 +1,5 @@
 import React from "react";
-import { calcMolkkyWind, isWindDisplayReady } from "../windSensor.js";
+import { calcMolkkyWind, isWindDisplayReady, getWindRampColor } from "../windSensor.js";
 
 /**
  * GameScreen上のコンパクト風表示ウィジェット（pill 型）
@@ -24,17 +24,30 @@ import { calcMolkkyWind, isWindDisplayReady } from "../windSensor.js";
  *   isWindDisplayReady(currentWind) === true の場合のみレンダリング
  *   条件を満たさない場合は null を返す（何も表示しない）
  *
- * 色ロジック（C-d スコープでは現状維持、C-e で Wind Ramp 連動へ変更予定）:
- *   - 矢印色: calcMolkkyWind 戻り値の方位色（DIRECTION パレット、C-a 移行済み）
- *   - 風速数値色: #fff 固定
- *   - 単位 m/s 色: rgba(255,255,255,0.6) 固定（--wind-text-label 相当）
- *   - 方向ラベル色: calcMolkkyWind 戻り値の方位色（C-a 路線 B 維持）
+ * 色ロジック（DESIGN.md §9.2.5 正典の Wind Ramp 連動仕様、C-e で追従完了）:
+ *   - 矢印色: getWindRampColor(wind_speed) の戻り値（Wind Ramp 色、風速カテゴリ連動）
+ *   - 風速数値色: getWindRampColor(wind_speed) の戻り値（Wind Ramp 色、風速カテゴリ連動）
+ *     ※ getWindRampColor が null を返した場合（NaN / Infinity 混入時のみ）は "#fff" にフォールバック
+ *   - 単位 m/s 色: rgba(255,255,255,0.6) 固定（--wind-text-label 相当、直書き）
+ *   - 方向ラベル色: rgba(255,255,255,0.6) 固定（--wind-text-label 相当、直書き、§9.2.5 完全追従）
+ *     ※ C-a 路線 B（DIRECTION パレット）は C-e で撤回。矢印色が Wind Ramp 連動に移行したことで
+ *       「矢印と方向ラベルの視覚的統一」という路線 B の当初根拠が失効したため、正典追従へ回帰。
+ *
+ * 単一の真実源:
+ *   getWindRampColor は src/windSensor.js に集約され、WindMonitor Hero 数値（§9.3.4）と
+ *   GameScreen Wind Vector Widget（§9.2.5、本コンポーネント）の両方から流用される。
+ *   閾値は §2.5 Wind Sensor Colors と共通（< 未満方式、境界値は上位カテゴリに属する）。
  */
 export default function GameWindWidget({ currentWind }) {
   if (!isWindDisplayReady(currentWind)) return null;
 
   const { wind_speed, wind_direction, compass_heading, throw_direction } = currentWind;
-  const { label, color, degrees } = calcMolkkyWind(wind_direction, compass_heading, throw_direction);
+  const { label, degrees } = calcMolkkyWind(wind_direction, compass_heading, throw_direction);
+  // Wind Ramp 色（風速カテゴリ連動、§9.2.5 正典）。
+  // getWindRampColor は NaN / Infinity に対して null を返すため、
+  // isWindDisplayReady のガードを通過した wind_speed でも理論上 null 発生しうる。
+  // フォールバックは #fff（C-d 以前の風速数値色と同値、現状互換性維持）。
+  const rampColor = getWindRampColor(wind_speed) || "#fff";
 
   // iPhone 縦向き簡略版判定（GameScreen.jsx の isTablet 判定と同じ mount 時取得方式）
   const vw = typeof window !== "undefined" ? window.innerWidth : 768;
@@ -67,16 +80,16 @@ export default function GameWindWidget({ currentWind }) {
       >
         <path
           d="M10 2 L14 10 L11 10 L11 18 L9 18 L9 10 L6 10 Z"
-          fill={color}
+          fill={rampColor}
         />
       </svg>
 
-      {/* 風速数値（20px / instrument / semibold / 白固定） */}
+      {/* 風速数値（20px / instrument / semibold / Wind Ramp 色連動、§9.2.5 正典） */}
       <span style={{
         fontSize: 20,
         fontWeight: 600,
         fontFamily: "var(--font-instrument)",
-        color: "#fff",
+        color: rampColor,
         lineHeight: 1,
       }}>
         {wind_speed.toFixed(1)}
@@ -96,13 +109,13 @@ export default function GameWindWidget({ currentWind }) {
         </span>
       )}
 
-      {/* 方向ラベル（12px / sans / bold / 方位色）
+      {/* 方向ラベル（12px / sans / bold / --wind-text-label 相当の薄白、§9.2.5 正典）
           iPhone 簡略版では非表示 */}
       {!isCompact && (
         <span style={{
           fontSize: 12,
           fontWeight: 700,
-          color: color,
+          color: "rgba(255,255,255,0.6)",
           lineHeight: 1,
         }}>
           {label}
