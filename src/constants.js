@@ -13,7 +13,7 @@ export const C=[
 {bg:"#1a5c3a",lt:"#e6faf0",ac:"#22b566",tx:"#1a5c3a",nm:"#b8ffd8"},
 {bg:"#6b5a1d",lt:"#fbf5e6",ac:"#d9a83a",tx:"#6b5a1d",nm:"#ffe8a0"},
 ];
-export const PC=["#2b7de9","#d93a5e","#22b566","#d9a83a","#9b59b6","#e67e22","#1abc9c","#e74c3c"];
+export const PC=["#c8553d","#b08847","#7a8450","#a86e3e","#2b3a78","#1e5968","#4a1f68","#6b4b3e"];
 
 // ═══ UI Constants ═══
 export const H1=30;
