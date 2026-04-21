@@ -45,9 +45,9 @@ function polarToSvg(degree, r, cx, cy) {
 
 function batteryColor(pct) {
   if (pct == null) return "#6b7280";
-  if (pct < 20) return "#ef4444";
+  if (pct < 20) return "var(--wind-severe)";
   if (pct < 50) return "#eab308";
-  return "#34d399";
+  return "var(--wind-calm)";
 }
 
 function StatCard({ label, value, color, isTablet }) {
@@ -295,7 +295,6 @@ export function WindMonitorModal({ isOpen, onClose, piAddress, windDebugEnabled,
 
   return (
     <>
-      <style>{`@keyframes wind-monitor-blink{0%,100%{opacity:1}50%{opacity:0.3}}`}</style>
       <div style={{
         position: "fixed",
         inset: 0,
@@ -498,7 +497,7 @@ export function WindMonitorModal({ isOpen, onClose, piAddress, windDebugEnabled,
             isTablet={isTablet}
             label="平均"
             value={stats.avgSpeed != null ? stats.avgSpeed.toFixed(1) + " m/s" : "---"}
-            color={stats.avgSpeed != null ? "#34d399" : "#6b7280"}
+            color={stats.avgSpeed != null ? "var(--wind-calm)" : "#6b7280"}
           />
           <StatCard
             isTablet={isTablet}

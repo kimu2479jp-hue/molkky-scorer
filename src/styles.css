@@ -113,6 +113,11 @@ body {
   20%, 40%, 60%, 80% { transform: translateX(6px); }
 }
 
+@keyframes wind-monitor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 /* ═══ Stage 5: Screen Transitions ═══ */
 @keyframes mk-slide-in-left {
   from { transform: translateX(-100%); opacity: 0; }
