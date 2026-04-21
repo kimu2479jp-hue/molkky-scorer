@@ -296,7 +296,7 @@ WindMonitor（Phase 3）のダーク Industrial 美学専用。
 
 #### 2.8.1 Chart Colors
 
-グラフ・データ可視化の補助色。`src/styles.css` に `--chart-1` 〜 `--chart-8` として CSS 変数化され、`src/constants.js` の `PC` 配列がその値を担持する（PC 配列は第2弾D D-apply で η パレット値に書き換え予定）。
+グラフ・データ可視化の補助色。`src/styles.css` に `--chart-1` 〜 `--chart-8` として CSS 変数化され、`src/constants.js` の `PC` 配列がその値を担持する。
 
 **パレット構成（η hybrid palette、2026-04-21 確定）**: β アース 5 色（テラコッタ / ブロンズ / オリーブ / ラスト / コーヒーブラウン）を軸に背景 `--bg-surface-alt` (`#f0f3f8`) に馴染ませつつ、寒色 3 枠（サファイア / ターコイズダーク / アメジスト）を γ の深色で締めることで、暖寒で明度差のリズムを作り 6 プレイヤー重畳時の識別性を確保する。色相候補 5 案（α 工学的 D3 / β アース / γ ジュエル / δ パステル / ε 空き領域限定）と β / γ ハイブリッド 2 案（ζ γ 寄り / η β 寄り）の比較検証を経て η で確定。
 
@@ -313,7 +313,7 @@ WindMonitor（Phase 3）のダーク Industrial 美学専用。
 | `--chart-7` | `#4a1f68` | アメジスト | γ（寒色深色） |
 | `--chart-8` | `#6b4b3e` | コーヒーブラウン | β（暖色） |
 
-**実装メモ**: 第2弾D D-tokens（2026-04-21）で `src/styles.css` に CSS 変数を新規定義済み。`src/constants.js` の `PC` 配列への値反映は D-apply（別 PR、視覚変化あり）、`src/components/StatsModal.jsx` 内のデッドコード 3 関数（`hexToHsl` / `hslToHex` / `generatePlayerColors`）の削除は D-cleanup（別 PR、視覚変化ゼロ）で実施予定。
+**実装メモ**: 第2弾D D-tokens（2026-04-21、PR #88）で `src/styles.css` に CSS 変数を新規定義、D-apply（2026-04-21、PR #89）で `src/constants.js` の `PC` 配列を η パレット値に書き換え実施済み（視覚変化あり）。`src/components/StatsModal.jsx` 内のデッドコード 3 関数（`hexToHsl` / `hslToHex` / `generatePlayerColors`）の削除は D-cleanup（別 PR、視覚変化ゼロ）で実施予定。
 
 #### 2.8.2 Debug Colors
 
