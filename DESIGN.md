@@ -1857,16 +1857,16 @@ index              = Math.round(relativeAngle / 45) mod 8
 - ラベル: カード上部、フォントサイズ 11px / `--weight-bold` / `--wind-text-label` 相当の濃度 / letter-spacing 0.3 / `white-space: nowrap`
 - 数値: `--font-instrument`（モノスペース）/ タブレット 24px / モバイル 22px / `--weight-bold` / line-height 1.1 / 単位（m/s、%）を同一行に付記 / `white-space: nowrap`
 - 色（現行実装準拠）:
-  - 最大: warning 系（実装値 `#f59e0b`）、値未取得時 グレー `#6b7280`
-  - 平均: success 系（実装値 `#34d399`、`--wind-calm` と同値）、値未取得時 グレー
+  - 最大: warning 系（実装値 `#f59e0b`、hex 直書き維持）、値未取得時 グレー `#6b7280`
+  - 平均: `var(--wind-calm)`（`#34d399`）、値未取得時 グレー `#6b7280`
   - バッテリー: 動的色
-    - 20% 未満 → danger 系 `#ef4444`（`--wind-severe` と同値）
-    - 50% 未満 → warning 系 `#eab308`
-    - 50% 以上 → success 系 `#34d399`
-    - 値未取得時 → グレー `#6b7280`
+    - 20% 未満 → `var(--wind-severe)`（`#ef4444`）
+    - 50% 未満 → warning 系 `#eab308`（hex 直書き維持）
+    - 50% 以上 → `var(--wind-calm)`（`#34d399`）
+    - 値未取得時 → グレー `#6b7280`（hex 直書き維持）
 - アニメーション: 統計カード固有の初期描画アニメは持たない（数値更新時の transition も不要）
 
-**トークン化の課題（メモ）**: 現行実装のカード色（`#f59e0b` / `#eab308` 等）は §2.4 Semantic Colors / §2.5 Wind Sensor Colors のいずれのトークンとも正確には一致しない hex 直書きである。将来の色トークン再設計の中で、warning/success/danger 系既存トークンに寄せるか、Wind 専用派生トークン（例 `--wind-stat-max`）を新設するかを判断する。本節は正典化の観点から現行実装の hex をそのまま記載する。
+**トークン化の課題（メモ）**: 第2弾C C-g（2026-04-21）で §2.5 Wind Sensor Colors と hex 完全同値だった 3 箇所（平均 / バッテリー 50% 以上 → `--wind-calm`、バッテリー 20% 未満 → `--wind-severe`）は `var()` 参照化済み。残る `#f59e0b`（最大） / `#eab308`（バッテリー 50% 未満） / `#6b7280`（値未取得時）は §2.4 Semantic Colors / §2.5 Wind Sensor Colors のいずれのトークンとも一致しない hex 直書きで、WindMonitor 美学棚卸しタスクで warning/success/danger 系既存トークンに寄せるか Wind 専用派生トークン（例 `--wind-stat-max`）を新設するかを一括判断する方針に従い、C-g では hex 直書き維持とする。
 
 #### 9.3.7 時系列グラフ
 
@@ -1961,7 +1961,7 @@ index              = Math.round(relativeAngle / 45) mod 8
 
 **接続中のドットは静的**（`box-shadow` による微グロウのみ、アニメーションなし）。
 
-**実装配置メモ**: 現状 `@keyframes wind-monitor-blink` は `WindMonitorModal.jsx` 内でインライン `<style>` として定義されている。将来的に `styles.css` 側への移動と `<style>` タグ削除が設計的に望ましいが、本節のスコープ外として積み残し。
+**実装配置メモ**: 第2弾C C-g で `@keyframes wind-monitor-blink` を `src/styles.css` の Stage 4 Keyframe Animations セクション末尾（`mk-shake` の直後）へ移動済み（2026-04-21）。`WindMonitorModal.jsx` 内のインライン `<style>` 定義は削除済み。
 
 #### 9.3.9 ✗ 使用禁止
 
