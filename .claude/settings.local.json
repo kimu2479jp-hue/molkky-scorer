@@ -38,7 +38,9 @@
       "Bash(grep -rn '\\\\\\\\u[0-9a-fA-F]\\\\{4\\\\}' --include='*.js' --include='*.jsx' src/)",
       "Bash(gh api *)",
       "Bash(gh pr *)",
-      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('.claude/settings.local.json','utf8'\\)\\); console.log\\('JSON OK'\\)\")"
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('.claude/settings.local.json','utf8'\\)\\); console.log\\('JSON OK'\\)\")",
+      "mcp__ff73c6f1-f9d5-45bf-b8f6-165386c44d0c__get_file_contents",
+      "Bash(git ls-tree *)"
     ]
   },
   "hooks": {
