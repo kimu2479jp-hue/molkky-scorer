@@ -71,6 +71,20 @@
   --chart-6: #1e5968;  /* ターコイズダーク（γ 寒色深色） */
   --chart-7: #4a1f68;  /* アメジスト（γ 寒色深色） */
   --chart-8: #6b4b3e;  /* コーヒーブラウン（β 暖色） */
+
+  /* Wind Monitor Industrial Palette（Apple Watch Ultra Industrial 美学、DESIGN.md §2.6 正典定義予定、X-3 で WindMonitorModal.jsx に適用、X-1 で DESIGN.md 追従） */
+  --wind-bg-base:      #0a0f1a;  /* WindMonitor ページ背景最下層（slate 950 系、--neutral-950 とは別系統の独立 slate） */
+  --wind-bg-surface:   #0f172a;  /* BezelPanel 内部背景、パネル内カード（slate 900 系） */
+  --wind-bg-panel:     #111827;  /* DeckHeader 背景、ヘッダーバー（slate 900 系より微明） */
+  --wind-edge:         #1e293b;  /* パネルボーダー、グリッド線、tick major、コンパス外周リング（slate 800 系） */
+  --wind-accent:       #67e8f9;  /* cyan accent 本体（BEARING 数値、括弧、ティック点灯、コンパスセクター塗り） */
+  --wind-accent-hi:    #a5f3fc;  /* cyan accent 明部（ブレードニードル明部、ハブ中央ハイライト） */
+  --wind-accent-lo:    #0e7490;  /* cyan accent 暗部（ブレードニードル暗部、ハブリング） */
+  --wind-text-primary: #e2e8f0;  /* 主要テキスト（INK、タイトル、方位ラベル強調時） */
+  --wind-text-slate:   #94a3b8;  /* SLATE、閉じるボタン文字、方位ラベル通常色、ラベルテキスト */
+  --wind-text-muted:   #64748b;  /* MUTED 統合（コーナーラベル、タイトル切り欠き、補助テキスト、Wind Sensor 補助） */
+  --wind-text-dim:     #475569;  /* 最淡テキスト（軸ラベル、フッター、tick minor、数値ラベル） */
+  --wind-linked:       #34d399;  /* LINKED 緑（接続中ドット、--wind-calm と hex 同値の意図的エイリアス、DESIGN.md §2.11.2 で正典承認予定） */
 }
 
 html, body, #root {
