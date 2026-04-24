@@ -142,6 +142,11 @@ body {
   50% { opacity: 0.3; }
 }
 
+@keyframes wind-monitor-hero-pulse {
+  0%, 100% { transform: scale(1.0); }
+  50% { transform: scale(1.015); }
+}
+
 /* ═══ Stage 5: Screen Transitions ═══ */
 @keyframes mk-slide-in-left {
   from { transform: translateX(-100%); opacity: 0; }
