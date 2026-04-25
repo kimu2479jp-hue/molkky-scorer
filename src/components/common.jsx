@@ -27,18 +27,18 @@ const longRef=useRef(null);const wrapRef=useRef(null);
 const available=favs.filter(f=>!(usedNames||[]).includes(f));
 const startLP=name=>{if(!isAdminProp)return;longRef.current=setTimeout(()=>setDelTarget(name),450);};const cancelLP=()=>{if(longRef.current)clearTimeout(longRef.current);};
 return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
-<button onTouchEnd={e=>{e.preventDefault();setOpen(!open);setDelTarget(null);}} onClick={e=>{if(e.detail===0)return;setOpen(!open);setDelTarget(null);}} style={{width:40,height:40,border:"1px solid #d0dff0",borderRadius:8,background:open?"var(--blue-500)":"#f0f6ff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:open?"#fff":"#d9a83a",WebkitTapHighlightColor:"transparent",touchAction:"manipulation"}}><Star size={18}/></button>
+<button onTouchEnd={e=>{e.preventDefault();setOpen(!open);setDelTarget(null);}} onClick={e=>{if(e.detail===0)return;setOpen(!open);setDelTarget(null);}} className={open?"mk-btn-primary":undefined} style={{width:40,height:40,border:"1px solid #d0dff0",borderRadius:8,background:open?undefined:"#f0f6ff",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,color:open?"#fff":"#d9a83a",WebkitTapHighlightColor:"transparent",touchAction:"manipulation"}}><Star size={18}/></button>
 {open&&(<div style={SS.ov} onClick={()=>{setOpen(false);setDelTarget(null);}}>
 <div className="mk-fade-scale-in" style={{...SS.mod,maxWidth:360}} onClick={e=>e.stopPropagation()}>
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}><span style={{fontSize:18,fontWeight:800,color:"var(--text-primary)"}}>お気に入り</span><button onClick={()=>{setOpen(false);setDelTarget(null);}} style={SS.clsB}>✕</button></div>
 {available.length===0&&<div style={{padding:12,textAlign:"center",color:"var(--text-muted)",fontSize:16}}>{favs.length===0?"登録なし":"全員配置済み"}</div>}
 <div style={{maxHeight:300,overflow:"auto",WebkitOverflowScrolling:"touch"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid var(--neutral-100)",background:delTarget===f?"var(--danger-bg)":"transparent",fontSize:18,fontWeight:600,color:"var(--text-primary)",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<div style={{display:"flex",gap:4}} onClick={e=>e.stopPropagation()}>
-<span onClick={()=>{setEditTarget(f);setEditName(f);setDelTarget(null);}} style={{padding:"5px 10px",background:"var(--blue-500)",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>編集</span>
+<span onClick={()=>{setEditTarget(f);setEditName(f);setDelTarget(null);}} className="mk-btn-primary" style={{padding:"5px 10px",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>編集</span>
 <span onClick={()=>{setDelConf(f);}} className="mk-btn-danger" style={{padding:"5px 10px",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>削除</span>
 </div>}</button></div>))}</div>
 <div style={{borderTop:"1px solid var(--neutral-100)",paddingTop:10,marginTop:4,flexShrink:0}}><div style={{display:"flex",gap:6}}>
 <input value={newN} onChange={e=>setNewN(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder={"新規("+MAX_NAME+"文字)"} style={{flex:1,padding:"10px 12px",border:"1px solid var(--neutral-200)",borderRadius:8,fontSize:16,outline:"none"}}/>
-<button onClick={()=>{if(newN.trim()&&favs.length<MAX_FAV){addF(newN.trim());setNewN("");}}} style={{padding:"10px 16px",border:"none",borderRadius:8,background:"var(--blue-500)",color:"var(--text-inverse)",fontWeight:700,fontSize:15,cursor:"pointer",opacity:newN.trim()?1:0.3}}>登録</button>
+<button onClick={()=>{if(newN.trim()&&favs.length<MAX_FAV){addF(newN.trim());setNewN("");}}} className="mk-btn-primary" style={{padding:"10px 16px",border:"none",borderRadius:8,color:"var(--text-inverse)",fontWeight:700,fontSize:15,cursor:"pointer",opacity:newN.trim()?1:0.3}}>登録</button>
 </div>{favs.length>=MAX_FAV&&<div style={{fontSize:12,color:"var(--text-danger)",marginTop:4,textAlign:"center"}}>登録上限({MAX_FAV}人)に達しています</div>}</div>
 </div></div>)}
 {delConf&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setDelConf(null)}><div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}} onClick={e=>e.stopPropagation()}>
@@ -52,7 +52,7 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 <input value={editName} onChange={e=>setEditName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} style={{width:"100%",padding:"12px",border:"1px solid var(--neutral-200)",borderRadius:8,fontSize:18,outline:"none",marginBottom:12,boxSizing:"border-box"}} autoFocus/>
 {editName.trim()&&editName.trim()!==editTarget&&favs.includes(editName.trim())&&<div style={{fontSize:13,color:"var(--text-danger)",marginBottom:8}}>この名前は既に登録されています</div>}
 <div style={{display:"flex",gap:8}}>
-<button onClick={()=>{const ok=editF(editTarget,editName);if(ok){setEditTarget(null);setDelTarget(null);}}} disabled={!editName.trim()||editName.trim()===editTarget||favs.includes(editName.trim())} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--blue-500)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer",opacity:(!editName.trim()||editName.trim()===editTarget||favs.includes(editName.trim()))?0.3:1}}>変更する</button>
+<button onClick={()=>{const ok=editF(editTarget,editName);if(ok){setEditTarget(null);setDelTarget(null);}}} disabled={!editName.trim()||editName.trim()===editTarget||favs.includes(editName.trim())} className="mk-btn-primary" style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer",opacity:(!editName.trim()||editName.trim()===editTarget||favs.includes(editName.trim()))?0.3:1}}>変更する</button>
 <button onClick={()=>setEditTarget(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--neutral-200)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
 </div>
 </div></div>}
@@ -245,11 +245,11 @@ transform:"rotateY(180deg)",borderRadius:br,background:"#fff",overflow:"hidden",
 <div style={{background:"#1a1a2e",border:"1px solid rgba(255,255,255,0.2)",borderRadius:16,padding:"24px 28px",textAlign:"center",maxWidth:isMultiCourt?320:280}}>
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>スキップしますか？</div>
 {isMultiCourt?(<div style={{display:"flex",flexDirection:"column",gap:8}}>
-<button onClick={()=>{setSkipConfirm(false);if(onSkipThisCourt)onSkipThisCourt();}} style={{padding:"12px 0",border:"none",borderRadius:10,background:"var(--blue-500)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>このコートはスキップ</button>
+<button onClick={()=>{setSkipConfirm(false);if(onSkipThisCourt)onSkipThisCourt();}} className="mk-btn-primary" style={{padding:"12px 0",border:"none",borderRadius:10,color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>このコートはスキップ</button>
 <button onClick={()=>{setSkipConfirm(false);if(onSkipAll)onSkipAll();}} style={{padding:"12px 0",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>全てスキップ</button>
 <button onClick={()=>setSkipConfirm(false)} style={{padding:"12px 0",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"rgba(255,255,255,0.5)",fontSize:14,fontWeight:600,cursor:"pointer"}}>いいえ</button>
 </div>):(<div style={{display:"flex",gap:10,justifyContent:"center"}}>
-<button onClick={()=>{setSkipConfirm(false);startRef.current=performance.now()/1000-T.p4-0.5;}} style={{flex:1,padding:"10px 0",border:"none",borderRadius:10,background:"var(--blue-500)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>はい</button>
+<button onClick={()=>{setSkipConfirm(false);startRef.current=performance.now()/1000-T.p4-0.5;}} className="mk-btn-primary" style={{flex:1,padding:"10px 0",border:"none",borderRadius:10,color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>はい</button>
 <button onClick={()=>setSkipConfirm(false)} style={{flex:1,padding:"10px 0",border:"1px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer"}}>いいえ</button>
 </div>)}
 </div>
@@ -344,7 +344,7 @@ return(<div key={cNum} style={{background:cNum===1?"rgba(43,125,233,0.08)":"rgba
 <div style={{background:"#1a1a2e",borderRadius:16,padding:"24px 28px",maxWidth:360,width:"100%"}}>
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>セットアップに戻りますか？</div>
 <div style={{display:"flex",gap:10}}>
-<button onClick={()=>{setBackConfirm(false);onBack();}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--blue-500)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
+<button onClick={()=>{setBackConfirm(false);onBack();}} className="mk-btn-primary" style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
 <button onClick={()=>setBackConfirm(false)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>いいえ</button>
 </div></div></div>)}
 </div>);
@@ -615,7 +615,7 @@ if(r.merged){setSyncStatus("✅ 同期完了"+(r.added>0?" (+"+r.added+"件)":""
 checkServerHasPin(syncInput).then(p=>setServerHasPin(p.has_pin));}
 else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 });
-}} style={{padding:"10px 18px",border:"none",borderRadius:8,background:"var(--blue-500)",color:"var(--text-inverse)",fontSize:15,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>同期</button>
+}} className="mk-btn-primary" style={{padding:"10px 18px",border:"none",borderRadius:8,color:"var(--text-inverse)",fontSize:15,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>同期</button>
 </div>
 <div style={{fontSize:12,color:"#bbb",marginTop:4}}>同期コードを入力して同期ボタンを押してください。</div>
 </>):(<>
@@ -665,7 +665,7 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 <label style={{fontSize:13,fontWeight:700,color:"var(--text-secondary)",marginBottom:4,display:"block"}}>場所を検索</label>
 <div style={{display:"flex",gap:8}}>
 <input value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")handleLocSearch();}} placeholder="公園名で検索..." style={{flex:1,border:"1px solid var(--neutral-200)",borderRadius:8,padding:"10px 12px",fontSize:15,outline:"none"}}/>
-<button onClick={handleLocSearch} disabled={searching} style={{padding:"10px 16px",border:"none",borderRadius:8,background:"var(--blue-500)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{searching?"...":"検索"}</button>
+<button onClick={handleLocSearch} disabled={searching} className="mk-btn-primary" style={{padding:"10px 16px",border:"none",borderRadius:8,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>{searching?"...":"検索"}</button>
 </div>
 </div>
 {searchErr&&<div style={{fontSize:13,color:"var(--text-danger)",marginBottom:8}}>{searchErr}</div>}
@@ -716,7 +716,7 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 {locErr&&<div style={{color:"var(--text-danger)",fontSize:13,fontWeight:600,marginBottom:8}}>{locErr}</div>}
 <div style={{display:"flex",gap:8,marginTop:16}}>
 {!editLoc&&<button onClick={()=>{setRegStep(1);setLocErr("");}} style={{flex:1,padding:"12px 0",border:"2px solid var(--neutral-200)",borderRadius:10,background:"transparent",color:"#666",fontSize:15,fontWeight:700,cursor:"pointer"}}>戻る</button>}
-<button onClick={handleLocSave} disabled={locBusy} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--blue-500)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",opacity:locBusy?0.5:1}}>{locBusy?"処理中...":editLoc?"更新":"登録"}</button>
+<button onClick={handleLocSave} disabled={locBusy} className="mk-btn-primary" style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",opacity:locBusy?0.5:1}}>{locBusy?"処理中...":editLoc?"更新":"登録"}</button>
 {editLoc&&<button onClick={()=>{setShowLocModal(false);resetLocForm();setLocErr("");}} style={{flex:1,padding:"12px 0",border:"2px solid var(--neutral-200)",borderRadius:10,background:"transparent",color:"#666",fontSize:15,fontWeight:700,cursor:"pointer"}}>キャンセル</button>}
 </div>
 </>}
@@ -770,7 +770,7 @@ return(<div key={name} style={{marginBottom:10,paddingBottom:10,borderBottom:"1p
 <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
 {options.map(opt=>{
 const isActive=(current===opt.value)||(current==null&&opt.value===null);
-return(<button key={opt.value===null?"auto":opt.value} onClick={()=>{savePlayerLevel(name,opt.value);setPlayerLevels(loadPlayerLevels());}} style={{padding:"5px 10px",border:"2px solid "+(isActive?"var(--blue-500)":"#ddd"),borderRadius:8,background:isActive?"var(--blue-500)":"var(--bg-surface)",color:isActive?"var(--text-inverse)":"var(--text-secondary)",fontSize:12,fontWeight:isActive?700:500,cursor:"pointer"}}>{opt.label}</button>);
+return(<button key={opt.value===null?"auto":opt.value} onClick={()=>{savePlayerLevel(name,opt.value);setPlayerLevels(loadPlayerLevels());}} className={isActive?"mk-btn-primary":undefined} style={{padding:"5px 10px",border:"2px solid "+(isActive?"var(--blue-500)":"#ddd"),borderRadius:8,background:isActive?undefined:"var(--bg-surface)",color:isActive?"var(--text-inverse)":"var(--text-secondary)",fontSize:12,fontWeight:isActive?700:500,cursor:"pointer"}}>{opt.label}</button>);
 })}
 </div>
 </div>);

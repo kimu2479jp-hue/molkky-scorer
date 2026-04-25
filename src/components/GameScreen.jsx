@@ -180,7 +180,7 @@ return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" st
 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><h2 style={{fontSize:32,fontWeight:900,color:"var(--text-primary)",display:"flex",alignItems:"center",gap:6}}><Users size={28}/> メンバー</h2><button style={SS.clsB} onClick={onClose}>✕</button></div>
 {/* Court switching tabs (only when courtCount >= 2) */}
 {cc>=2&&<div style={{display:"flex",gap:4,marginBottom:12}}>
-{Array.from({length:cc},(_,i)=>i+1).map(cn=>(<button key={cn} onClick={()=>{setActiveCourt(cn);setSel(0);}} style={{flex:1,padding:"8px 0",border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",background:activeCourt===cn?"var(--blue-500)":"rgba(0,0,0,0.06)",color:activeCourt===cn?"#fff":"#666"}}>{cn===1?"📱":"📋"} {cn}コート</button>))}
+{Array.from({length:cc},(_,i)=>i+1).map(cn=>(<button key={cn} onClick={()=>{setActiveCourt(cn);setSel(0);}} className={activeCourt===cn?"mk-btn-primary":undefined} style={{flex:1,padding:"8px 0",border:"none",borderRadius:8,fontSize:15,fontWeight:700,cursor:"pointer",background:activeCourt===cn?undefined:"rgba(0,0,0,0.06)",color:activeCourt===cn?"#fff":"#666"}}>{cn===1?"📱":"📋"} {cn}コート</button>))}
 </div>}
 {/* Device court (court 1): existing behavior */}
 {activeCourt===1&&<>
@@ -212,7 +212,7 @@ return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" st
 <div style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
 <select value={effectiveSel} onChange={e=>setSel(+e.target.value)} style={{padding:8,borderRadius:8,border:"1px solid var(--neutral-200)",fontSize:16}}>{addTeamsList.map((t,i)=><option key={i} value={i}>{t.name}</option>)}</select>
 <input value={name} onChange={e=>setName(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder="名前" style={{flex:1,minWidth:80,padding:8,borderRadius:8,border:"1px solid var(--neutral-200)",fontSize:16}}/>
-<button onClick={()=>doAdd()} style={{minWidth:80,padding:"8px 14px",borderRadius:8,border:"none",background:"var(--blue-500)",color:"var(--text-inverse)",fontWeight:700,fontSize:15,cursor:"pointer",opacity:name.trim()?1:0.3}}>追加</button>
+<button onClick={()=>doAdd()} className="mk-btn-primary" style={{minWidth:80,padding:"8px 14px",borderRadius:8,border:"none",color:"var(--text-inverse)",fontWeight:700,fontSize:15,cursor:"pointer",opacity:name.trim()?1:0.3}}>追加</button>
 <button onClick={()=>doAutoAdd()} style={{minWidth:80,padding:"8px 14px",borderRadius:8,border:"none",background:"#22b566",color:"#fff",fontWeight:700,fontSize:15,cursor:"pointer",opacity:name.trim()?1:0.3}}>自動追加</button>
 <FavDropdown favs={favs} addF={addF} rmF={rmF} editF={editF} onPick={n=>setName(n)} usedNames={allUsed} isAdmin={isAdmin}/>
 </div>
@@ -497,7 +497,7 @@ return(
 {caKeepDiscard===0?(<>
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>コート割り当てデータの扱い</div>
 <div style={{display:"flex",flexDirection:"column",gap:10}}>
-<button onClick={()=>{setCaKeepDialog(false);setCaKeepDiscard(0);setShowRes(false);goBack(null);}} style={{padding:"14px 0",border:"none",borderRadius:10,background:"var(--blue-500)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>コート割り当ては保持する</button>
+<button onClick={()=>{setCaKeepDialog(false);setCaKeepDiscard(0);setShowRes(false);goBack(null);}} className="mk-btn-primary" style={{padding:"14px 0",border:"none",borderRadius:10,color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>コート割り当ては保持する</button>
 <button onClick={()=>setCaKeepDiscard(1)} style={{padding:"14px 0",border:"2px solid color-mix(in srgb, var(--danger) 40%, transparent)",borderRadius:10,background:"color-mix(in srgb, var(--danger) 10%, transparent)",color:"var(--danger)",fontSize:15,fontWeight:800,cursor:"pointer"}}>コート割り当ても破棄する</button>
 <button onClick={()=>{setCaKeepDialog(false);setCaKeepDiscard(0);setSaveDialog(true);}} style={{padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
 </div>
