@@ -205,13 +205,17 @@ body {
   transition: box-shadow 0.15s ease;
 }
 
-/* ═══ Stage 6: Button Hover (PR β) ═══ */
+/* ═══ Stage 6: Button Hover (PR β / γ) ═══ */
 .mk-btn-danger {
   background: var(--danger);
 }
 
 .mk-btn-danger-strong {
   background: var(--text-danger);
+}
+
+.mk-btn-primary {
+  background: var(--blue-500);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -221,6 +225,10 @@ body {
   }
   .mk-btn-danger-strong:hover {
     background: var(--text-danger-hover);
+    transition: background var(--transition-normal);
+  }
+  .mk-btn-primary:hover {
+    background: var(--blue-700);
     transition: background var(--transition-normal);
   }
 }
