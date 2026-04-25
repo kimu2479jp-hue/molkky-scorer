@@ -9,6 +9,7 @@ import json
 import logging
 import math
 import os
+import struct
 import tempfile
 import time
 from datetime import datetime, timezone
@@ -16,10 +17,32 @@ from datetime import datetime, timezone
 from bleak import BleakClient, BleakScanner
 import websockets
 
-# ESS標準UUIDs
+# ESS標準UUIDs (Phase A、Phase B では未使用だが定数定義は残す)
 WIND_SPEED_UUID = "00002a72-0000-1000-8000-00805f9b34fb"
 WIND_DIR_UUID = "00002a73-0000-1000-8000-00805f9b34fb"
 BATTERY_UUID = "00002a19-0000-1000-8000-00805f9b34fb"
+
+# Phase B: Calypso vendor characteristics
+# 出典: maritime-labs/calypso-anemometer v0.6.0 model.py (一次仕様)
+VENDOR_DATA_UUID = "00002a39-0000-1000-8000-00805f9b34fb"     # notify 10 byte blob
+VENDOR_MODE_UUID = "0000a001-0000-1000-8000-00805f9b34fb"     # write 1 byte
+VENDOR_RATE_UUID = "0000a002-0000-1000-8000-00805f9b34fb"     # write 1 byte
+VENDOR_COMPASS_UUID = "0000a003-0000-1000-8000-00805f9b34fb"  # write 1 byte
+
+# Phase B: 設定値（IntEnum を使わず単純なバイト値で扱う）
+CALYPSO_MODE_NORMAL = 0x02
+CALYPSO_RATE_HZ_1 = 0x01
+CALYPSO_RATE_HZ_4 = 0x04
+CALYPSO_RATE_HZ_8 = 0x08
+CALYPSO_COMPASS_OFF = 0x00  # QMC5883L 利用のため内蔵9DOFは OFF
+
+# Phase B: rate 文字列 → バイト値マッピング (config.json/WebSocket コマンド用)
+CALYPSO_RATE_MAP = {
+    "hz_1": CALYPSO_RATE_HZ_1,
+    "hz_4": CALYPSO_RATE_HZ_4,
+    "hz_8": CALYPSO_RATE_HZ_8,
+}
+DEFAULT_WIND_RATE = "hz_8"  # Phase B デフォルト
 
 # デフォルト設定
 DEFAULT_WS_PORT = 8765
@@ -122,6 +145,38 @@ def read_compass():
         return 0
 
 
+def decode_vendor_reading(buffer: bytes) -> dict:
+    """
+    Calypso vendor 0x2A39 notify の 10 byte payload をデコード。
+
+    一次仕様: maritime-labs/calypso-anemometer v0.6.0 model.py CalypsoReading.from_buffer()
+    フォーマット: <HHBBBBH (little-endian)
+
+    Returns:
+        dict: {wind_speed (m/s), wind_direction (deg), battery_level (%),
+               temperature (C), roll (deg), pitch (deg), heading (deg)}
+
+    Raises:
+        ValueError: buffer 長が 10 でない場合
+        struct.error: unpack 失敗時
+    """
+    if len(buffer) != 10:
+        raise ValueError(f"Expected 10 bytes, got {len(buffer)}: {buffer.hex()}")
+
+    wind_speed_raw, wind_direction, battery_raw, temperature_raw, roll_raw, pitch_raw, heading_raw = \
+        struct.unpack("<HHBBBBH", buffer)
+
+    return {
+        "wind_speed": wind_speed_raw / 100.0,
+        "wind_direction": wind_direction,
+        "battery_level": battery_raw * 10,
+        "temperature": temperature_raw - 100,
+        "roll": roll_raw - 90,
+        "pitch": pitch_raw - 90,
+        "heading": 360 - heading_raw,
+    }
+
+
 def on_wind_speed(sender, data):
     speed = int.from_bytes(data, "little") / 100.0
     latest_wind_data["wind_speed"] = round(speed, 2)
@@ -140,6 +195,36 @@ def on_wind_dir(sender, data):
     latest_wind_data["wind_direction"] = round(direction, 1)
     logging.debug(f"Wind Dir: {direction:.1f}")
     # Phase A: BLE notify 受信時に即座に broadcast をトリガー
+    if wind_data_updated is not None:
+        wind_data_updated.set()
+
+
+def on_vendor_data(sender, data):
+    """
+    Phase B: Calypso vendor 0x2A39 notify ハンドラ。
+    10 byte blob から wind_speed / wind_direction を取り出して latest_wind_data を更新。
+    Calypso 内蔵 9DOF (roll/pitch/heading) は使用せず、QMC5883L 由来の compass_heading を使う。
+    """
+    try:
+        reading = decode_vendor_reading(bytes(data))
+    except (ValueError, struct.error) as e:
+        logging.warning(f"vendor notify デコード失敗: {e}")
+        return
+
+    latest_wind_data["wind_speed"] = round(reading["wind_speed"], 2)
+    latest_wind_data["wind_direction"] = round(reading["wind_direction"], 1)
+    latest_wind_data["timestamp"] = datetime.now(timezone.utc).isoformat()
+    latest_wind_data["connected"] = True
+    latest_wind_data["compass_heading"] = read_compass()
+    latest_wind_data["compass_valid"] = compass_valid
+
+    # battery は vendor blob 内に含まれるので vendor パスでは別 read 不要
+    latest_wind_data["battery"] = reading["battery_level"]
+
+    logging.debug(
+        f"Vendor: speed={reading['wind_speed']:.2f}m/s dir={reading['wind_direction']}° batt={reading['battery_level']}%"
+    )
+
     if wind_data_updated is not None:
         wind_data_updated.set()
 
