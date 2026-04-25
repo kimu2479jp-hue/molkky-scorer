@@ -13,6 +13,8 @@
   --text-danger: #c0392b;
   --danger: #e74c3c;
   --danger-bg: #fde8e8;
+  --danger-hover: color-mix(in srgb, var(--danger) 85%, black);
+  --text-danger-hover: color-mix(in srgb, var(--text-danger) 85%, black);
   --text-warning: #e67700;
   --text-success: var(--accent-green);
   --blue-50: #e6f0fb;
@@ -201,4 +203,24 @@ body {
 }
 .mk-card-shadow-glow {
   transition: box-shadow 0.15s ease;
+}
+
+/* ═══ Stage 6: Button Hover (PR β) ═══ */
+.mk-btn-danger {
+  background: var(--danger);
+}
+
+.mk-btn-danger-strong {
+  background: var(--text-danger);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mk-btn-danger:hover {
+    background: var(--danger-hover);
+    transition: background var(--transition-normal);
+  }
+  .mk-btn-danger-strong:hover {
+    background: var(--text-danger-hover);
+    transition: background var(--transition-normal);
+  }
 }
