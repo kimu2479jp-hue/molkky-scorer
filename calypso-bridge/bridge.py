@@ -86,6 +86,7 @@ wind_data_updated = None
 
 ws_clients = set()
 ble_client_ref = None
+current_wind_rate = "hz_8"  # Phase B: 現在の rate 設定文字列（WebSocket 経由で変更可能）
 
 # キャリブレーション実行中の state
 calibration_state = {
@@ -229,9 +230,42 @@ def on_vendor_data(sender, data):
         wind_data_updated.set()
 
 
+async def _configure_calypso_vendor(client, rate_byte: int):
+    """
+    Phase B: vendor characteristics 経由で Calypso を設定する。
+    切断で揮発するため再接続のたびに呼ぶ必要がある。
+
+    Args:
+        client: BleakClient インスタンス（接続済み）
+        rate_byte: CALYPSO_RATE_HZ_1 / HZ_4 / HZ_8 のいずれか
+    """
+    # mode = NORMAL
+    await client.write_gatt_char(VENDOR_MODE_UUID, data=bytes([CALYPSO_MODE_NORMAL]), response=True)
+    logging.info(f"vendor: mode = NORMAL (0x{CALYPSO_MODE_NORMAL:02x})")
+
+    # rate = HZ_8 (or 設定値)
+    await client.write_gatt_char(VENDOR_RATE_UUID, data=bytes([rate_byte]), response=True)
+    logging.info(f"vendor: rate = 0x{rate_byte:02x}")
+
+    # compass = OFF (QMC5883L を使うため内蔵 9DOF は無効)
+    await client.write_gatt_char(VENDOR_COMPASS_UUID, data=bytes([CALYPSO_COMPASS_OFF]), response=True)
+    logging.info(f"vendor: compass = OFF (0x{CALYPSO_COMPASS_OFF:02x})")
+
+
 async def ble_task(config):
-    global ble_client_ref
+    """
+    Phase B: vendor characteristic 経由で Calypso CMI1022 と通信する。
+    Phase A の ESS パスは使用しない。
+    """
+    global ble_client_ref, current_wind_rate
     ble_address = config.get("ble_address")
+
+    # 起動時の rate 設定をグローバルに保持（WebSocket set_rate コマンドで変更可能）
+    rate_str = config.get("wind_rate", DEFAULT_WIND_RATE)
+    if rate_str not in CALYPSO_RATE_MAP:
+        logging.warning(f"不正な wind_rate: {rate_str}, デフォルト {DEFAULT_WIND_RATE} を使用")
+        rate_str = DEFAULT_WIND_RATE
+    current_wind_rate = rate_str
 
     while True:
         try:
@@ -252,18 +286,19 @@ async def ble_task(config):
                 ble_client_ref = client
                 logging.info("BLE接続成功")
 
-                # バッテリー初回読み取り
+                # vendor 設定書き込み（mode / rate / compass）
+                rate_byte = CALYPSO_RATE_MAP[current_wind_rate]
                 try:
-                    battery_data = await client.read_gatt_char(BATTERY_UUID)
-                    latest_wind_data["battery"] = battery_data[0]
-                    logging.info(f"バッテリー: {battery_data[0]}%")
+                    await _configure_calypso_vendor(client, rate_byte)
                 except Exception as e:
-                    logging.warning(f"バッテリー読み取り失敗: {e}")
+                    logging.error(f"vendor設定書き込み失敗: {e}")
+                    # vendor設定が動かない CMI1022 では Phase B は機能しない
+                    # 切断 → 5秒待機 → リトライ（フォールバックはしない）
+                    raise
 
-                # ESS notify購読
-                await client.start_notify(WIND_SPEED_UUID, on_wind_speed)
-                await client.start_notify(WIND_DIR_UUID, on_wind_dir)
-                logging.info("ESS notify購読開始。データ受信中...")
+                # vendor notify 購読開始
+                await client.start_notify(VENDOR_DATA_UUID, on_vendor_data)
+                logging.info(f"vendor notify 購読開始 (rate={current_wind_rate})。データ受信中...")
 
                 while client.is_connected:
                     await asyncio.sleep(1)
@@ -279,15 +314,12 @@ async def ble_task(config):
 
 
 async def battery_task():
+    """
+    Phase B: バッテリー値は vendor 0x2A39 notify (on_vendor_data) で毎回更新されるため、
+    このタスクは何もしない。タスク自体は asyncio.gather のシグネチャ維持のため残す。
+    """
     while True:
-        await asyncio.sleep(BATTERY_READ_INTERVAL)
-        if ble_client_ref and ble_client_ref.is_connected:
-            try:
-                battery_data = await ble_client_ref.read_gatt_char(BATTERY_UUID)
-                latest_wind_data["battery"] = battery_data[0]
-                logging.debug(f"バッテリー更新: {battery_data[0]}%")
-            except Exception as e:
-                logging.debug(f"バッテリー読み取り失敗: {e}")
+        await asyncio.sleep(3600)  # 1時間ごとに目覚めるだけ（事実上 no-op）
 
 
 def save_compass_offsets(offset_x, offset_y):
@@ -565,7 +597,8 @@ async def main():
     )
 
     logging.info("=== Calypso CMI1022 BLE Bridge 起動 ===")
-    logging.info(f"プロトコル: ESS (Environmental Sensing Service)")
+    logging.info(f"プロトコル: vendor 0x2A39 (Phase B)")
+    logging.info(f"rate: {config.get('wind_rate', DEFAULT_WIND_RATE)}")
     logging.info(f"broadcast: イベント駆動 + フォールバック {BROADCAST_FALLBACK_INTERVAL}秒")
 
     # Phase A: asyncio.Event は event loop 起動後（main 内）で生成する
