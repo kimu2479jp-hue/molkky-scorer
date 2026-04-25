@@ -27,7 +27,10 @@ DEFAULT_LOG_LEVEL = "INFO"
 BATTERY_READ_INTERVAL = 300  # 5分間隔
 
 # ブロードキャスト / キャリブレーション関連
-BROADCAST_INTERVAL = 1.0            # 1Hz で wind_data をブロードキャスト
+# Phase A: イベント駆動 + フォールバック定期送信。
+# BLE notify 受信時に即座にブロードキャストし、
+# 何も来ない場合でも BROADCAST_FALLBACK_INTERVAL 秒ごとに送る。
+BROADCAST_FALLBACK_INTERVAL = 0.25  # 4Hz でフォールバック送信
 CALIBRATE_TIMEOUT_SEC = 60          # キャリブレーション最大時間（秒）
 CALIBRATE_COVERAGE_THRESHOLD = 500  # x/y range の目標値（これに到達で coverage=1.0）
 CALIBRATE_SAMPLE_INTERVAL = 0.1     # 10Hz で QMC5883L を読む
@@ -51,6 +54,12 @@ latest_wind_data = {
     "timestamp": None,
     "connected": False,
 }
+
+# Phase A: broadcast トリガー用の asyncio.Event。
+# BLE notify 受信時に set() し、broadcast_task 側で wait() する。
+# 注: asyncio.Event は event loop 起動後に生成する必要があるため、
+# モジュールレベルでは None で初期化し、main() 内で実体化する。
+wind_data_updated = None
 
 ws_clients = set()
 ble_client_ref = None
@@ -121,12 +130,18 @@ def on_wind_speed(sender, data):
     latest_wind_data["compass_heading"] = read_compass()
     latest_wind_data["compass_valid"] = compass_valid
     logging.debug(f"Wind Speed: {speed:.2f} m/s")
+    # Phase A: BLE notify 受信時に即座に broadcast をトリガー
+    if wind_data_updated is not None:
+        wind_data_updated.set()
 
 
 def on_wind_dir(sender, data):
     direction = int.from_bytes(data, "little") / 100.0
     latest_wind_data["wind_direction"] = round(direction, 1)
     logging.debug(f"Wind Dir: {direction:.1f}")
+    # Phase A: BLE notify 受信時に即座に broadcast をトリガー
+    if wind_data_updated is not None:
+        wind_data_updated.set()
 
 
 async def ble_task(config):
@@ -398,11 +413,29 @@ async def ws_handler(websocket):
 
 
 async def broadcast_task():
-    """1Hz で全クライアントに latest_wind_data をブロードキャスト"""
+    """イベント駆動 + フォールバック定期送信で latest_wind_data をブロードキャスト
+
+    Phase A: BLE notify 受信時に wind_data_updated.set() されると即座に送信。
+    notify が来ない場合でも BROADCAST_FALLBACK_INTERVAL 秒ごとに送る
+    （クライアントの初期表示や接続維持のため）。
+    """
     while True:
-        await asyncio.sleep(BROADCAST_INTERVAL)
+        # イベント待機（タイムアウトでフォールバック送信）
+        try:
+            await asyncio.wait_for(
+                wind_data_updated.wait(),
+                timeout=BROADCAST_FALLBACK_INTERVAL,
+            )
+            wind_data_updated.clear()
+        except asyncio.TimeoutError:
+            pass  # フォールバック: データ未更新でも送信
+
         if not ws_clients:
             continue
+
+        # Phase A: 送信時刻を payload に含めて、後続の遅延測定を可能にする
+        latest_wind_data["bridge_send_ts"] = time.time()
+
         payload = json.dumps(latest_wind_data)
         dead = []
         # list() でスナップショット（イテレーション中の変更回避）
@@ -436,6 +469,8 @@ async def ws_server_task(config):
 
 
 async def main():
+    global wind_data_updated
+
     config = load_config()
 
     log_level = config.get("log_level", DEFAULT_LOG_LEVEL)
@@ -446,6 +481,10 @@ async def main():
 
     logging.info("=== Calypso CMI1022 BLE Bridge 起動 ===")
     logging.info(f"プロトコル: ESS (Environmental Sensing Service)")
+    logging.info(f"broadcast: イベント駆動 + フォールバック {BROADCAST_FALLBACK_INTERVAL}秒")
+
+    # Phase A: asyncio.Event は event loop 起動後（main 内）で生成する
+    wind_data_updated = asyncio.Event()
 
     init_compass(config)
 
