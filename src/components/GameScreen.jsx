@@ -189,7 +189,7 @@ return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" st
 {team.players.map((p,pi)=>(<div key={pi} style={{display:"flex",alignItems:"center",padding:"6px 12px",background:p.active?"#f8f9fa":"#f0f0f0",borderRadius:8,marginBottom:4,opacity:p.active?1:0.4}}>
 <span style={{flex:1,fontSize:17}}>{p.name}</span>
 <div style={{display:"flex",gap:5}}>
-<button onClick={()=>tog(ti,pi,!p.active)} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:p.active?"var(--danger)":"#27ae60",color:"var(--text-inverse)"}}>{p.active?"退出":"復帰"}</button>
+<button onClick={()=>tog(ti,pi,!p.active)} className={p.active?"mk-btn-danger":undefined} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:p.active?undefined:"#27ae60",color:"var(--text-inverse)"}}>{p.active?"退出":"復帰"}</button>
 <button onClick={()=>setDelConf({ti,pi,name:p.name,court:1})} style={{padding:"6px 14px",border:"none",borderRadius:6,fontSize:14,fontWeight:700,cursor:"pointer",background:"#888",color:"var(--text-inverse)"}}>削除</button>
 </div>
 </div>))}
@@ -226,7 +226,7 @@ return(<div style={SS.ov} onClick={onClose}><div className="mk-fade-scale-in" st
 {delConf&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:200,display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}}>
 <div style={{fontSize:18,fontWeight:800,color:"var(--text-danger)",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}><AlertTriangle size={18}/> メンバー削除</div>
 <div style={{fontSize:16,marginBottom:16}}>{"「"+delConf.name+"」を完全に削除しますか？"}<br/><span style={{fontSize:13,color:"var(--text-secondary)"}}>この操作は元に戻せません</span></div>
-<div style={{display:"flex",gap:8}}><button onClick={()=>{if(delConf.court===1){rmPlayer(delConf.ti,delConf.pi);}else{removeFromPaperCourt(delConf.court,delConf.ti,delConf.pi);setDelConf(null);}}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>削除する</button><button onClick={()=>setDelConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--neutral-200)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
+<div style={{display:"flex",gap:8}}><button onClick={()=>{if(delConf.court===1){rmPlayer(delConf.ti,delConf.pi);}else{removeFromPaperCourt(delConf.court,delConf.ti,delConf.pi);setDelConf(null);}}} className="mk-btn-danger-strong" style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>削除する</button><button onClick={()=>setDelConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--neutral-200)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
 </div></div>}
 
   </div></div>);
@@ -504,13 +504,13 @@ return(
 </>):caKeepDiscard===1?(<>
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>コート割り当てを破棄しますか？</div>
 <div style={{display:"flex",gap:10}}>
-<button onClick={()=>setCaKeepDiscard(2)} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--danger)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
+<button onClick={()=>setCaKeepDiscard(2)} className="mk-btn-danger" style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
 <button onClick={()=>setCaKeepDiscard(0)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>いいえ</button>
 </div>
 </>):(<>
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>この操作は取り消せません。破棄しますか？</div>
 <div style={{display:"flex",gap:10}}>
-<button onClick={()=>{setCaKeepDialog(false);setCaKeepDiscard(0);if(clearCourtAllocation)clearCourtAllocation();setShowRes(false);goBack(null);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--danger)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>破棄する</button>
+<button onClick={()=>{setCaKeepDialog(false);setCaKeepDiscard(0);if(clearCourtAllocation)clearCourtAllocation();setShowRes(false);goBack(null);}} className="mk-btn-danger" style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>破棄する</button>
 <button onClick={()=>setCaKeepDiscard(0)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>キャンセル</button>
 </div>
 </>)}

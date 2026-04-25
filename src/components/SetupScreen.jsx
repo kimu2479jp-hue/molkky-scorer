@@ -415,10 +415,10 @@ return(
 {editMode&&<div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}><button onClick={()=>{setEditMode(false);setExpandedDel(null);}} style={{padding:"6px 18px",border:"none",borderRadius:8,background:"var(--blue-500)",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>Done</button></div>}
 {teams.slice(0,tc).map((team,ti)=>(<div key={ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac}} onTouchStart={lpStart} onTouchEnd={lpEnd} onTouchMove={lpMove}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><div style={{width:34,height:34,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-inverse)",fontWeight:900,fontSize:18,flexShrink:0,background:C[ti].ac}}>{ti+1}</div><input value={team.name} onChange={e=>uN(ti,e.target.value)} style={TIN} placeholder={"チーム"+(ti+1)}/></div>
 <div style={{paddingLeft:editMode?28:44}}>{team.players.map((p,pi)=>{const delKey="m"+ti+"_"+pi;const isExp=expandedDel===delKey;return(<div key={pi} style={{display:"flex",alignItems:"center",gap:6,marginBottom:7,overflow:"hidden"}}>
-{editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:26,height:26,borderRadius:13,border:"none",background:"var(--danger)",color:"#fff",fontSize:18,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"−"}</button>}
+{editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} className="mk-btn-danger" style={{width:26,height:26,borderRadius:13,border:"none",color:"#fff",fontSize:18,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"−"}</button>}
 <span style={{width:20,fontSize:16,color:"var(--text-muted)",fontWeight:700,textAlign:"center"}}>{pi+1}</span><input value={p} onChange={e=>uP(ti,pi,e.target.value)} maxLength={MAX_NAME} style={{...PIN,flex:isExp?"0 1 auto":"1"}} placeholder={"名前("+MAX_NAME+"文字)"}/>
 {!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} editF={editF} onPick={name=>uP(ti,pi,name)} usedNames={used} isAdmin={isAdmin}/>}
-{editMode&&isExp&&team.players.length>1&&<button onClick={()=>{rP(ti,pi);setExpandedDel(null);}} style={{padding:"6px 16px",border:"none",borderRadius:8,background:"var(--danger)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
+{editMode&&isExp&&team.players.length>1&&<button onClick={()=>{rP(ti,pi);setExpandedDel(null);}} className="mk-btn-danger" style={{padding:"6px 16px",border:"none",borderRadius:8,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
 </div>);})}
 {!editMode&&team.players.length<MAX_PL&&<button style={{width:"100%",padding:10,border:"2px dashed var(--neutral-200)",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer"}} onClick={()=>aP(ti)}>＋ 追加</button>}
 {!editMode&&team.players.length>1&&<button style={{width:"100%",padding:10,border:"2px dashed #f0b0b0",borderRadius:8,background:"transparent",color:"var(--text-danger)",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:4}} onClick={()=>rP(ti,team.players.length-1)}>− 最後を削除</button>}
@@ -431,10 +431,10 @@ return(
 {editMode&&<div style={{display:"flex",justifyContent:"flex-end",marginBottom:8}}><button onClick={()=>{setEditMode(false);setExpandedDel(null);}} style={{padding:"6px 18px",border:"none",borderRadius:8,background:"var(--blue-500)",color:"#fff",fontSize:16,fontWeight:700,cursor:"pointer"}}>Done</button></div>}
 {courtTeams[activeCourt].slice(0,courtTeamCounts[activeCourt]).map((team,ti)=>(<div key={activeCourt+"-"+ti} style={{...CARD,borderLeft:"6px solid "+C[ti].ac}} onTouchStart={lpStart} onTouchEnd={lpEnd} onTouchMove={lpMove}><div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}><div style={{width:34,height:34,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",color:"var(--text-inverse)",fontWeight:900,fontSize:18,flexShrink:0,background:C[ti].ac}}>{ti+1}</div><input value={team.name} onChange={e=>ctUn(activeCourt,ti,e.target.value)} style={TIN} placeholder={"チーム"+(ti+1)}/></div>
 <div style={{paddingLeft:editMode?28:44}}>{team.players.map((p,pi)=>{const delKey="c"+activeCourt+"_"+ti+"_"+pi;const isExp=expandedDel===delKey;return(<div key={pi} style={{display:"flex",alignItems:"center",gap:6,marginBottom:7,overflow:"hidden"}}>
-{editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:26,height:26,borderRadius:13,border:"none",background:"var(--danger)",color:"#fff",fontSize:18,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"−"}</button>}
+{editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} className="mk-btn-danger" style={{width:26,height:26,borderRadius:13,border:"none",color:"#fff",fontSize:18,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"−"}</button>}
 <span style={{width:20,fontSize:16,color:"var(--text-muted)",fontWeight:700,textAlign:"center"}}>{pi+1}</span><input value={p} onChange={e=>ctUp(activeCourt,ti,pi,e.target.value)} maxLength={MAX_NAME} style={{...PIN,flex:isExp?"0 1 auto":"1"}} placeholder={"名前("+MAX_NAME+"文字)"}/>
 {!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} editF={editF} onPick={name=>ctUp(activeCourt,ti,pi,name)} usedNames={used} isAdmin={isAdmin}/>}
-{editMode&&isExp&&team.players.length>1&&<button onClick={()=>{ctRp(activeCourt,ti,pi);setExpandedDel(null);}} style={{padding:"6px 16px",border:"none",borderRadius:8,background:"var(--danger)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
+{editMode&&isExp&&team.players.length>1&&<button onClick={()=>{ctRp(activeCourt,ti,pi);setExpandedDel(null);}} className="mk-btn-danger" style={{padding:"6px 16px",border:"none",borderRadius:8,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
 </div>);})}
 {!editMode&&team.players.length<MAX_PL&&<button style={{width:"100%",padding:10,border:"2px dashed var(--neutral-200)",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer"}} onClick={()=>ctAp(activeCourt,ti)}>＋ 追加</button>}
 {!editMode&&team.players.length>1&&<button style={{width:"100%",padding:10,border:"2px dashed #f0b0b0",borderRadius:8,background:"transparent",color:"var(--text-danger)",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:4}} onClick={()=>ctRp(activeCourt,ti,team.players.length-1)}>− 最後を削除</button>}
@@ -444,10 +444,10 @@ return(
 {mode==="shuffle"&&(<><div style={CARD} onTouchStart={lpStart} onTouchEnd={lpEnd} onTouchMove={lpMove}><div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}><div style={{fontWeight:700,fontSize:18,color:"var(--text-primary)"}}>参加メンバー（最大{maxShufForCourt}人）</div>
 {editMode&&<button onClick={()=>{setEditMode(false);setExpandedDel(null);}} style={{padding:"4px 14px",border:"none",borderRadius:8,background:"var(--blue-500)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer"}}>Done</button>}</div>
 <div style={{display:"grid",gridTemplateColumns:editMode?"1fr":"1fr 1fr",gap:7}}>{mems.map((m,i)=>{const delKey="s"+i;const isExp=expandedDel===delKey;return(<div key={i} style={{display:"flex",alignItems:"center",gap:4}}>
-{editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} style={{width:24,height:24,borderRadius:12,border:"none",background:"var(--danger)",color:"#fff",fontSize:16,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"−"}</button>}
+{editMode&&<button onClick={()=>setExpandedDel(isExp?null:delKey)} className="mk-btn-danger" style={{width:24,height:24,borderRadius:12,border:"none",color:"#fff",fontSize:16,fontWeight:900,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",lineHeight:1,padding:0}}>{"−"}</button>}
 <span style={{width:20,fontSize:14,color:"var(--text-muted)",fontWeight:700,textAlign:"right",flexShrink:0}}>{i+1}</span><input value={m} onChange={e=>uM(i,e.target.value)} maxLength={MAX_NAME} style={{...PIN,padding:"10px 12px",fontSize:18,flex:isExp?"0 1 auto":"1",minWidth:0}} placeholder="メンバー"/>
 {!editMode&&<FavDropdown favs={favs} addF={addF} rmF={rmF} editF={editF} onPick={name=>uM(i,name)} usedNames={used} isAdmin={isAdmin}/>}
-{editMode&&isExp&&mems.length>2&&<button onClick={()=>{rM(i);setExpandedDel(null);}} style={{padding:"4px 14px",border:"none",borderRadius:8,background:"var(--danger)",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
+{editMode&&isExp&&mems.length>2&&<button onClick={()=>{rM(i);setExpandedDel(null);}} className="mk-btn-danger" style={{padding:"4px 14px",border:"none",borderRadius:8,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>削除</button>}
 </div>);})}</div>
 {!editMode&&mems.length<maxShufForCourt&&<button style={{width:"100%",padding:10,border:"2px dashed var(--neutral-200)",borderRadius:8,background:"transparent",color:"#999",fontSize:16,fontWeight:600,cursor:"pointer",marginTop:6}} onClick={aM}>＋</button>}
 {!editMode&&<button onClick={()=>setShowSmartFav(true)} style={{width:"100%",padding:10,border:"2px solid var(--blue-500)",borderRadius:8,background:"rgba(43,125,233,0.08)",color:"var(--blue-500)",fontSize:16,fontWeight:700,cursor:"pointer",marginTop:4}}>{"☆"} お気に入りから選択追加</button>}
@@ -474,14 +474,14 @@ return(
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:10}}>{"⚠"} メンバー数が超過します</div>
 <div style={{fontSize:14,color:"rgba(255,255,255,0.7)",marginBottom:16,lineHeight:1.6}}>現在<span style={{color:"var(--danger)",fontWeight:800}}>{trimConfirm.filled}人</span>入力済みですが、変更後の上限は<span style={{color:"var(--danger)",fontWeight:800}}>{trimConfirm.newMax}人</span>です。超過分の<span style={{color:"var(--danger)",fontWeight:800}}>{trimConfirm.filled-trimConfirm.newMax}人</span>が末尾から削除されます。続けますか？</div>
 <div style={{display:"flex",gap:10}}>
-<button onClick={()=>setTrimConfirm(p=>({...p,step:2}))} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--danger)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
+<button onClick={()=>setTrimConfirm(p=>({...p,step:2}))} className="mk-btn-danger" style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
 <button onClick={()=>setTrimConfirm(null)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>いいえ</button>
 </div>
 </>):(<>
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:10}}>本当に変更しますか？</div>
 <div style={{fontSize:14,color:"rgba(255,255,255,0.7)",marginBottom:16,lineHeight:1.6}}>この操作は取り消せません。<span style={{color:"var(--danger)",fontWeight:800}}>{trimConfirm.filled-trimConfirm.newMax}人</span>のメンバーが削除されます。</div>
 <div style={{display:"flex",gap:10}}>
-<button onClick={trimDialogExec} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--danger)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>変更する</button>
+<button onClick={trimDialogExec} className="mk-btn-danger" style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>変更する</button>
 <button onClick={()=>setTrimConfirm(null)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>キャンセル</button>
 </div>
 </>)}
@@ -491,13 +491,13 @@ return(
 {caDiscardStep===1?(<>
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>前回のコート割り当てを破棄しますか？</div>
 <div style={{display:"flex",gap:10}}>
-<button onClick={()=>setCaDiscardStep(2)} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--danger)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
+<button onClick={()=>setCaDiscardStep(2)} className="mk-btn-danger" style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>はい</button>
 <button onClick={()=>setCaDiscardStep(0)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>いいえ</button>
 </div>
 </>):(<>
 <div style={{fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>この操作は取り消せません。破棄しますか？</div>
 <div style={{display:"flex",gap:10}}>
-<button onClick={()=>{setCaDiscardStep(0);if(onClearCourtAllocation)onClearCourtAllocation();}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--danger)",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>破棄する</button>
+<button onClick={()=>{setCaDiscardStep(0);if(onClearCourtAllocation)onClearCourtAllocation();}} className="mk-btn-danger" style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>破棄する</button>
 <button onClick={()=>setCaDiscardStep(0)} style={{flex:1,padding:"12px 0",border:"2px solid rgba(255,255,255,0.3)",borderRadius:10,background:"transparent",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer"}}>キャンセル</button>
 </div>
 </>)}

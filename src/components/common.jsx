@@ -34,7 +34,7 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 {available.length===0&&<div style={{padding:12,textAlign:"center",color:"var(--text-muted)",fontSize:16}}>{favs.length===0?"登録なし":"全員配置済み"}</div>}
 <div style={{maxHeight:300,overflow:"auto",WebkitOverflowScrolling:"touch"}}>{available.map(f=>(<div key={f}><button onPointerDown={()=>startLP(f)} onPointerUp={cancelLP} onPointerLeave={cancelLP} onClick={()=>{if(delTarget===f)setDelTarget(null);else{onPick(f);setOpen(false);}}} style={{width:"100%",padding:"12px 16px",border:"none",borderBottom:"1px solid var(--neutral-100)",background:delTarget===f?"var(--danger-bg)":"transparent",fontSize:18,fontWeight:600,color:"var(--text-primary)",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span>{f}</span>{delTarget===f&&<div style={{display:"flex",gap:4}} onClick={e=>e.stopPropagation()}>
 <span onClick={()=>{setEditTarget(f);setEditName(f);setDelTarget(null);}} style={{padding:"5px 10px",background:"var(--blue-500)",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>編集</span>
-<span onClick={()=>{setDelConf(f);}} style={{padding:"5px 10px",background:"var(--danger)",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>削除</span>
+<span onClick={()=>{setDelConf(f);}} className="mk-btn-danger" style={{padding:"5px 10px",color:"var(--text-inverse)",borderRadius:6,fontSize:13,fontWeight:700,cursor:"pointer"}}>削除</span>
 </div>}</button></div>))}</div>
 <div style={{borderTop:"1px solid var(--neutral-100)",paddingTop:10,marginTop:4,flexShrink:0}}><div style={{display:"flex",gap:6}}>
 <input value={newN} onChange={e=>setNewN(e.target.value.slice(0,MAX_NAME))} maxLength={MAX_NAME} placeholder={"新規("+MAX_NAME+"文字)"} style={{flex:1,padding:"10px 12px",border:"1px solid var(--neutral-200)",borderRadius:8,fontSize:16,outline:"none"}}/>
@@ -44,7 +44,7 @@ return(<div ref={wrapRef} style={{position:"relative",display:"inline-block"}}>
 {delConf&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setDelConf(null)}><div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%",textAlign:"center"}} onClick={e=>e.stopPropagation()}>
 <div style={{fontSize:18,fontWeight:800,color:"var(--text-danger)",marginBottom:6,display:"flex",alignItems:"center",justifyContent:"center",gap:4}}><AlertTriangle size={18}/> お気に入り削除</div>
 <div style={{fontSize:16,marginBottom:16}}>「{delConf}」をお気に入りから削除しますか？</div>
-<div style={{display:"flex",gap:8}}><button onClick={()=>{rmF(delConf);setDelConf(null);setDelTarget(null);}} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>削除する</button><button onClick={()=>setDelConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--neutral-200)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
+<div style={{display:"flex",gap:8}}><button onClick={()=>{rmF(delConf);setDelConf(null);setDelTarget(null);}} className="mk-btn-danger-strong" style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,color:"var(--text-inverse)",fontSize:16,fontWeight:700,cursor:"pointer"}}>削除する</button><button onClick={()=>setDelConf(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--neutral-200)",borderRadius:10,background:"transparent",color:"#666",fontSize:16,fontWeight:700,cursor:"pointer"}}>キャンセル</button></div>
 </div></div>}
 {editTarget&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.4)",zIndex:10000,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setEditTarget(null)}><div className="mk-fade-scale-in" style={{background:"var(--bg-surface)",borderRadius:16,padding:24,maxWidth:360,width:"90%"}} onClick={e=>e.stopPropagation()}>
 <div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:12}}>名前を編集</div>
@@ -728,7 +728,7 @@ else{setSyncStatus("❌ "+(r.error||"同期失敗"));}
 <div style={{fontSize:18,fontWeight:800,color:"var(--text-primary)",marginBottom:8}}>場所を削除</div>
 <div style={{fontSize:14,color:"var(--text-secondary)",marginBottom:16}}>「{delConfirm.place_name} - {delConfirm.sub_name}」を削除しますか？</div>
 <div style={{display:"flex",gap:8}}>
-<button onClick={()=>handleLocDelete(delConfirm.id)} disabled={locBusy} style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,background:"var(--text-danger)",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",opacity:locBusy?0.5:1}}>{locBusy?"削除中...":"削除する"}</button>
+<button onClick={()=>handleLocDelete(delConfirm.id)} disabled={locBusy} className="mk-btn-danger-strong" style={{flex:1,padding:"12px 0",border:"none",borderRadius:10,color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",opacity:locBusy?0.5:1}}>{locBusy?"削除中...":"削除する"}</button>
 <button onClick={()=>setDelConfirm(null)} style={{flex:1,padding:"12px 0",border:"2px solid var(--neutral-200)",borderRadius:10,background:"transparent",color:"#666",fontSize:15,fontWeight:700,cursor:"pointer"}}>キャンセル</button>
 </div>
 </div>
