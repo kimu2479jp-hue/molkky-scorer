@@ -234,7 +234,7 @@ PR β（Danger hover 実装）では、用途逸脱の修正を行わず**現状
 
 ### 2.6 Wind Monitor Industrial Palette
 
-Apple Watch Ultra Industrial 美学（Wayfinder 文字盤 + Modular Ultra 文字盤参照）の WindMonitorModal 専用 12 トークン。PR β X-2（PR #91、2026-04-24）で `src/styles.css` に追加、PR β X-3（PR #92、2026-04-24）で `src/components/WindMonitorModal.jsx` に全面適用済み。既存の `--wind-bg-base` / `--wind-bg-card` / `--wind-grid-*` / `--wind-text-*` の 6 トークン定義（2025 年時点）は本節の書き換えで廃止され、新 12 トークン体系に置き換わる。
+Apple Watch Ultra Industrial 美学（Wayfinder 文字盤 + Modular Ultra 文字盤参照）の WindMonitorModal 専用 16 トークン。PR β X-2（PR #91、2026-04-24）で `src/styles.css` に 12 トークン追加、PR β X-3（PR #92、2026-04-24）で `src/components/WindMonitorModal.jsx` に全面適用、PR 1（2026-04-26、WindMonitor 美学棚卸し）で `--wind-battery-null` / `--wind-battery-mid` / `--wind-border-subtle` / `--wind-shadow-deep` の 4 トークンを追加し残余 hex 直書き 15 箇所を解消。既存の `--wind-bg-base` / `--wind-bg-card` / `--wind-grid-*` / `--wind-text-*` の 6 トークン定義（2025 年時点）は本節の書き換えで廃止され、新 16 トークン体系に置き換わる。
 
 | トークン | 値 | 役割 | 系統 |
 |---|---|---|---|
@@ -250,12 +250,20 @@ Apple Watch Ultra Industrial 美学（Wayfinder 文字盤 + Modular Ultra 文字
 | `--wind-text-muted` | `#64748b` | MUTED 統合（コーナーラベル、BEARING ラベル上側、補助テキスト、Hero 数値の「m/s」、PEAK/AVG/BAT カードの単位・サブ） | MUTED |
 | `--wind-text-dim` | `#475569` | 最淡テキスト（軸ラベル、フッター、tick minor、数値ラベル、BezelPanel リベット stroke 内側） | DIM |
 | `--wind-linked` | `#34d399` | LINKED 緑（接続中ドット、LINKED ラベル文字色、`--wind-calm` と hex 同値の意図的エイリアス、§ 2.11.2 で正典承認） | Wind Monitor Status（Wind Sensor Colors とエイリアス関係） |
+| `--wind-battery-null` | `#6b7280` | バッテリー値未取得色（`batteryColor()` null 時、§9.3.6 / §9.3.10.1） | Battery Null（独立カテゴリ） |
+| `--wind-battery-mid` | `#eab308` | バッテリー警告色（`batteryColor()` pct < 50、warning 系） | Battery Mid（独立カテゴリ） |
+| `--wind-border-subtle` | `#334155` | CompassGauge ring 円 stroke、閉じるボタン border、構造ボーダー専用 | Structure Border（独立カテゴリ） |
+| `--wind-shadow-deep` | `#020617` | 最深シャドウ（face radial 終点、ハブ中心、左右小ドット、リベット fill、boxShadow inset、ルート radial 終点ほか 11 箇所） | Deep Shadow（独立カテゴリ、`--wind-bg-base` (#0a0f1a) より深い独立 slate） |
 
 **補足記述**:
 
 - Wind Monitor Industrial Palette は既存 `--neutral-*` スケールとは別系統の独立 slate であり、`--neutral-950`（`#0b1526`）とは微差で意図的に分離されている（`#0a0f1a` は slate 950 系、`#0b1526` は独自 navy 系）。この分離により、WindMonitor 画面全体が「計器盤としての独自世界観」を持ち、他画面（GameScreen / Stats / Settings / SetupScreen）と混ざらないことを保証する。
 - `--wind-linked` は Wind Sensor Colors（§ 2.5）の `--wind-calm` と hex 完全同値（`#34d399`）だが、意味論が異なるため別トークンとして独立保持する（§ 2.11.2 で正典承認）。`--wind-calm` は「風速カテゴリの穏やか」を表し、`--wind-linked` は「WebSocket 接続状態の LINKED（接続中）」を表す。
 - 既存 6 トークン（`--wind-bg-card` / `--wind-grid-major` / `--wind-grid-minor` / `--wind-text-label`）は新体系で使用されない。代替: `--wind-bg-card` → 用途廃止（BezelPanel 構造に変更）、`--wind-grid-*` → `--wind-edge` に統合、`--wind-text-label` → `--wind-text-slate` / `--wind-text-muted` / `--wind-text-dim` の 3 トークンに細分化。
+
+##### 将来追加候補（命名のみ保留、styles.css 未追加）
+
+- `--wind-panel-gradient-end` (`#050914`): BezelPanel radial-gradient end（§9.3.10.3）。現時点で 1 箇所参照のためトークン化価値が境界。将来複数箇所参照になった時点で styles.css 追加 + 実コード置換を判断する
 
 #### § 10.2 非抵触の追認
 
@@ -1820,14 +1828,14 @@ GameScreen ヘッダーに常時表示される pill 型風速ウィジェット
 | 要素 | 値 | 備考 |
 |---|---|---|
 | モーダルルート背景 | `var(--wind-bg-base)` (#0a0f1a) | `position: fixed; inset: 0; zIndex: 9999` の最下層 |
-| モーダル内ルート radial-gradient | `radial-gradient(ellipse at 30% 0%, var(--wind-bg-surface) 0%, var(--wind-bg-base) 55%, #020617 100%)` | `#020617` は §9.3.11 残余承認 |
+| モーダル内ルート radial-gradient | `radial-gradient(ellipse at 30% 0%, var(--wind-bg-surface) 0%, var(--wind-bg-base) 55%, var(--wind-shadow-deep) 100%)` | `var(--wind-shadow-deep)` は §2.6 で命名（旧 #020617 直書き） |
 | BezelPanel 背景 radial-gradient | `radial-gradient(ellipse at top, var(--wind-bg-panel) 0%, var(--wind-bg-base) 60%, #050914 100%)` | `#050914` は §9.3.11 残余承認 |
 | BezelPanel ボーダー | `1px solid var(--wind-edge)` (#1e293b) | |
-| BezelPanel 影 | `inset 0 1px 0 rgba(148,163,184,0.08), inset 0 0 0 1px #020617, 0 8px 24px rgba(0,0,0,0.5)` | rgba 値と `#020617` は §9.3.11 残余承認 |
-| BezelPanel リベット（4 隅） | `background: #020617`、`boxShadow: inset 0 0 0 0.5px var(--wind-text-dim)` | `#020617` は §9.3.11 残余承認 |
+| BezelPanel 影 | `inset 0 1px 0 rgba(148,163,184,0.08), inset 0 0 0 1px var(--wind-shadow-deep), 0 8px 24px rgba(0,0,0,0.5)` | rgba 値は §9.3.11 残余承認、`var(--wind-shadow-deep)` (#020617) は §2.6 で命名 |
+| BezelPanel リベット（4 隅） | `background: var(--wind-shadow-deep)`、`boxShadow: inset 0 0 0 0.5px var(--wind-text-dim)` | `var(--wind-shadow-deep)` は §2.6 で命名（旧 #020617 直書き） |
 | DeckHeader 背景 | `linear-gradient(180deg, var(--wind-bg-panel) 0%, #0b1220 100%)` | `#0b1220` は §9.3.11 残余承認 |
 | DeckHeader ボーダー | `1px solid var(--wind-edge)` | |
-| DeckHeader 影 | `inset 0 1px 0 rgba(148,163,184,0.1), inset 0 -1px 0 #020617` | rgba 値と `#020617` は §9.3.11 残余承認 |
+| DeckHeader 影 | `inset 0 1px 0 rgba(148,163,184,0.1), inset 0 -1px 0 var(--wind-shadow-deep)` | rgba 値は §9.3.11 残余承認、`var(--wind-shadow-deep)` (#020617) は §2.6 で命名 |
 | 背景グリッド stroke | `var(--wind-text-slate)` (#94a3b8)、opacity 0.05 | |
 
 **ルート背景レイヤ構成**:
@@ -1932,7 +1940,7 @@ BezelPanel COMPASS（title `COMPASS · ${bearing}°` 切り欠き、corner は I
 
 ##### 構成要素（描画順）
 
-1. **三重リング金属ベゼル**: face radial-gradient（`var(--wind-bg-panel)` → `var(--wind-bg-base)` → `#020617`）+ ベゼル外周 stroke（`var(--wind-text-dim)` → `var(--wind-edge)` → `var(--wind-bg-surface)` の linearGradient）+ face 内縁 + ring 円 stroke（`#334155`、§9.3.11 残余承認）
+1. **三重リング金属ベゼル**: face radial-gradient（`var(--wind-bg-panel)` → `var(--wind-bg-base)` → `var(--wind-shadow-deep)`）+ ベゼル外周 stroke（`var(--wind-text-dim)` → `var(--wind-edge)` → `var(--wind-bg-surface)` の linearGradient）+ face 内縁 + ring 円 stroke（`var(--wind-border-subtle)` (#334155)）
 2. **セクター放射グラデ**: BEARING ± 12° の扇形、`var(--wind-accent)` radialGradient（中心 opacity 0 → 外周 opacity 0.32）
 3. **72 本階層ティック**（4 階層）: cardinal（90° 毎）/ major（30° 毎）/ medium（15° 毎）/ minor（残り）、詳細は §9.3.10.2
 4. **セパレータリング**: 点線円（`var(--wind-edge)`、`strokeDasharray: "1 3"`）
@@ -2088,9 +2096,9 @@ PEAK / AVG / BAT の 3 項目を横 3 列で表示する統計カード群。PR 
 
 | 入力 | 戻り値 |
 |---|---|
-| `pct == null` | `"#6b7280"`（§9.3.11 残余承認） |
+| `pct == null` | `"var(--wind-battery-null)"` (#6b7280) |
 | `pct < 20` | `"var(--wind-severe)"` (#ef4444) |
-| `pct < 50` | `"#eab308"`（§9.3.11 残余承認、warning 系） |
+| `pct < 50` | `"var(--wind-battery-mid)"` (#eab308)（warning 系） |
 | `pct >= 50` | `"var(--wind-calm)"` (#34d399) |
 
 ##### ticks 20 本バー（InstrumentDeckPad のみ）
@@ -2112,16 +2120,11 @@ PEAK / AVG / BAT の 3 項目を横 3 列で表示する統計カード群。PR 
 
 統計カード固有の初期描画アニメーションは持たない。数値更新時の transition も不要（`wind_data` 受信のたびに即時切替）。唯一の例外は BAT 色が 20% / 50% 閾値をまたぐ時の色変化で、これも即時切替。
 
-##### トークン化の課題（メモ）
+##### トークン化の経緯（メモ）
 
 PR β X-3 Type B 実装で § 2.5 Wind Sensor Colors と hex 完全同値だった 3 箇所（AVG / BAT 50% 以上 → `--wind-calm`、BAT 20% 未満 → `--wind-severe`）は `var()` 参照化済み（第2弾C C-g、2026-04-21）。PR β X-3 では PEAK カード色を Wind Ramp 連動（`getWindRampColor`）に変更したため、旧実装の `#f59e0b` 直書きは削除された。
 
-残る hex 直書きは以下 2 箇所。§9.3.11 に棚卸し済み:
-
-- `#eab308`: `batteryColor()` 内 pct < 50 の warning 系
-- `#6b7280`: `batteryColor()` 内 pct == null の未取得色
-
-これらは将来の WindMonitor 美学棚卸しタスクで、warning/success/danger 系既存トークンに寄せるか Wind 専用派生トークン（例 `--wind-battery-mid` / `--wind-stat-null`）を新設するかを一括判断する。
+残っていた hex 直書き 2 箇所（`#eab308` / `#6b7280`）は PR 1（2026-04-26、WindMonitor 美学棚卸し）で `--wind-battery-mid` / `--wind-battery-null` の Wind 専用派生トークンとして §2.6 に追加・参照化済（§9.3.11 アーカイブ参照）。
 
 #### 9.3.7 時系列グラフ
 
@@ -2519,7 +2522,7 @@ const secD =
 |---|---|---|
 | 0 | 0% | `var(--wind-bg-panel)` (#111827) |
 | 1 | 70% | `var(--wind-bg-base)` (#0a0f1a) |
-| 2 | 100% | `#020617`（§9.3.11 残余承認） |
+| 2 | 100% | `var(--wind-shadow-deep)` (#020617) |
 
 属性: `cx="0.5"`, `cy="0.42"`, `r="0.65"`（中心から上寄りの楕円）
 
@@ -2576,7 +2579,7 @@ const secD =
 | stop | offset | stopColor |
 |---|---|---|
 | 0 | 0% | `var(--wind-edge)` (#1e293b) |
-| 1 | 100% | `#020617`（§9.3.11 残余承認） |
+| 1 | 100% | `var(--wind-shadow-deep)` (#020617) |
 
 属性: `cx="0.5"`, `cy="0.5"`, `r="0.5"`
 
@@ -2592,13 +2595,13 @@ const secD =
 
 **3. face 内縁 stroke**: ベゼル内側の境界線（暗色）
 
-- `<circle cx=CX cy=CY r={rOuter - 3 * k} stroke="#020617" strokeWidth="1" fill="none" />`
-- `#020617` は §9.3.11 残余承認
+- `<circle cx=CX cy=CY r={rOuter - 3 * k} stroke="var(--wind-shadow-deep)" strokeWidth="1" fill="none" />`
+- `var(--wind-shadow-deep)` (#020617) は §2.6 で命名（PR 1）
 
 **4. ring 円 stroke**: ティック外周リング
 
-- `<circle cx=CX cy=CY r=rRing stroke="#334155" strokeWidth="1" fill="none" />`
-- `#334155` は §9.3.11 残余承認
+- `<circle cx=CX cy=CY r=rRing stroke="var(--wind-border-subtle)" strokeWidth="1" fill="none" />`
+- `var(--wind-border-subtle)` (#334155) は §2.6 で命名（PR 1）
 
 **5. セクター放射パス**: BEARING ± 12° の扇形塗り
 
@@ -2706,10 +2709,10 @@ const secD =
 
 **14-8. ハブ中心円 + ハイライト + 左右小ドット**:
 
-- ハブ中心円: `<circle cx=CX cy=CY r={6 * k} fill="#020617" />`（§9.3.11 残余承認）
+- ハブ中心円: `<circle cx=CX cy=CY r={6 * k} fill="var(--wind-shadow-deep)" />`
 - ハイライト: `<circle cx=CX cy=CY r={2.4 * k} fill="var(--wind-accent-hi)" />`
-- 左小ドット: `<circle cx={CX - 12 * k} cy=CY r={1.2 * k} fill="#020617" stroke="var(--wind-accent-lo)" strokeWidth="0.6" />`
-- 右小ドット: `<circle cx={CX + 12 * k} cy=CY r={1.2 * k} fill="#020617" stroke="var(--wind-accent-lo)" strokeWidth="0.6" />`
+- 左小ドット: `<circle cx={CX - 12 * k} cy=CY r={1.2 * k} fill="var(--wind-shadow-deep)" stroke="var(--wind-accent-lo)" strokeWidth="0.6" />`
+- 右小ドット: `<circle cx={CX + 12 * k} cy=CY r={1.2 * k} fill="var(--wind-shadow-deep)" stroke="var(--wind-accent-lo)" strokeWidth="0.6" />`
 
 ###### 回転とトランジション
 
@@ -2762,7 +2765,7 @@ const BezelPanel = ({ children, style, title, corner }) => { ... }
   position: "relative",
   background: "radial-gradient(ellipse at top, var(--wind-bg-panel) 0%, var(--wind-bg-base) 60%, #050914 100%)",
   border: "1px solid var(--wind-edge)",
-  boxShadow: "inset 0 1px 0 rgba(148,163,184,0.08), inset 0 0 0 1px #020617, 0 8px 24px rgba(0,0,0,0.5)",
+  boxShadow: "inset 0 1px 0 rgba(148,163,184,0.08), inset 0 0 0 1px var(--wind-shadow-deep), 0 8px 24px rgba(0,0,0,0.5)",
   borderRadius: 10,
   padding: 14,
   ...style,  // 呼び出し側の style で上書き可能
@@ -2774,7 +2777,7 @@ const BezelPanel = ({ children, style, title, corner }) => { ... }
 - `border`: `1px solid var(--wind-edge)` (#1e293b)
 - `boxShadow`: 3 層のシャドウ（inset 上端ハイライト / inset 全面縁取り / 外側ドロップシャドウ）
   - `rgba(148,163,184,0.08)`: §9.3.11 残余承認（slate 系 8% ハイライト）
-  - `#020617`: §9.3.11 残余承認（最深色の inset 縁取り）
+  - `var(--wind-shadow-deep)` (#020617): §2.6 で命名（最深色の inset 縁取り）
   - `rgba(0,0,0,0.5)`: §9.3.11 残余承認（外側のドロップシャドウ）
 - `borderRadius: 10`
 - `padding: 14`（呼び出し側で style に padding を渡すと上書きされる）
@@ -2793,7 +2796,7 @@ const BezelPanel = ({ children, style, title, corner }) => { ... }
   <div key={k} style={{
     position: "absolute",
     width: 4, height: 4, borderRadius: 2,
-    background: "#020617",
+    background: "var(--wind-shadow-deep)",
     boxShadow: "inset 0 0 0 0.5px var(--wind-text-dim)",
     ...pos,
   }} />
@@ -2804,7 +2807,7 @@ const BezelPanel = ({ children, style, title, corner }) => { ... }
 
 - `position: absolute`
 - `width: 4`、`height: 4`、`borderRadius: 2`
-- `background: "#020617"`（§9.3.11 残余承認、最深色）
+- `background: "var(--wind-shadow-deep)"` (#020617)（最深色）
 - `boxShadow: "inset 0 0 0 0.5px var(--wind-text-dim)"`（#475569 の 0.5px inset、金属縁の光沢表現）
 - 位置: top-left / top-right / bottom-left / bottom-right の 4 パターン、各 6px インセット
 
@@ -3193,7 +3196,7 @@ const DeckHeader = ({ scale = 1, session = "00:00", connected = false, onClose }
   padding: `${8 * scale}px ${12 * scale}px`,
   background: "linear-gradient(180deg, var(--wind-bg-panel) 0%, #0b1220 100%)",
   border: "1px solid var(--wind-edge)",
-  boxShadow: "inset 0 1px 0 rgba(148,163,184,0.1), inset 0 -1px 0 #020617",
+  boxShadow: "inset 0 1px 0 rgba(148,163,184,0.1), inset 0 -1px 0 var(--wind-shadow-deep)",
   borderRadius: 8,
 }
 ```
@@ -3203,7 +3206,7 @@ const DeckHeader = ({ scale = 1, session = "00:00", connected = false, onClose }
 - `border`: `1px solid var(--wind-edge)`
 - `boxShadow`: 2 層の inset（上端ハイライト + 下端最深色）
   - `rgba(148,163,184,0.1)`: §9.3.11 残余承認
-  - `#020617`: §9.3.11 残余承認
+  - `var(--wind-shadow-deep)` (#020617): §2.6 で命名（PR 1）
 - `borderRadius: 8`
 
 ###### 左グループ（閉じる + WIND · MONITOR）
@@ -3217,7 +3220,7 @@ const DeckHeader = ({ scale = 1, session = "00:00", connected = false, onClose }
 ```javascript
 <button type="button" onClick={onClose} style={{
   padding: `${5 * scale}px ${10 * scale}px`,
-  border: "1px solid #334155",
+  border: "1px solid var(--wind-border-subtle)",
   borderRadius: 6,
   background: "transparent",
   color: "var(--wind-text-slate)",
@@ -3232,7 +3235,7 @@ const DeckHeader = ({ scale = 1, session = "00:00", connected = false, onClose }
 ```
 
 - `padding`: `scale` 連動
-- `border: 1px solid #334155`（§9.3.11 残余承認）
+- `border: 1px solid var(--wind-border-subtle)` (#334155)
 - `borderRadius: 6`
 - `background: transparent`（ヘッダー背景が透ける）
 - `color: var(--wind-text-slate)` (#94a3b8)
@@ -3404,7 +3407,7 @@ const timelineCorner = hasWindSpeed
 ```javascript
 {
   maxWidth: 420, margin: "0 auto", minHeight: "100vh",
-  background: "radial-gradient(ellipse at 30% 0%, var(--wind-bg-surface) 0%, var(--wind-bg-base) 55%, #020617 100%)",
+  background: "radial-gradient(ellipse at 30% 0%, var(--wind-bg-surface) 0%, var(--wind-bg-base) 55%, var(--wind-shadow-deep) 100%)",
   color: "var(--wind-text-primary)",
   fontFamily: "-apple-system, 'Hiragino Sans', sans-serif",
   padding: 12, boxSizing: "border-box",
@@ -3415,7 +3418,7 @@ const timelineCorner = hasWindSpeed
 
 - `maxWidth: 420`、`margin: "0 auto"`（中央寄せ）
 - `minHeight: "100vh"`
-- `background`: 3 stop の radial-gradient（`#020617` は §9.3.11 残余）
+- `background`: 3 stop の radial-gradient（`var(--wind-shadow-deep)` (#020617) は §2.6 で命名）
 - `fontFamily`: Hiragino Sans（日本語）
 - `padding: 12`、`gap: 12`（セクション間）
 
@@ -3645,56 +3648,24 @@ export function WindMonitorModal({
 
 #### 9.3.11 WindMonitor 残余 hex 棚卸し
 
-PR β X-3 Type B 実装で未トークン化のまま残った装飾色 / rgba の一覧。**A 案採択により、全て特殊用途として承認**し、本 PR（PR β X-1）および前段の PR β X-2 / X-3 ではコード変更ゼロとする。将来の「WindMonitor 美学棚卸し」タスクで実装全体を俯瞰してから命名・トークン化を一括判断する。
-
-##### A 案採択の根拠
-
-- PR β X-3 実装では Wind Monitor Industrial Palette（§2.6、12 トークン）が全面適用されており、12 トークンで表現可能な色はすべてトークン化済み
-- 残余 hex は **微差のバリエーション**（`#6b7280` vs `--wind-text-muted` #64748b 等）または **独立した装飾固定値**（`#ffffff` / `#050914` / `#020617` 等）に分類される
-- 微差バリエーションを新トークン化すると、既存トークンとの意味論衝突（`--wind-text-muted` と新トークンの使い分け基準が曖昧化）が発生するリスクがある
-- 装飾固定値は「WindMonitor Industrial 美学の特殊表現」として hex 直書きを残す方が実装と仕様の整合が取りやすい
-- 以上により、現時点ではトークン化せず、全体俯瞰後の一括判断とする
+本節は 2026-04-26 の WindMonitor 美学棚卸しタスク（観点 2）で確定した残余 hex 12 項目の処理方針を記録するアーカイブである。PR 1（視覚変化なし、新トークン 4 本追加 + jsx 置換 15 箇所）でほぼ完了し、`#f87171` → `--wind-strong` 統合のみ視覚変化を伴うため PR 2 で別個に対応する。本節は確定後の状態を記録する位置づけであり、新たな審議を必要としない。
 
 ##### 残余 hex / rgba 一覧（12 項目）
 
 | # | 箇所 | hex / rgba | 既存トークン候補 | 差分 | 扱い確定 |
 |---|---|---|---|---|---|
-| 1 | `batteryColor()` 内: null 時 | `#6b7280` | `--wind-text-muted` (#64748b) | 微差（RGB 各 ±3〜9） | 特殊用途として承認 |
-| 2 | `batteryColor()` 内: 中間（< 50%） | `#eab308` | `--wind-moderate` (#fbbf24) | 微差（RGB 各 ±5〜22） | 特殊用途として承認（warning 系） |
-| 3 | レンジゲージ STRONG 帯（Phone / Pad） | `#f87171` | `--wind-strong` (#f97316) | 微差（RGB 各 ±7〜13） | 特殊用途として承認 |
-| 4 | CompassGauge ティック major（30° 毎の太めティック） | `#cbd5e1` | なし | - | 新トークン `--wind-tick-major` 候補、hex 直書き承認 |
-| 5 | 最深背景・CompassGauge face radial 終点・ハブ中心・BezelPanel リベット fill・BezelPanel boxShadow inset・DeckHeader boxShadow inset・InstrumentDeckPhone / Pad ルート radial-gradient 終点 ほか多数 | `#020617` | `--neutral-950` (#0b1526) | 大差（RGB 各 ±6〜18） | 特殊用途 `--wind-shadow-deep` 候補、hex 直書き承認 |
-| 6 | CompassGauge ring 円 stroke・閉じるボタン border | `#334155` | `--wind-text-dim` (#475569) | 微差 | 特殊用途として承認 |
-| 7 | DeckHeader gradient 下端・レンジゲージ背景 | `#0b1220` | なし | - | 特殊用途として承認 |
-| 8 | BLADE 先端ドット | `#ffffff` | なし（pure white） | - | 装飾固定として承認 |
-| 9 | BezelPanel radial-gradient 終点 | `#050914` | なし | - | 装飾固定として承認 |
-| 10 | BezelPanel boxShadow inset（上端ハイライト）・DeckHeader boxShadow inset（上端ハイライト）・BezelPanel boxShadow outer（外側ドロップシャドウ） | `rgba(148,163,184,0.08)` / `rgba(148,163,184,0.1)` / `rgba(0,0,0,0.5)` | なし | - | 装飾固定として承認 |
-| 11 | InstrumentDeckPad Hero 数値 textShadow | `rgba(251,191,36,0.25)` | なし（amber 250 系 25% 透過） | - | 装飾固定として承認 |
-| 12 | DeckHeader LINKED ドット boxShadow（接続時 green 80% グロウ / 切断時 red 50% グロウ） | `rgba(52,211,153,0.8)` / `rgba(239,68,68,0.5)` | なし | - | 装飾固定として承認 |
-
-##### C-g（PR #87）先例との整合
-
-本節の方針は第2弾C C-g（PR #87、2026-04-21）で確立された「WindMonitor 残余 hex は美学棚卸しタスクで一括判断」ルールに従う。C-g では `#f59e0b`（当時の PEAK 数値、PR β X-3 で Wind Ramp 連動に変更されて実質廃止）、`#eab308`（BAT < 50%）、`#6b7280`（値未取得時）が hex 直書き維持されており、PR β X-3 新規残余もこの先例に沿って同じ扱いとする。
-
-##### 将来タスク予告（WindMonitor 美学棚卸し）
-
-将来の「WindMonitor 美学棚卸し」タスクで以下を一括判断する:
-
-- **新トークン候補 8 本の追加案**:
-  - `--wind-shadow-deep`（`#020617` 複数箇所参照、一括置換で大きな効果）
-  - `--wind-tick-major`（`#cbd5e1`、CompassGauge ティック major 専用）
-  - `--wind-border-subtle`（`#334155`、ring stroke / ボタン border 専用）
-  - `--wind-panel-gradient-end`（`#050914`、BezelPanel 終点専用）
-  - `--wind-header-gradient-end`（`#0b1220`、DeckHeader 終点専用）
-  - `--wind-range-strong`（`#f87171`、レンジゲージ STRONG 帯専用）
-  - `--wind-battery-mid`（`#eab308`、batteryColor < 50% 専用）
-  - `--wind-battery-null`（`#6b7280`、batteryColor null 時専用）
-- **もしくは全面再設計案**: 実装全体を再設計し、Wind Monitor Industrial Palette を 12 本 → 20 本程度に拡張する案
-- 判断は WindMonitor 美学棚卸しタスクで太一さんの承認のもとで確定
-
-##### 本節の位置づけ
-
-§9.3.11 は DESIGN.md と実装の乖離を **明示的に記録する棚卸し表**であり、「実装優先」原則（§9.1）のもとで乖離を許容することを正典化する。将来の美学棚卸しタスクで本表の各項目をトークン化 or 承認維持のどちらかに確定させた時点で、本節は更新または廃止される。
+| 1 | `batteryColor()` 内: null 時 | `#6b7280` | `--wind-text-muted` (#64748b) | 微差（RGB 各 ±3〜9） | `var(--wind-battery-null)` 化済（PR 1） |
+| 2 | `batteryColor()` 内: 中間（< 50%） | `#eab308` | `--wind-moderate` (#fbbf24) | 微差（RGB 各 ±5〜22） | `var(--wind-battery-mid)` 化済（PR 1） |
+| 3 | レンジゲージ STRONG 帯（Phone / Pad） | `#f87171` | `--wind-strong` (#f97316) | 微差（RGB 各 ±7〜13） | **PR 2 で `--wind-strong` 統合予定**（視覚変化あり、モック確認必須） |
+| 4 | CompassGauge ティック major（30° 毎の太めティック） | `#cbd5e1` | なし | - | 直書き維持確定（CompassGauge 内ローカル値、1 箇所） |
+| 5 | 最深背景・CompassGauge face radial 終点・ハブ中心・BezelPanel リベット fill・BezelPanel boxShadow inset・DeckHeader boxShadow inset・InstrumentDeckPhone / Pad ルート radial-gradient 終点 ほか多数 | `#020617` | `--neutral-950` (#0b1526) | 大差（RGB 各 ±6〜18） | `var(--wind-shadow-deep)` 化済（PR 1、11 箇所、推定 7〜9 より多） |
+| 6 | CompassGauge ring 円 stroke・閉じるボタン border | `#334155` | `--wind-text-dim` (#475569) | 微差 | `var(--wind-border-subtle)` 化済（PR 1） |
+| 7 | DeckHeader gradient 下端・レンジゲージ背景 | `#0b1220` | なし | - | 直書き維持確定（2 箇所、`--wind-bg-base` と微差の特殊用途） |
+| 8 | BLADE 先端ドット | `#ffffff` | なし（pure white） | - | 直書き維持確定（pure white、意味論明確） |
+| 9 | BezelPanel radial-gradient 終点 | `#050914` | なし | - | 直書き維持確定（命名候補 `--wind-panel-gradient-end` を §2.6「将来追加候補」に保留、1 箇所） |
+| 10 | BezelPanel boxShadow inset（上端ハイライト）・DeckHeader boxShadow inset（上端ハイライト）・BezelPanel boxShadow outer（外側ドロップシャドウ） | `rgba(148,163,184,0.08)` / `rgba(148,163,184,0.1)` / `rgba(0,0,0,0.5)` | なし | - | 直書き維持確定（影・グロウ専用 rgba） |
+| 11 | InstrumentDeckPad Hero 数値 textShadow | `rgba(251,191,36,0.25)` | なし（amber 250 系 25% 透過） | - | 直書き維持確定（amber textShadow） |
+| 12 | DeckHeader LINKED ドット boxShadow（接続時 green 80% グロウ / 切断時 red 50% グロウ） | `rgba(52,211,153,0.8)` / `rgba(239,68,68,0.5)` | なし | - | 直書き維持確定（接続/切断グロウ rgba） |
 
 ---
 

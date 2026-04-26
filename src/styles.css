@@ -90,6 +90,12 @@
   --wind-text-muted:   #64748b;  /* MUTED 統合（コーナーラベル、タイトル切り欠き、補助テキスト、Wind Sensor 補助） */
   --wind-text-dim:     #475569;  /* 最淡テキスト（軸ラベル、フッター、tick minor、数値ラベル） */
   --wind-linked:       #34d399;  /* LINKED 緑（接続中ドット、--wind-calm と hex 同値の意図的エイリアス、DESIGN.md §2.11.2 で正典承認予定） */
+
+  /* WindMonitor 美学棚卸し PR 1（2026-04-26 確定方針、§9.3.11 残余 hex のうち命名整理 4 本） */
+  --wind-battery-null:   #6b7280;  /* batteryColor() null 時、§9.3.6 / §9.3.10.1 参照 */
+  --wind-battery-mid:    #eab308;  /* batteryColor() pct < 50 警告色（warning 系） */
+  --wind-border-subtle:  #334155;  /* CompassGauge ring stroke / 閉じるボタン border（構造ボーダー専用） */
+  --wind-shadow-deep:    #020617;  /* 最深シャドウ系、--wind-bg-base (#0a0f1a) より深い独立 slate、複数箇所参照 */
 }
 
 html, body, #root {
