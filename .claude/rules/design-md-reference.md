@@ -16,7 +16,7 @@ UI の新規実装・改修・レビュー時は `/DESIGN.md` を **最初に参
 ## 参照順序
 
 1. `/DESIGN.md` §1「Overview & Role Separation」で役割分離を確認
-2. 該当する章（§2 Color, §3 Typography, §4 Spacing, §5 Shadow, §6 Radii, §7 Components, §8 Motion, §9 Screens, §10 Don'ts）を参照
+2. 該当する章（§2 Color, §3 Typography, §4 Spacing, §5 Radius & Shadow, §6 Motion, §7 Components, §8 Layout Principles, §9 Screens, §10 Don'ts）を参照
 3. 必要に応じて `/DESIGN_PHILOSOPHY.md`（哲学）と `.claude/skills/molkky-ui-design/SKILL.md`（実装ガイドライン）を追加参照
 
 ## トークン使用の必須ルール
