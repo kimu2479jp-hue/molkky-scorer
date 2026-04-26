@@ -80,6 +80,24 @@ function getWindRampLabel(windSpeed) {
  */
 const CompassGauge = ({ prefix, size = 260, bearing = 45 }) => {
   const CX = size / 2, CY = size / 2, k = size / 340;
+
+  // 針の滑らか回転（UI改善）:
+  // CSS transition で 500ms かけて新角度へ補間する。
+  // 0°↔359° 境界で長回り（例: 358°→1° で +3° ではなく -357° に動く）を避けるため、
+  // 累積角度（rotate に渡す値が 360° を超えても良い）を維持し、
+  // 新 bearing との差分を「最短経路（-180°〜+180°）」に正規化して加算する。
+  // useRef を使うのは state にすると bearing 変化のたびに再レンダーが余計に走るため。
+  // bearing prop の変化検知でガードを入れることで StrictMode の二重実行に対応。
+  const prevBearingRef = useRef(bearing);
+  const cumulativeBearingRef = useRef(bearing);
+  if (bearing !== prevBearingRef.current) {
+    // 最短差分: ((diff % 360) + 540) % 360 - 180 で -180〜+180 に正規化
+    const diff = ((bearing - prevBearingRef.current) % 360 + 540) % 360 - 180;
+    cumulativeBearingRef.current += diff;
+    prevBearingRef.current = bearing;
+  }
+  const renderedBearing = cumulativeBearingRef.current;
+
   const rOuter = 156 * k, rRing = 150 * k, rSep = 128 * k, rInner = 100 * k, rFace = 94 * k;
   const rDegText = 137 * k, rDirText = 112 * k;
   const tickAngles = Array.from({ length: 72 }, (_, i) => i * 5);
@@ -203,7 +221,11 @@ const CompassGauge = ({ prefix, size = 260, bearing = 45 }) => {
         {String(bearing).padStart(3, "0")}°
       </text>
 
-      <g style={{ transform: `rotate(${bearing}deg)`, transformOrigin: `${CX}px ${CY}px` }}>
+      <g style={{
+        transform: `rotate(${renderedBearing}deg)`,
+        transformOrigin: `${CX}px ${CY}px`,
+        transition: 'transform 500ms ease-out',
+      }}>
         <path d={`M ${CX - 7 * k} ${CY + 4 * k} L ${CX + 7 * k} ${CY + 4 * k} L ${CX + 4 * k} ${CY + 44 * k} L ${CX - 4 * k} ${CY + 44 * k} Z`}
           fill={`url(#${idT})`} />
         <path d={`M ${CX} ${CY - 118 * k} L ${CX + 7 * k} ${CY - 4 * k} L ${CX - 7 * k} ${CY - 4 * k} Z`}
