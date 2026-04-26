@@ -85,12 +85,12 @@ return(<div style={{background:"var(--bg-surface)",borderRadius:14,padding:16,bo
 </div>
 {(()=>{const nextMonthDate=new Date(year,month+1,1);const canGoNext=nextMonthDate<=new Date();return(<button onClick={canGoNext?nextMonth:undefined} style={{width:36,height:36,border:"1px solid var(--neutral-200)",borderRadius:8,background:"var(--bg-surface)",fontSize:18,cursor:canGoNext?"pointer":"default",display:"flex",alignItems:"center",justifyContent:"center",opacity:canGoNext?1:0.3}}>›</button>);})()}
 </div>
-{showYearPicker&&(<div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10,justifyContent:"center"}}>{availableYears.map(y=>(<button key={y} onClick={()=>{setViewDate(new Date(y,month,1));setShowYearPicker(false);}} style={{padding:"6px 14px",border:y===year?"2px solid var(--blue-500)":"1px solid var(--neutral-200)",borderRadius:8,background:y===year?"var(--blue-500)":"var(--bg-surface)",color:y===year?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{y}</button>))}</div>)}
+{showYearPicker&&(<div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:10,justifyContent:"center"}}>{availableYears.map(y=>(<button key={y} onClick={()=>{setViewDate(new Date(y,month,1));setShowYearPicker(false);}} className={y===year?"mk-btn-primary":undefined} style={{padding:"6px 14px",border:y===year?"2px solid var(--blue-500)":"1px solid var(--neutral-200)",borderRadius:8,background:y===year?undefined:"var(--bg-surface)",color:y===year?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{y}</button>))}</div>)}
 <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2}}>
 {dayNames.map((dn,i)=>(<div key={dn} style={{textAlign:"center",fontSize:13,fontWeight:700,color:i===0?"#d93a5e":i===6?"var(--blue-500)":"var(--text-secondary)",padding:"4px 0"}}>{dn}</div>))}
 {cells.map((d,i)=>{
 const inR=isInRange(d);const isSt=isStart(d);const isEn=isEnd(d);const gd=isGameDay(d);const td=isToday(d);const today=new Date();today.setHours(23,59,59,999);const isFuture=d&&new Date(year,month,d)>today;
-return(<div key={i} onClick={()=>{if(!isFuture)handleClick(d);}} style={{textAlign:"center",padding:"8px 2px",cursor:d&&!isFuture?"pointer":"default",position:"relative",borderRadius:isSt&&isEn?10:isSt?"10px 0 0 10px":isEn?"0 10px 10px 0":0,background:inR&&!isFuture?"var(--blue-500)":"transparent",color:isFuture?"#ccc":inR?"#fff":!d?"transparent":td?"var(--blue-500)":"#333",fontWeight:td||inR?800:500,fontSize:15,opacity:isFuture?0.4:1,transition:"background 0.15s"}}>
+return(<div key={i} onClick={()=>{if(!isFuture)handleClick(d);}} className={inR&&!isFuture?"mk-btn-primary":undefined} style={{textAlign:"center",padding:"8px 2px",cursor:d&&!isFuture?"pointer":"default",position:"relative",borderRadius:isSt&&isEn?10:isSt?"10px 0 0 10px":isEn?"0 10px 10px 0":0,background:inR&&!isFuture?undefined:"transparent",color:isFuture?"#ccc":inR?"#fff":!d?"transparent":td?"var(--blue-500)":"#333",fontWeight:td||inR?800:500,fontSize:15,opacity:isFuture?0.4:1,transition:"background 0.15s"}}>
 {d||""}{gd&&!inR&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:"var(--blue-500)"}}/>}{gd&&inR&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",width:5,height:5,borderRadius:"50%",background:"rgba(255,255,255,0.7)"}}/>}
 </div>);
 })}
@@ -118,7 +118,7 @@ if(!hasSV)return(<div style={{background:"var(--bg-surface)",borderRadius:14,pad
   return(<div style={{background:"var(--bg-surface)",borderRadius:14,padding:14,marginBottom:14,border:"1px solid var(--neutral-200)"}}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
     <div style={{fontSize:16,fontWeight:800,color:"var(--text-primary)"}}><Target size={16} style={{display:"inline",verticalAlign:"middle",marginRight:4}}/> スコア分布分析</div>
-    {aiEnabled&&analyzablePlayers.length>1&&<button onClick={()=>{setAnalyzeAll(true);setAnalyzeKey(k=>k+1);}} style={{padding:"6px 14px",border:"none",borderRadius:8,background:"var(--blue-500)",color:"var(--text-inverse)",fontSize:13,fontWeight:700,cursor:"pointer"}}><Bot size={13} style={{display:"inline",verticalAlign:"middle",marginRight:2}}/> 全員分析</button>}
+    {aiEnabled&&analyzablePlayers.length>1&&<button onClick={()=>{setAnalyzeAll(true);setAnalyzeKey(k=>k+1);}} className="mk-btn-primary" style={{padding:"6px 14px",border:"none",borderRadius:8,color:"var(--text-inverse)",fontSize:13,fontWeight:700,cursor:"pointer"}}><Bot size={13} style={{display:"inline",verticalAlign:"middle",marginRight:2}}/> 全員分析</button>}
     </div>
     {playersData.map(pd=>(<ScoreDistPlayer key={pd.name} pd={pd} SCORE_COLORS={SCORE_COLORS} isFav={(favs||[]).includes(pd.name)} isAdmin={isAdmin} aiEnabled={aiEnabled} triggerAll={analyzeAll} analyzeKey={analyzeKey} playerGames={getGames(pd.name)}/>))}
   </div>);
@@ -184,7 +184,7 @@ return(<div style={{marginBottom:16}}>
 {aiEnabled&&canAnalyze&&!aiLoading&&(
 <div style={{display:"flex",alignItems:"center",gap:8,marginTop:8}}>
 {aiText?<button onClick={()=>doAnalyze(true)} style={{padding:"5px 12px",border:"1px solid var(--neutral-200)",borderRadius:6,background:"var(--bg-surface)",color:"#555",fontSize:12,fontWeight:600,cursor:"pointer"}}><RefreshCw size={12} style={{display:"inline",verticalAlign:"middle",marginRight:2}}/> 再分析</button>
-:<button onClick={()=>doAnalyze(false)} style={{padding:"6px 14px",border:"none",borderRadius:8,background:"var(--blue-500)",color:"var(--text-inverse)",fontSize:13,fontWeight:700,cursor:"pointer"}}><Bot size={13} style={{display:"inline",verticalAlign:"middle",marginRight:2}}/> 分析</button>}
+:<button onClick={()=>doAnalyze(false)} className="mk-btn-primary" style={{padding:"6px 14px",border:"none",borderRadius:8,color:"var(--text-inverse)",fontSize:13,fontWeight:700,cursor:"pointer"}}><Bot size={13} style={{display:"inline",verticalAlign:"middle",marginRight:2}}/> 分析</button>}
 {!isAdmin&&<span style={{fontSize:11,color:"#bbb"}}>残{remaining}/{ANALYSIS_DAILY_MAX}回</span>}
 </div>)}
 </div>
@@ -754,7 +754,7 @@ const winLabel=game.ft==="50finish"?"上がり者":"勝者";
 const hasTeam=(game.winnerMembers||[]).length>=2;
 const hasReplay=game.hasReplay;
 return(<div style={{display:"flex",alignItems:"flex-start",gap:10,padding:"12px 14px",background:checked?"#e6f0fb":"#fff",borderRadius:10,border:checked?"2px solid var(--blue-500)":"1px solid #e0e0e0",marginBottom:6,transition:"all 0.15s"}}>
-<div onClick={onToggle} style={{width:22,height:22,borderRadius:6,border:checked?"none":"2px solid #ccc",background:checked?"var(--blue-500)":"var(--bg-surface)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2,cursor:"pointer"}}>
+<div onClick={onToggle} className={checked?"mk-btn-primary":undefined} style={{width:22,height:22,borderRadius:6,border:checked?"none":"2px solid #ccc",background:checked?undefined:"var(--bg-surface)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,marginTop:2,cursor:"pointer"}}>
 {checked&&<span style={{color:"var(--text-inverse)",fontSize:14,fontWeight:900}}>✓</span>}
 </div>
 <div onClick={onToggle} style={{flex:1,minWidth:0,cursor:"pointer"}}>
@@ -982,14 +982,14 @@ return(<div className="mk-fade-scale-in" style={{position:"fixed",inset:0,backgr
 {viewMode==="cumulative"&&tab==="all"&&(
 <div style={{display:"flex",gap:4,marginBottom:10,flexWrap:"wrap"}}>
 {PERIOD_OPTIONS.map(opt=>{const active=(selectedPeriod===opt.value);return(
-<button key={opt.label} onClick={()=>setSelectedPeriod(opt.value)} style={{padding:isTab?"8px 16px":"6px 10px",border:active?"2px solid var(--blue-500)":"1px solid var(--neutral-200)",borderRadius:8,background:active?"var(--blue-500)":"var(--bg-surface)",color:active?"var(--text-inverse)":"var(--text-secondary)",fontSize:isTab?15:12,fontWeight:active?800:600,cursor:"pointer"}}>{opt.label}</button>
+<button key={opt.label} onClick={()=>setSelectedPeriod(opt.value)} className={active?"mk-btn-primary":undefined} style={{padding:isTab?"8px 16px":"6px 10px",border:active?"2px solid var(--blue-500)":"1px solid var(--neutral-200)",borderRadius:8,background:active?undefined:"var(--bg-surface)",color:active?"var(--text-inverse)":"var(--text-secondary)",fontSize:isTab?15:12,fontWeight:active?800:600,cursor:"pointer"}}>{opt.label}</button>
 );})}
 </div>
 )}
 {/* Calendar Tab */}
 {viewMode==="cumulative"&&tab==="calendar"&&(<>
 <div style={{display:"flex",gap:6,marginBottom:8}}>
-{[["single","単一日付"],["range","期間選択"]].map(([k,l])=>(<button key={k} onClick={()=>{setCalMode(k);setCalStart(null);setCalEnd(null);setSelectedGameKeys(new Set());setCalPage(0);}} style={{flex:1,padding:"8px 0",border:"2px solid "+(calMode===k?"var(--blue-500)":"var(--neutral-200)"),borderRadius:8,background:calMode===k?"var(--blue-500)":"var(--bg-surface)",color:calMode===k?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{l}</button>))}
+{[["single","単一日付"],["range","期間選択"]].map(([k,l])=>(<button key={k} onClick={()=>{setCalMode(k);setCalStart(null);setCalEnd(null);setSelectedGameKeys(new Set());setCalPage(0);}} className={calMode===k?"mk-btn-primary":undefined} style={{flex:1,padding:"8px 0",border:"2px solid "+(calMode===k?"var(--blue-500)":"var(--neutral-200)"),borderRadius:8,background:calMode===k?undefined:"var(--bg-surface)",color:calMode===k?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{l}</button>))}
 </div>
 <CalendarPicker gameDates={gameDateSet} onSelect={handleCalSelect} onSelectMonth={handleMonthSelect} onSelectYear={handleYearSelect} mode={calMode} selectedStart={calStart} selectedEnd={calEnd}/>
 {calFilteredGames.length>0&&(<div style={{marginBottom:10}}>
@@ -1003,7 +1003,7 @@ return(<div className="mk-fade-scale-in" style={{position:"fixed",inset:0,backgr
 {(()=>{const CAL_PAGE_SIZE=10;const calTotalPages=Math.ceil(calFilteredGames.length/CAL_PAGE_SIZE);const calPagedGames=calFilteredGames.slice(calPage*CAL_PAGE_SIZE,(calPage+1)*CAL_PAGE_SIZE);return(<>
 {calPagedGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab} onShowScore={setScoreGame} onShowWind={setWindChartGame} onDelete={(key,game)=>setDeleteConf(game)} isAdmin={isAdmin} windData={windDataCache[g.d]}/>))}
 {calTotalPages>1&&<div style={{display:"flex",gap:6,justifyContent:"center",marginTop:8}}>
-{Array.from({length:calTotalPages},(_,i)=>(<button key={i} onClick={()=>setCalPage(i)} style={{width:36,height:36,border:calPage===i?"2px solid var(--blue-500)":"1px solid var(--neutral-200)",borderRadius:8,background:calPage===i?"var(--blue-500)":"var(--bg-surface)",color:calPage===i?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{i+1}</button>))}
+{Array.from({length:calTotalPages},(_,i)=>(<button key={i} onClick={()=>setCalPage(i)} className={calPage===i?"mk-btn-primary":undefined} style={{width:36,height:36,border:calPage===i?"2px solid var(--blue-500)":"1px solid var(--neutral-200)",borderRadius:8,background:calPage===i?undefined:"var(--bg-surface)",color:calPage===i?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{i+1}</button>))}
 </div>}
 </>);})()}
 </div>)}
@@ -1033,7 +1033,7 @@ return(<button key={k} onClick={applyPreset} style={{padding:"6px 12px",border:"
 {recentGames.map(g=>(<GameListItem key={g.d} game={g} checked={selectedGameKeys.has(g.d)} onToggle={()=>toggleGameKey(g.d)} isTab={isTab} onShowScore={setScoreGame} onShowWind={setWindChartGame} onDelete={(key,game)=>setDeleteConf(game)} isAdmin={isAdmin} windData={windDataCache[g.d]}/>))}
 {/* F: Pagination */}
 {totalPages>1&&(<div style={{display:"flex",justifyContent:"center",gap:8,marginTop:10}}>
-{Array.from({length:totalPages},(_,i)=>(<button key={i} onClick={()=>setRecentPage(i)} style={{width:36,height:36,border:recentPage===i?"2px solid var(--blue-500)":"1px solid var(--neutral-200)",borderRadius:8,background:recentPage===i?"var(--blue-500)":"var(--bg-surface)",color:recentPage===i?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{i+1}</button>))}
+{Array.from({length:totalPages},(_,i)=>(<button key={i} onClick={()=>setRecentPage(i)} className={recentPage===i?"mk-btn-primary":undefined} style={{width:36,height:36,border:recentPage===i?"2px solid var(--blue-500)":"1px solid var(--neutral-200)",borderRadius:8,background:recentPage===i?undefined:"var(--bg-surface)",color:recentPage===i?"var(--text-inverse)":"var(--text-primary)",fontSize:14,fontWeight:700,cursor:"pointer"}}>{i+1}</button>))}
 </div>)}
 </div>)}
 {/* Player selection */}
