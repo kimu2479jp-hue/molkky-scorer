@@ -9,6 +9,7 @@ import json
 import logging
 import math
 import os
+import struct
 import tempfile
 import time
 from datetime import datetime, timezone
@@ -16,10 +17,32 @@ from datetime import datetime, timezone
 from bleak import BleakClient, BleakScanner
 import websockets
 
-# ESS標準UUIDs
+# ESS標準UUIDs (Phase A、Phase B では未使用だが定数定義は残す)
 WIND_SPEED_UUID = "00002a72-0000-1000-8000-00805f9b34fb"
 WIND_DIR_UUID = "00002a73-0000-1000-8000-00805f9b34fb"
 BATTERY_UUID = "00002a19-0000-1000-8000-00805f9b34fb"
+
+# Phase B: Calypso vendor characteristics
+# 出典: maritime-labs/calypso-anemometer v0.6.0 model.py (一次仕様)
+VENDOR_DATA_UUID = "00002a39-0000-1000-8000-00805f9b34fb"     # notify 10 byte blob
+VENDOR_MODE_UUID = "0000a001-0000-1000-8000-00805f9b34fb"     # write 1 byte
+VENDOR_RATE_UUID = "0000a002-0000-1000-8000-00805f9b34fb"     # write 1 byte
+VENDOR_COMPASS_UUID = "0000a003-0000-1000-8000-00805f9b34fb"  # write 1 byte
+
+# Phase B: 設定値（IntEnum を使わず単純なバイト値で扱う）
+CALYPSO_MODE_NORMAL = 0x02
+CALYPSO_RATE_HZ_1 = 0x01
+CALYPSO_RATE_HZ_4 = 0x04
+CALYPSO_RATE_HZ_8 = 0x08
+CALYPSO_COMPASS_OFF = 0x00  # QMC5883L 利用のため内蔵9DOFは OFF
+
+# Phase B: rate 文字列 → バイト値マッピング (config.json/WebSocket コマンド用)
+CALYPSO_RATE_MAP = {
+    "hz_1": CALYPSO_RATE_HZ_1,
+    "hz_4": CALYPSO_RATE_HZ_4,
+    "hz_8": CALYPSO_RATE_HZ_8,
+}
+DEFAULT_WIND_RATE = "hz_8"  # Phase B デフォルト
 
 # デフォルト設定
 DEFAULT_WS_PORT = 8765
@@ -63,6 +86,7 @@ wind_data_updated = None
 
 ws_clients = set()
 ble_client_ref = None
+current_wind_rate = "hz_8"  # Phase B: 現在の rate 設定文字列（WebSocket 経由で変更可能）
 
 # キャリブレーション実行中の state
 calibration_state = {
@@ -122,6 +146,38 @@ def read_compass():
         return 0
 
 
+def decode_vendor_reading(buffer: bytes) -> dict:
+    """
+    Calypso vendor 0x2A39 notify の 10 byte payload をデコード。
+
+    一次仕様: maritime-labs/calypso-anemometer v0.6.0 model.py CalypsoReading.from_buffer()
+    フォーマット: <HHBBBBH (little-endian)
+
+    Returns:
+        dict: {wind_speed (m/s), wind_direction (deg), battery_level (%),
+               temperature (C), roll (deg), pitch (deg), heading (deg)}
+
+    Raises:
+        ValueError: buffer 長が 10 でない場合
+        struct.error: unpack 失敗時
+    """
+    if len(buffer) != 10:
+        raise ValueError(f"Expected 10 bytes, got {len(buffer)}: {buffer.hex()}")
+
+    wind_speed_raw, wind_direction, battery_raw, temperature_raw, roll_raw, pitch_raw, heading_raw = \
+        struct.unpack("<HHBBBBH", buffer)
+
+    return {
+        "wind_speed": wind_speed_raw / 100.0,
+        "wind_direction": wind_direction,
+        "battery_level": battery_raw * 10,
+        "temperature": temperature_raw - 100,
+        "roll": roll_raw - 90,
+        "pitch": pitch_raw - 90,
+        "heading": 360 - heading_raw,
+    }
+
+
 def on_wind_speed(sender, data):
     speed = int.from_bytes(data, "little") / 100.0
     latest_wind_data["wind_speed"] = round(speed, 2)
@@ -144,9 +200,72 @@ def on_wind_dir(sender, data):
         wind_data_updated.set()
 
 
+def on_vendor_data(sender, data):
+    """
+    Phase B: Calypso vendor 0x2A39 notify ハンドラ。
+    10 byte blob から wind_speed / wind_direction を取り出して latest_wind_data を更新。
+    Calypso 内蔵 9DOF (roll/pitch/heading) は使用せず、QMC5883L 由来の compass_heading を使う。
+    """
+    try:
+        reading = decode_vendor_reading(bytes(data))
+    except (ValueError, struct.error) as e:
+        logging.warning(f"vendor notify デコード失敗: {e}")
+        return
+
+    latest_wind_data["wind_speed"] = round(reading["wind_speed"], 2)
+    latest_wind_data["wind_direction"] = round(reading["wind_direction"], 1)
+    latest_wind_data["timestamp"] = datetime.now(timezone.utc).isoformat()
+    latest_wind_data["connected"] = True
+    latest_wind_data["compass_heading"] = read_compass()
+    latest_wind_data["compass_valid"] = compass_valid
+
+    # battery は vendor blob 内に含まれるので vendor パスでは別 read 不要
+    latest_wind_data["battery"] = reading["battery_level"]
+
+    logging.debug(
+        f"Vendor: speed={reading['wind_speed']:.2f}m/s dir={reading['wind_direction']}° batt={reading['battery_level']}%"
+    )
+
+    if wind_data_updated is not None:
+        wind_data_updated.set()
+
+
+async def _configure_calypso_vendor(client, rate_byte: int):
+    """
+    Phase B: vendor characteristics 経由で Calypso を設定する。
+    切断で揮発するため再接続のたびに呼ぶ必要がある。
+
+    Args:
+        client: BleakClient インスタンス（接続済み）
+        rate_byte: CALYPSO_RATE_HZ_1 / HZ_4 / HZ_8 のいずれか
+    """
+    # mode = NORMAL
+    await client.write_gatt_char(VENDOR_MODE_UUID, data=bytes([CALYPSO_MODE_NORMAL]), response=True)
+    logging.info(f"vendor: mode = NORMAL (0x{CALYPSO_MODE_NORMAL:02x})")
+
+    # rate = HZ_8 (or 設定値)
+    await client.write_gatt_char(VENDOR_RATE_UUID, data=bytes([rate_byte]), response=True)
+    logging.info(f"vendor: rate = 0x{rate_byte:02x}")
+
+    # compass = OFF (QMC5883L を使うため内蔵 9DOF は無効)
+    await client.write_gatt_char(VENDOR_COMPASS_UUID, data=bytes([CALYPSO_COMPASS_OFF]), response=True)
+    logging.info(f"vendor: compass = OFF (0x{CALYPSO_COMPASS_OFF:02x})")
+
+
 async def ble_task(config):
-    global ble_client_ref
+    """
+    Phase B: vendor characteristic 経由で Calypso CMI1022 と通信する。
+    Phase A の ESS パスは使用しない。
+    """
+    global ble_client_ref, current_wind_rate
     ble_address = config.get("ble_address")
+
+    # 起動時の rate 設定をグローバルに保持（WebSocket set_rate コマンドで変更可能）
+    rate_str = config.get("wind_rate", DEFAULT_WIND_RATE)
+    if rate_str not in CALYPSO_RATE_MAP:
+        logging.warning(f"不正な wind_rate: {rate_str}, デフォルト {DEFAULT_WIND_RATE} を使用")
+        rate_str = DEFAULT_WIND_RATE
+    current_wind_rate = rate_str
 
     while True:
         try:
@@ -167,18 +286,19 @@ async def ble_task(config):
                 ble_client_ref = client
                 logging.info("BLE接続成功")
 
-                # バッテリー初回読み取り
+                # vendor 設定書き込み（mode / rate / compass）
+                rate_byte = CALYPSO_RATE_MAP[current_wind_rate]
                 try:
-                    battery_data = await client.read_gatt_char(BATTERY_UUID)
-                    latest_wind_data["battery"] = battery_data[0]
-                    logging.info(f"バッテリー: {battery_data[0]}%")
+                    await _configure_calypso_vendor(client, rate_byte)
                 except Exception as e:
-                    logging.warning(f"バッテリー読み取り失敗: {e}")
+                    logging.error(f"vendor設定書き込み失敗: {e}")
+                    # vendor設定が動かない CMI1022 では Phase B は機能しない
+                    # 切断 → 5秒待機 → リトライ（フォールバックはしない）
+                    raise
 
-                # ESS notify購読
-                await client.start_notify(WIND_SPEED_UUID, on_wind_speed)
-                await client.start_notify(WIND_DIR_UUID, on_wind_dir)
-                logging.info("ESS notify購読開始。データ受信中...")
+                # vendor notify 購読開始
+                await client.start_notify(VENDOR_DATA_UUID, on_vendor_data)
+                logging.info(f"vendor notify 購読開始 (rate={current_wind_rate})。データ受信中...")
 
                 while client.is_connected:
                     await asyncio.sleep(1)
@@ -194,15 +314,12 @@ async def ble_task(config):
 
 
 async def battery_task():
+    """
+    Phase B: バッテリー値は vendor 0x2A39 notify (on_vendor_data) で毎回更新されるため、
+    このタスクは何もしない。タスク自体は asyncio.gather のシグネチャ維持のため残す。
+    """
     while True:
-        await asyncio.sleep(BATTERY_READ_INTERVAL)
-        if ble_client_ref and ble_client_ref.is_connected:
-            try:
-                battery_data = await ble_client_ref.read_gatt_char(BATTERY_UUID)
-                latest_wind_data["battery"] = battery_data[0]
-                logging.debug(f"バッテリー更新: {battery_data[0]}%")
-            except Exception as e:
-                logging.debug(f"バッテリー読み取り失敗: {e}")
+        await asyncio.sleep(3600)  # 1時間ごとに目覚めるだけ（事実上 no-op）
 
 
 def save_compass_offsets(offset_x, offset_y):
@@ -480,7 +597,8 @@ async def main():
     )
 
     logging.info("=== Calypso CMI1022 BLE Bridge 起動 ===")
-    logging.info(f"プロトコル: ESS (Environmental Sensing Service)")
+    logging.info(f"プロトコル: vendor 0x2A39 (Phase B)")
+    logging.info(f"rate: {config.get('wind_rate', DEFAULT_WIND_RATE)}")
     logging.info(f"broadcast: イベント駆動 + フォールバック {BROADCAST_FALLBACK_INTERVAL}秒")
 
     # Phase A: asyncio.Event は event loop 起動後（main 内）で生成する
