@@ -59,21 +59,50 @@ struct format: `<HHBBBBH` (little-endian)
 
 ## 検証結果
 
-（Step 5 で記入）
+**判定: CMI1022 Mini は内部 1Hz 固定。Phase B のレート向上効果は得られず。ただし vendor パス自体は採用。**
 
-### 立ち上がりラグ測定
+### 検証 A: 接続と起動ログ
 
-| 条件 | Phase A | Phase B (4Hz) | Phase B (8Hz) |
-|---|---|---|---|
-| ON 立ち上がり | 2-3 秒 | TBD | TBD |
-| OFF 立ち下がり | 1 秒 | TBD | TBD |
+vendor パス接続成功。期待ログがすべて出力された:
 
-### CMI1022 の hz_8 受理判定
+- `BLE接続成功`
+- `vendor: mode = NORMAL (0x02)`
+- `vendor: rate = 0x08`
+- `vendor: compass = OFF (0x00)`
+- `vendor notify 購読開始 (rate=hz_8)。データ受信中...`
 
-ログから notify 間隔を測定し、以下のいずれかを判定:
-- 受理: 約 125ms 間隔で notify が来る
-- クランプ: hz_8 書き込み成功でも 250ms (4Hz) または 1000ms (1Hz) 間隔のまま
+vendor write は ACK 返信付きで成功し、デコーダも正常動作（wind_speed/wind_direction/battery が現実的な値で受信）。
 
-### BLE 安定性
+### 検証 B: notify 頻度測定（決定的）
 
-8Hz で N 分間切断なく動作するかを記録。
+WebSocket クライアントで 5 秒間サンプリング:
+
+```
+received: 26 messages in 5 sec
+unique timestamps: 6
+broadcast rate: 5.2 Hz
+notify rate: 1.2 Hz
+```
+
+`broadcast rate = 5.2Hz` は bridge.py の broadcast_task のフォールバック（0.25s = 4Hz 名目）+ notify によるイベント駆動が混在した数値。`unique timestamps = 6` を 5 秒で割った `notify rate = 1.2Hz` が **Calypso が実際に送ってくる頻度**。
+
+`hz_8` 書き込みは受理されたものの、Calypso 内部で 1Hz にクランプされて配信されている。Tradeinn 流通データシートの「Sample rate: 1Hz」記述が正しかったことが確定。
+
+### 採用判断: vendor パス採用
+
+レート向上効果は得られなかったが、vendor パス自体は技術的に Phase A の ESS パスより優れているため採用:
+
+1. Phase A の二重 ESS notify（`0x2A72` 風速 + `0x2A73` 風向）→ vendor 単一 notify（`0x2A39`）に簡素化
+2. battery が vendor blob 内に含まれるため別 read 不要 → battery_task が事実上 no-op に
+3. Calypso 公式アプリ (Anemotracker) と同じプロトコルパス、将来的なファーム更新でレート上限が緩和された場合も無修正で恩恵を受けられる
+
+### 立ち上がりラグ問題への対応
+
+Phase B のレート上限解消では立ち上がりラグ（Phase A 計測 2-3 秒）を縮められないため、別アプローチで対応:
+
+- **UI 側の表示滑らか化**: WindMonitor 針の CSS transition で 500ms 補間 → 別タスクで実施
+- **将来的な代替センサー検討**: Skywatch BL400（¥40,000、BLE 標準 ESS、サブ秒 push）または Calypso ULP 有線版（¥55,000、10Hz、Wind Filter 操作可能）への置換は別判断
+
+## Step 3-5 を実施しない理由
+
+当初計画の Step 3（config.json wind_rate キー追加）、Step 4（WebSocket set_rate コマンド）、Step 5（検証）のうち、Step 3-4 は CMI1022 が hz_8 を受理しない（クランプする）ため意味なし。Step 5 は本ドキュメントの「検証結果」記録で代替。
