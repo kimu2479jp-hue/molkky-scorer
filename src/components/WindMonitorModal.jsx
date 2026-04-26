@@ -44,9 +44,9 @@ function polarToSvg(degree, r, cx, cy) {
 }
 
 function batteryColor(pct) {
-  if (pct == null) return "#6b7280";
+  if (pct == null) return "var(--wind-battery-null)";
   if (pct < 20) return "var(--wind-severe)";
-  if (pct < 50) return "#eab308";
+  if (pct < 50) return "var(--wind-battery-mid)";
   return "var(--wind-calm)";
 }
 
@@ -123,7 +123,7 @@ const CompassGauge = ({ prefix, size = 260, bearing = 45 }) => {
         <radialGradient id={idF} cx="0.5" cy="0.42" r="0.65">
           <stop offset="0%" stopColor="var(--wind-bg-panel)" />
           <stop offset="70%" stopColor="var(--wind-bg-base)" />
-          <stop offset="100%" stopColor="#020617" />
+          <stop offset="100%" stopColor="var(--wind-shadow-deep)" />
         </radialGradient>
         <linearGradient id={idB} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="var(--wind-text-dim)" />
@@ -150,14 +150,14 @@ const CompassGauge = ({ prefix, size = 260, bearing = 45 }) => {
         </linearGradient>
         <radialGradient id={idH} cx="0.5" cy="0.5" r="0.5">
           <stop offset="0%" stopColor="var(--wind-edge)" />
-          <stop offset="100%" stopColor="#020617" />
+          <stop offset="100%" stopColor="var(--wind-shadow-deep)" />
         </radialGradient>
       </defs>
 
       <circle cx={CX} cy={CY} r={rOuter} fill={`url(#${idF})`} />
       <circle cx={CX} cy={CY} r={rOuter} stroke={`url(#${idB})`} strokeWidth={3 * k} fill="none" />
-      <circle cx={CX} cy={CY} r={rOuter - 3 * k} stroke="#020617" strokeWidth="1" fill="none" />
-      <circle cx={CX} cy={CY} r={rRing} stroke="#334155" strokeWidth="1" fill="none" />
+      <circle cx={CX} cy={CY} r={rOuter - 3 * k} stroke="var(--wind-shadow-deep)" strokeWidth="1" fill="none" />
+      <circle cx={CX} cy={CY} r={rRing} stroke="var(--wind-border-subtle)" strokeWidth="1" fill="none" />
       <path d={secD} fill={`url(#${idS})`} />
 
       {tickAngles.map((a) => {
@@ -237,10 +237,10 @@ const CompassGauge = ({ prefix, size = 260, bearing = 45 }) => {
         <circle cx={CX} cy={CY - 112 * k} r={1.4 * k} fill="#ffffff" fillOpacity="0.9" />
         <circle cx={CX} cy={CY} r={16 * k} fill={`url(#${idH})`} stroke="var(--wind-accent)" strokeWidth="1.5" />
         <circle cx={CX} cy={CY} r={11 * k} fill="none" stroke="var(--wind-accent-lo)" strokeWidth="1" />
-        <circle cx={CX} cy={CY} r={6 * k} fill="#020617" />
+        <circle cx={CX} cy={CY} r={6 * k} fill="var(--wind-shadow-deep)" />
         <circle cx={CX} cy={CY} r={2.4 * k} fill="var(--wind-accent-hi)" />
-        <circle cx={CX - 12 * k} cy={CY} r={1.2 * k} fill="#020617" stroke="var(--wind-accent-lo)" strokeWidth="0.6" />
-        <circle cx={CX + 12 * k} cy={CY} r={1.2 * k} fill="#020617" stroke="var(--wind-accent-lo)" strokeWidth="0.6" />
+        <circle cx={CX - 12 * k} cy={CY} r={1.2 * k} fill="var(--wind-shadow-deep)" stroke="var(--wind-accent-lo)" strokeWidth="0.6" />
+        <circle cx={CX + 12 * k} cy={CY} r={1.2 * k} fill="var(--wind-shadow-deep)" stroke="var(--wind-accent-lo)" strokeWidth="0.6" />
       </g>
     </svg>
   );
@@ -252,7 +252,7 @@ const BezelPanel = ({ children, style, title, corner }) => (
     position: "relative",
     background: "radial-gradient(ellipse at top, var(--wind-bg-panel) 0%, var(--wind-bg-base) 60%, #050914 100%)",
     border: "1px solid var(--wind-edge)",
-    boxShadow: "inset 0 1px 0 rgba(148,163,184,0.08), inset 0 0 0 1px #020617, 0 8px 24px rgba(0,0,0,0.5)",
+    boxShadow: "inset 0 1px 0 rgba(148,163,184,0.08), inset 0 0 0 1px var(--wind-shadow-deep), 0 8px 24px rgba(0,0,0,0.5)",
     borderRadius: 10,
     padding: 14,
     ...style,
@@ -265,7 +265,7 @@ const BezelPanel = ({ children, style, title, corner }) => (
     ].map(([k, pos]) => (
       <div key={k} style={{
         position: "absolute", width: 4, height: 4, borderRadius: 2,
-        background: "#020617", boxShadow: "inset 0 0 0 0.5px var(--wind-text-dim)",
+        background: "var(--wind-shadow-deep)", boxShadow: "inset 0 0 0 0.5px var(--wind-text-dim)",
         ...pos,
       }} />
     ))}
@@ -446,7 +446,7 @@ const DeckHeader = ({ scale = 1, session = "00:00", connected = false, onClose }
     padding: `${8 * scale}px ${12 * scale}px`,
     background: "linear-gradient(180deg, var(--wind-bg-panel) 0%, #0b1220 100%)",
     border: "1px solid var(--wind-edge)",
-    boxShadow: "inset 0 1px 0 rgba(148,163,184,0.1), inset 0 -1px 0 #020617",
+    boxShadow: "inset 0 1px 0 rgba(148,163,184,0.1), inset 0 -1px 0 var(--wind-shadow-deep)",
     borderRadius: 8,
   }}>
     <div style={{ display: "flex", alignItems: "center", gap: 10 * scale }}>
@@ -455,7 +455,7 @@ const DeckHeader = ({ scale = 1, session = "00:00", connected = false, onClose }
         onClick={onClose}
         style={{
           padding: `${5 * scale}px ${10 * scale}px`,
-          border: "1px solid #334155",
+          border: "1px solid var(--wind-border-subtle)",
           borderRadius: 6,
           background: "transparent",
           color: "var(--wind-text-slate)",
@@ -595,7 +595,7 @@ const InstrumentDeckPhone = ({
   return (
     <div style={{
       maxWidth: 420, margin: "0 auto", minHeight: "100vh",
-      background: "radial-gradient(ellipse at 30% 0%, var(--wind-bg-surface) 0%, var(--wind-bg-base) 55%, #020617 100%)",
+      background: "radial-gradient(ellipse at 30% 0%, var(--wind-bg-surface) 0%, var(--wind-bg-base) 55%, var(--wind-shadow-deep) 100%)",
       color: "var(--wind-text-primary)",
       fontFamily: "-apple-system, 'Hiragino Sans', sans-serif",
       padding: 12, boxSizing: "border-box",
@@ -804,7 +804,7 @@ const InstrumentDeckPad = ({
   return (
     <div style={{
       maxWidth: 880, margin: "0 auto", minHeight: "100vh",
-      background: "radial-gradient(ellipse at 30% 0%, var(--wind-bg-surface) 0%, var(--wind-bg-base) 55%, #020617 100%)",
+      background: "radial-gradient(ellipse at 30% 0%, var(--wind-bg-surface) 0%, var(--wind-bg-base) 55%, var(--wind-shadow-deep) 100%)",
       color: "var(--wind-text-primary)",
       fontFamily: "-apple-system, 'Hiragino Sans', sans-serif",
       padding: 22, boxSizing: "border-box",
