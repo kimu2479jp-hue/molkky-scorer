@@ -40,7 +40,10 @@
       "Bash(gh pr *)",
       "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('.claude/settings.local.json','utf8'\\)\\); console.log\\('JSON OK'\\)\")",
       "mcp__ff73c6f1-f9d5-45bf-b8f6-165386c44d0c__get_file_contents",
-      "Bash(git ls-tree *)"
+      "Bash(git ls-tree *)",
+      "PowerShell(python -m py_compile calypso-bridge/bridge.py 2>&1)",
+      "Bash(command -v python)",
+      "Bash(command -v python3)"
     ]
   },
   "hooks": {
