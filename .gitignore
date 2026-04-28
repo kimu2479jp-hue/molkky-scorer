@@ -1,8 +1,9 @@
 node_modules/
 dist/
-# Claude Code - ローカル専用 (rules/, skills/, launch.json は追跡する)
+# Claude Code - ローカル専用 (rules/, skills/, settings.local.json, launch.json は追跡する)
 .claude/settings.json
 .claude/*.local.json
+!.claude/settings.local.json
 .claude/worktrees/
 .claude/plans/
 .claude/cache/
