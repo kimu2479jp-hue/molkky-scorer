@@ -45,7 +45,11 @@
       "Bash(command -v python)",
       "Bash(command -v python3)",
       "Bash(claude update *)",
-      "Bash(git cherry-pick *)"
+      "Bash(git cherry-pick *)",
+      "Bash(awk 'NR>=3307 && NR<=3348' DESIGN.md)",
+      "Bash(git worktree *)",
+      "Bash(awk 'NR>=3645 && NR<=3690' DESIGN.md)",
+      "Bash(GIT_EDITOR=true git cherry-pick --continue)"
     ]
   },
   "hooks": {
