@@ -43,7 +43,8 @@
       "Bash(git ls-tree *)",
       "PowerShell(python -m py_compile calypso-bridge/bridge.py 2>&1)",
       "Bash(command -v python)",
-      "Bash(command -v python3)"
+      "Bash(command -v python3)",
+      "Bash(claude update *)"
     ]
   },
   "hooks": {
