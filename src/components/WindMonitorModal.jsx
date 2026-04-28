@@ -642,7 +642,7 @@ const InstrumentDeckPhone = ({
           <div style={{ height: 6, background: "#0b1220", borderRadius: 3, position: "relative", border: "1px solid var(--wind-edge)" }}>
             <div style={{ position: "absolute", left: "0%", top: 0, height: 4, width: "40%", background: "var(--wind-calm)", borderRadius: 2, margin: 1 }} />
             <div style={{ position: "absolute", left: "40%", top: 0, height: 4, width: "30%", background: "var(--wind-moderate)", margin: 1 }} />
-            <div style={{ position: "absolute", left: "70%", top: 0, height: 4, width: "30%", background: "#f87171", borderRadius: 2, margin: 1 }} />
+            <div style={{ position: "absolute", left: "70%", top: 0, height: 4, width: "30%", background: "var(--wind-strong)", borderRadius: 2, margin: 1 }} />
             {gaugeShow && (
               <div style={{ position: "absolute", left: `${gaugePct}%`, top: -3, width: 2, height: 12, background: "var(--wind-text-primary)" }} />
             )}
@@ -868,7 +868,7 @@ const InstrumentDeckPad = ({
               <div style={{ height: 8, background: "#0b1220", borderRadius: 4, position: "relative", border: "1px solid var(--wind-edge)" }}>
                 <div style={{ position: "absolute", left: "0%", top: 0, height: 6, width: "40%", background: "var(--wind-calm)", borderRadius: 3, margin: 1 }} />
                 <div style={{ position: "absolute", left: "40%", top: 0, height: 6, width: "30%", background: "var(--wind-moderate)", margin: 1 }} />
-                <div style={{ position: "absolute", left: "70%", top: 0, height: 6, width: "30%", background: "#f87171", borderRadius: 3, margin: 1 }} />
+                <div style={{ position: "absolute", left: "70%", top: 0, height: 6, width: "30%", background: "var(--wind-strong)", borderRadius: 3, margin: 1 }} />
                 {gaugeShow && (
                   <div style={{ position: "absolute", left: `${gaugePct}%`, top: -4, width: 2.5, height: 16, background: "var(--wind-text-primary)" }} />
                 )}
