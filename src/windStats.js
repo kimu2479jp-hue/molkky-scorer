@@ -116,6 +116,11 @@ function makePlayerResult() {
       byLateral: { vertical: makeCount(), diagonal: makeCount(), cross: makeCount() },
       bySpeed: { "0-2": makeCount(), "2-4": makeCount(), "4-6": makeCount(), "6+": makeCount() },
       byNamed: { tail: makeCount(), head: makeCount(), side: makeCount() },
+      byLateralSpeed: {
+        vertical: { "0-2": makeCount(), "2-4": makeCount(), "4-6": makeCount(), "6+": makeCount() },
+        diagonal: { "0-2": makeCount(), "2-4": makeCount(), "4-6": makeCount(), "6+": makeCount() },
+        cross: { "0-2": makeCount(), "2-4": makeCount(), "4-6": makeCount(), "6+": makeCount() },
+      },
       byOctant,
       gamesUsed: 0,
       totalThrows: 0,
@@ -160,6 +165,10 @@ function aggregateThrow(result, nameSet, gamePlayers, w, h) {
   // 方向系: windCategory が有効な区分のときのみ（速度系とは独立に判定）
   const lg = lateralGroup(w.windCategory);
   if (lg) addType(tl.byLateral[lg], t);
+
+  // クロス集計（横方向成分 × 速度帯）: sb と lg が両方有効なときのみ。
+  // 後続UI PRの折れ線3本と点タップ詳細の唯一のデータ源。
+  if (sb && lg) addType(tl.byLateralSpeed[lg][sb], t);
 
   const ng = namedGroup(w.windCategory);
   if (ng) addType(tl.byNamed[ng], t);
