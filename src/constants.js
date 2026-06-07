@@ -211,6 +211,16 @@ export const WIND_CATEGORY_COLORS = {
   unknown: "#9ca3af",
 };
 
+// 横方向成分の3区分ラベル（vertical = 追い風+向かい風 で横成分ゼロ）
+export const WIND_LATERAL_LABELS = {
+  vertical: "追/向", diagonal: "斜め", cross: "横",
+};
+
+// 向き名の3区分ラベル
+export const WIND_NAMED_LABELS = {
+  tail: "追い風", head: "向かい風", side: "横風",
+};
+
 export const ABSOLUTE_DIRECTION_LABELS = {
   N: "北", NE: "北東", E: "東", SE: "南東",
   S: "南", SW: "南西", W: "西", NW: "北西",
