@@ -302,7 +302,7 @@ turnStartRef.current=Date.now();
 /* Wind sensor snapshot */
 if(windSensorEnabled&&windManagerRef.current){
 const snap=windManagerRef.current.snapshot();
-if(snap)setTurnWindData(prev=>[...prev,snap]);
+if(snap)setTurnWindData(prev=>[...prev,{...snap,histIdx:hIdx}]);
 }
 /* Trigger animations based on last entry */
 const last=history[history.length-1];
@@ -322,7 +322,10 @@ setAnimState(p=>({...p,flash:tI,shake:tI}));setTimeout(()=>setAnimState(p=>({...
 }
 } else if(history.length<prevHistLen.current){
 setTimestamps(p=>p.slice(0,-1));
-if(windSensorEnabled)setTurnWindData(prev=>prev.slice(0,-1));
+if(windSensorEnabled){
+const removedHistIdx=prevHistLen.current-1;
+setTurnWindData(prev=>prev.filter(s=>s.histIdx!==removedHistIdx));
+}
 turnStartRef.current=Date.now();
 }
 prevHistLen.current=history.length;
