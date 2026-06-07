@@ -1,12 +1,33 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Target, BarChart3, Lock, Bot, RefreshCw, Star, ClipboardList, AlertTriangle, Trash2 } from "lucide-react";
+import { Target, BarChart3, Lock, Bot, RefreshCw, Star, ClipboardList, AlertTriangle, Trash2, ChevronRight } from "lucide-react";
 
-import { PC, MASCOT_R, ANALYSIS_DAILY_MAX, LEVEL_NAMES, CONFIDENCE_LEVELS, PERIOD_OPTIONS, DEFAULT_PERIOD_MS, getWeatherInfo, FIELD_TYPES, ROOF_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS, WIND_CATEGORY_COLORS, WIND_CATEGORY_LABELS, ABSOLUTE_DIRECTION_LABELS, WIND_SPEED_CAP, getWindDirectionLabel } from "../constants.js";
+import { PC, MASCOT_R, ANALYSIS_DAILY_MAX, LEVEL_NAMES, CONFIDENCE_LEVELS, PERIOD_OPTIONS, DEFAULT_PERIOD_MS, getWeatherInfo, FIELD_TYPES, ROOF_TYPES, FIELD_TYPE_BADGE_COLORS, VENUE_TYPES, VENUE_TYPE_BADGE_COLORS, WIND_CATEGORY_COLORS, WIND_CATEGORY_LABELS, ABSOLUTE_DIRECTION_LABELS, WIND_SPEED_CAP, getWindDirectionLabel, WIND_LATERAL_LABELS, WIND_NAMED_LABELS } from "../constants.js";
 import { loadStats, loadReplays, loadFavs, loadPlayerLevels, loadWindData, saveWindData } from "../db.js";
 import { pullWindData } from "../sync.js";
 import { deleteStatsByPeriod, deleteGameByKey, getAvailableGames, getGameDates, filterGamesByDates, filterGamesByPeriod, calcMetrics, fmtMD, fmtHM, estimatePlayerLevel } from "../stats.js";
 import { makeAnalysisKey, getAnalysisCached, fetchPlayerAnalysis, getPlayerAnalysisCount, calcNewIndicators, getTopScores } from "../analysis.js";
 import { ScoreTable } from "./common.jsx";
+import { buildWindMissStats, missRate, sampleN } from "../windStats.js";
+
+/* ═══ Wind Miss 分析の定数 ═══ */
+/* 各 meta = [集計キー, 表示ラベル, 色]。色は意味別の固定値（テーマ非依存の指標色）。 */
+const WIND_LATERAL_META = [
+  ["vertical", WIND_LATERAL_LABELS.vertical, "#3b82f6"],
+  ["diagonal", WIND_LATERAL_LABELS.diagonal, "#f59e0b"],
+  ["cross", WIND_LATERAL_LABELS.cross, "#ef4444"],
+];
+/* 風速帯の4色は windSensor.js の getWindRampColor と同一値（変更時は両方を合わせる） */
+const WIND_SPEED_META = [
+  ["0-2", "0–2", "#34d399"], ["2-4", "2–4", "#fbbf24"], ["4-6", "4–6", "#f97316"], ["6+", "6+", "#ef4444"],
+];
+const WIND_NAMED_META = [
+  ["tail", WIND_NAMED_LABELS.tail, "#22c55e"], ["head", WIND_NAMED_LABELS.head, "#ef4444"], ["side", WIND_NAMED_LABELS.side, "#38bdf8"],
+];
+const WIND_OCTANT_META = ["tailwind", "tail_right", "right_cross", "head_right", "headwind", "head_left", "left_cross", "tail_left"]
+  .map(k => [k, WIND_CATEGORY_LABELS[k], WIND_CATEGORY_COLORS[k]]);
+const WIND_BANDS = ["0-2", "2-4", "4-6", "6+"];
+const WIND_BAND_LABELS = ["0–2", "2–4", "4–6", "6+"];
+const WIND_LOW_N = 5; // n<5 は参考値（網掛け / 破線）
 
 /* ═══ Radar Chart SVG ═══ */
 const RADAR_LABELS=["ミス率\n(低い程◎)","上がり\n決定率","投擲\n平均点","2ミス後\n平均点","ブレイク\n平均点","勝率"];
@@ -809,6 +830,250 @@ return(<div style={{background:"var(--bg-surface)",borderRadius:14,padding:14,bo
 </div>);
 }
 
+/* ═══ Wind Miss 分析：1本の横棒（ミス率） ═══ */
+function WindMissBar({ label, bucket, color, size, labelW, faultSlot }) {
+  const main = size === "main";
+  const h = main ? 22 : 13;
+  const r = main ? 6 : 5;
+  const n = sampleN(bucket);
+  const rate = missRate(bucket);
+  const isLow = n > 0 && n < WIND_LOW_N;
+  const hatch = `repeating-linear-gradient(45deg, ${color} 0, ${color} 5px, var(--neutral-100) 5px, var(--neutral-100) 10px)`;
+  let valueText;
+  if (n === 0) valueText = "—";
+  else if (isLow) valueText = `参考 (n=${n})`;
+  else valueText = `${Math.round(rate * 100)}% (n=${n})`;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: main ? 6 : 4 }}>
+      <div style={{ width: labelW, flexShrink: 0, fontSize: main ? 14 : 12, fontWeight: main ? 700 : 600, color: main ? "var(--text-primary)" : "var(--text-secondary)" }}>{label}</div>
+      <div style={{ flex: 1, height: h, background: "var(--neutral-100)", borderRadius: r, overflow: "hidden" }}>
+        {n > 0 && <div style={{ height: "100%", width: `${(rate || 0) * 100}%`, background: isLow ? hatch : color, borderRadius: r }} />}
+      </div>
+      <div style={{ width: main ? 78 : 72, textAlign: "right", fontSize: main ? 13 : 11, fontWeight: main ? 700 : 600, color: n === 0 ? "var(--text-muted)" : "var(--text-primary)", whiteSpace: "nowrap" }}>{valueText}</div>
+      {faultSlot && <div style={{ width: 52, textAlign: "left", fontSize: main ? 10.5 : 10, fontWeight: 600, color: "var(--text-muted)", whiteSpace: "nowrap" }}>{bucket.fault > 0 ? `フォルト${bucket.fault}` : ""}</div>}
+    </div>
+  );
+}
+
+/* ═══ Wind Miss 分析：横棒のまとまり（区分ごと）═══ */
+function WindBars({ metas, buckets, size, labelW }) {
+  const hasFault = metas.some(([k]) => ((buckets[k] && buckets[k].fault) || 0) > 0);
+  return (
+    <div>
+      {metas.map(([key, label, color]) => (
+        <WindMissBar key={key} label={label} bucket={buckets[key] || { miss: 0, score: 0, fault: 0 }} color={color} size={size} labelW={labelW} faultSlot={hasFault} />
+      ))}
+    </div>
+  );
+}
+
+/* ═══ Wind Miss 分析：小見出し（main=主役・大 / それ以外=補助・小）═══ */
+function WindSubHeading({ children, main }) {
+  return <div style={{ fontSize: main ? 14 : 12, fontWeight: main ? 800 : 700, color: main ? "var(--text-primary)" : "var(--text-secondary)", marginTop: main ? 0 : 14, marginBottom: main ? 8 : 6 }}>{children}</div>;
+}
+
+/* ═══ Wind Miss 分析：折りたたみ（デフォルト閉）═══ */
+function WindCollapse({ title, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button onClick={() => setOpen(o => !o)} style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "none", padding: "4px 0", cursor: "pointer", color: "var(--blue-500)", fontSize: 13, fontWeight: 600 }}>
+        <ChevronRight size={15} style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform .15s" }} />
+        {title}
+      </button>
+      {open && <div style={{ paddingTop: 4, paddingLeft: 2 }}>{children}</div>}
+    </div>
+  );
+}
+
+/* ═══ Wind Miss 分析：風速別ミス率の折れ線（追/向・斜め風・横風の3本）═══
+   縦軸=ミス率(0-100%), 横軸=風速帯。n>=5: 実線+塗りマーカー / n<5: 破線+白抜き+n表示 / n=0: ギャップ。
+   点タップで「線名(n) / ミス率% / 風速帯 m/s」を表示、背景タップで消える。 */
+function WindSpeedResponseChart({ byLateralSpeed }) {
+  const W = 520, H = 304, mL = 32, mR = 14, mT = 14, mB = 30;
+  const innerW = W - mL - mR, innerH = H - mT - mB;
+  const xFor = i => mL + i * (innerW / (WIND_BANDS.length - 1));
+  const yFor = r => mT + innerH * (1 - Math.min(Math.max(r, 0), 1));
+
+  const [sel, setSel] = useState(null); // タップ中の点 {key, i} | null
+
+  /* 凡例ラベルはこのチャート専用（バーの表記とは一部異なる: diagonal→斜め風, cross→横風） */
+  const LINES = [
+    { key: "vertical", label: WIND_LATERAL_LABELS.vertical, color: "#3b82f6" },
+    { key: "diagonal", label: "斜め風", color: "#f59e0b" },
+    { key: "cross", label: "横風", color: "#ef4444" },
+  ];
+
+  const series = LINES.map(L => {
+    const bk = byLateralSpeed[L.key] || {};
+    const pts = WIND_BANDS.map((b, i) => {
+      const c = bk[b] || { miss: 0, score: 0, fault: 0 };
+      const n = c.miss + c.score;
+      const rate = n === 0 ? null : c.miss / n;
+      return { i, n, rate, x: xFor(i), y: rate == null ? null : yFor(rate) };
+    });
+    return { ...L, pts };
+  });
+
+  const hasAny = series.some(s => s.pts.some(p => p.n > 0));
+  if (!hasAny) return <div style={{ fontSize: 12, color: "var(--text-muted)", padding: "6px 0" }}>風速別データがありません</div>;
+
+  const yTicks = [0, 0.25, 0.5, 0.75, 1];
+
+  const selInfo = (() => {
+    if (!sel) return null;
+    const s = series.find(x => x.key === sel.key);
+    const p = s && s.pts[sel.i];
+    if (!p || p.n === 0) return null;
+    return { color: s.color, label: s.label, band: WIND_BAND_LABELS[sel.i], pct: Math.round(p.rate * 100), n: p.n, x: p.x, y: p.y };
+  })();
+
+  return (
+    <div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }} onClick={() => setSel(null)}>
+        {yTicks.map(t => (
+          <g key={t}>
+            <line x1={mL} x2={W - mR} y1={yFor(t)} y2={yFor(t)} stroke={t === 0 ? "var(--neutral-200)" : "var(--neutral-100)"} strokeWidth={1} />
+            <text x={mL - 6} y={yFor(t)} textAnchor="end" dominantBaseline="middle" fontSize={9} fill="var(--text-muted)">{Math.round(t * 100)}{t === 1 ? "%" : ""}</text>
+          </g>
+        ))}
+        {WIND_BAND_LABELS.map((lab, i) => (
+          <text key={i} x={xFor(i)} y={H - 14} textAnchor="middle" fontSize={9} fill="var(--text-muted)">{lab}</text>
+        ))}
+        <text x={W - mR} y={H - 2} textAnchor="end" fontSize={9} fill="var(--text-muted)">m/s</text>
+
+        {series.map(s => (
+          <g key={s.key}>
+            {s.pts.map((p, i) => {
+              if (i === WIND_BANDS.length - 1) return null;
+              const a = p, b = s.pts[i + 1];
+              if (a.n === 0 || b.n === 0) return null;
+              const dashed = a.n < WIND_LOW_N || b.n < WIND_LOW_N;
+              return <line key={"sg" + i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={s.color} strokeWidth={2.2} strokeDasharray={dashed ? "5,4" : undefined} strokeLinecap="round" />;
+            })}
+            {s.pts.map((p, i) => {
+              if (p.n === 0) return null;
+              const low = p.n < WIND_LOW_N;
+              const isSel = sel && sel.key === s.key && sel.i === i;
+              return (
+                <g key={"pt" + i} onClick={(e) => { e.stopPropagation(); setSel({ key: s.key, i }); }} style={{ cursor: "pointer" }}>
+                  <circle cx={p.x} cy={p.y} r={13} fill="transparent" />
+                  <circle cx={p.x} cy={p.y} r={isSel ? 6 : (low ? 4 : 4.5)} fill={low && !isSel ? "var(--bg-surface)" : s.color} stroke={isSel ? "var(--bg-surface)" : s.color} strokeWidth={isSel ? 2.5 : 2} />
+                  {low && !isSel && <text x={p.x} y={p.y - 9} textAnchor="middle" fontSize={9} fontWeight={600} fill={s.color}>n={p.n}</text>}
+                </g>
+              );
+            })}
+          </g>
+        ))}
+
+        {selInfo && (() => {
+          const boxW = 104, boxH = 32;
+          const below = selInfo.y < (mT + 44);
+          const bx = Math.max(mL, Math.min(selInfo.x - boxW / 2, W - mR - boxW));
+          const by = below ? selInfo.y + 10 : selInfo.y - boxH - 10;
+          return (
+            <g>
+              <rect x={bx} y={by} width={boxW} height={boxH} rx={6} fill="#1a1a2e" opacity={0.96} />
+              <text x={bx + boxW / 2} y={by + 12} textAnchor="middle" fontSize={11} fontWeight={700} fill={selInfo.color}>{selInfo.label}（n={selInfo.n}）</text>
+              <text x={bx + boxW / 2} y={by + 25} textAnchor="middle" fontSize={11} fontWeight={600} fill="#ffffff">{selInfo.pct}% / {selInfo.band} m/s</text>
+            </g>
+          );
+        })()}
+      </svg>
+      <div style={{ display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap", marginTop: 4, paddingLeft: 2 }}>
+        {LINES.map(L => (
+          <span key={L.key} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: "var(--text-secondary)" }}>
+            <span style={{ width: 16, height: 3, background: L.color, borderRadius: 2, display: "inline-block" }} />{L.label}
+          </span>
+        ))}
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--text-muted)" }}>
+          <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--bg-surface)", border: "2px solid var(--text-muted)", display: "inline-block" }} />{"= 参考 (n<5)"}
+        </span>
+        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>※ 点をタップで詳細</span>
+      </div>
+    </div>
+  );
+}
+
+/* ═══ Wind Miss 分析：選手1人分のブロック ═══ */
+function WindMissPlayer({ pd, ps, first }) {
+  if (!ps) return null;
+  const tl = ps.throwLevel, ml = ps.matchLevel;
+  const hasWind = tl.totalThrows > 0 || ml.gamesUsed > 0;
+  return (
+    <div style={{ marginBottom: 22, ...(first ? {} : { borderTop: "1px solid var(--neutral-100)", paddingTop: 16 }) }}>
+      <div style={{ fontSize: 15, fontWeight: 800, color: pd.color, marginBottom: 2 }}>{pd.name}</div>
+      {!hasWind ? (
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>この選手の風速データはありません</div>
+      ) : (
+        <>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 12 }}>投擲レベル {tl.gamesUsed}試合 / 試合レベル {ml.gamesUsed}試合</div>
+
+          <WindSubHeading main>横方向成分別ミス率</WindSubHeading>
+          <WindBars metas={WIND_LATERAL_META} buckets={tl.byLateral} size="main" labelW={38} />
+
+          <div style={{ fontSize: 14, fontWeight: 800, color: "var(--text-primary)", marginTop: 16, marginBottom: 8 }}>風速別ミス率（横方向成分別）</div>
+          <WindSpeedResponseChart byLateralSpeed={tl.byLateralSpeed} />
+
+          <WindSubHeading>風速帯別ミス率（m/s）</WindSubHeading>
+          <WindBars metas={WIND_SPEED_META} buckets={tl.bySpeed} size="sub" labelW={42} />
+
+          <WindCollapse title="向き別（追い風 / 向かい風 / 横風）">
+            <WindBars metas={WIND_NAMED_META} buckets={tl.byNamed} size="sub" labelW={56} />
+          </WindCollapse>
+
+          <WindCollapse title="8方位の詳細">
+            <WindBars metas={WIND_OCTANT_META} buckets={tl.byOctant} size="sub" labelW={50} />
+          </WindCollapse>
+
+          {ml.gamesUsed > 0 && (
+            <WindCollapse title={`試合単位で見る（${ml.gamesUsed}試合）`}>
+              <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 8 }}>投擲ごとの突き合わせができなかった試合を、試合全体の代表風で集計したものです。</div>
+              <WindSubHeading>横方向成分別</WindSubHeading>
+              <WindBars metas={WIND_LATERAL_META} buckets={ml.byLateral} size="sub" labelW={38} />
+              <WindSubHeading>風速帯別（m/s）</WindSubHeading>
+              <WindBars metas={WIND_SPEED_META} buckets={ml.bySpeed} size="sub" labelW={42} />
+              <WindSubHeading>向き別</WindSubHeading>
+              <WindBars metas={WIND_NAMED_META} buckets={ml.byNamed} size="sub" labelW={56} />
+            </WindCollapse>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ═══ Wind Miss 分析：カード本体（選手ごとに WindMissPlayer を縦積み）═══ */
+function WindMissSection({ stats, playersData, ready }) {
+  const windIcon = (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" /><path d="M9.6 4.6A2 2 0 1 1 11 8H2" /><path d="M12.6 19.4A2 2 0 1 0 14 16H2" /></svg>
+  );
+  const hasAnyWind = playersData.some(pd => {
+    const ps = stats[pd.name];
+    return ps && (ps.throwLevel.totalThrows > 0 || ps.matchLevel.gamesUsed > 0);
+  });
+  return (
+    <div style={{ background: "var(--bg-surface)", borderRadius: 14, padding: 14, border: "1px solid var(--neutral-200)", marginBottom: 14 }}>
+      <div style={{ fontSize: 16, fontWeight: 800, color: "var(--text-primary)", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+        {windIcon} 風速とミス分析
+      </div>
+      {!ready ? (
+        <div style={{ textAlign: "center", padding: 20, color: "var(--text-muted)", fontSize: 14 }}>読み込み中…</div>
+      ) : !hasAnyWind ? (
+        <div style={{ textAlign: "center", padding: 20, color: "var(--text-muted)", fontSize: 14 }}>風速データのある試合がありません</div>
+      ) : (
+        <>
+          <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 14, lineHeight: 1.5 }}>風の向き・強さ別のミス率。横向きの風ほどミスが増えるかを確認できます。</div>
+          {playersData.map((pd, idx) => (
+            <WindMissPlayer key={pd.name} pd={pd} ps={stats[pd.name]} first={idx === 0} />
+          ))}
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6, paddingTop: 10, borderTop: "1px solid var(--neutral-100)" }}>※ 未同期の試合は集計に含まれない場合があります。</div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ═══ Stats Modal — with Calendar/Recent tabs + Score Distribution ═══ */
 export function StatsModal({onClose,currentGameRecords,initialDelete,source,isAdmin,aiEnabled}){
 const isTab=typeof window!=="undefined"&&window.innerWidth>=768;
@@ -958,6 +1223,55 @@ setWindDataCache(prev=>({...prev,...patch}));
 });
 return()=>{cancelled=true;};
 },[visibleGameKeysStr]);
+
+/* ═══ 風速とミス分析: 全タブ対応のローカル一括ロード（案A）═══ */
+/* 対象 gameKeys（cumulative のみ）: 選択選手の getPlayerGames と同じ条件で .d を収集。
+   tab==="all" は期間フィルタ、calendar/recent は選択中の試合。区切り文字は \u0001（選手名にカンマが入っても安全）。 */
+const windStatsGameKeysStr = React.useMemo(() => {
+  if (viewMode !== "cumulative") return "";
+  const keySet = new Set();
+  effectiveSelected.forEach(nm => {
+    let games;
+    if (tab === "all") games = filterGamesByPeriod(stats[nm] || [], selectedPeriod);
+    else games = (stats[nm] || []).filter(g => selectedGameKeys.has(g.d));
+    games.forEach(g => { if (g && g.d) keySet.add(g.d); });
+  });
+  return Array.from(keySet).sort().join("\u0001");
+}, [viewMode, tab, effectiveSelected, selectedPeriod, selectedGameKeys, stats]);
+
+/* 風速分析専用キャッシュ。loadWindData（IndexedDB）のみ・Supabaseフォールバックなし＝累計の大量試合でも高速。
+   個別「風」ボタン（WindDataModal）は従来どおりフォールバックするので未同期試合も個別には見られる。 */
+const [windStatsCache, setWindStatsCache] = useState({});
+useEffect(() => {
+  if (!windStatsGameKeysStr) return;
+  let cancelled = false;
+  const keys = windStatsGameKeysStr.split("\u0001");
+  const toLoad = keys.filter(k => !(k in windStatsCache));
+  if (toLoad.length === 0) return;
+  Promise.all(toLoad.map(k => loadWindData(k).then(d => ({ k, d })).catch(() => ({ k, d: null }))))
+    .then(results => {
+      if (cancelled) return;
+      const patch = {};
+      results.forEach(({ k, d }) => { patch[k] = d || null; });
+      setWindStatsCache(prev => ({ ...prev, ...patch }));
+    });
+  return () => { cancelled = true; };
+}, [windStatsGameKeysStr]);
+
+/* 対象 gameKeys が全件ロード完了したか（未完なら「読み込み中…」を出して誤った空表示を防ぐ） */
+const windStatsKeysArr = windStatsGameKeysStr ? windStatsGameKeysStr.split("\u0001") : [];
+const windStatsReady = windStatsKeysArr.every(k => k in windStatsCache);
+
+/* 集計（buildWindMissStats）。選手名キーの集計オブジェクトを返す。 */
+const windMissStats = React.useMemo(() => {
+  if (viewMode !== "cumulative" || effectiveSelected.length === 0) return {};
+  const keys = windStatsGameKeysStr ? windStatsGameKeysStr.split("\u0001") : [];
+  if (keys.length === 0) return {};
+  const replays = loadReplays();
+  const windDataByKey = {};
+  keys.forEach(k => { windDataByKey[k] = windStatsCache[k] || null; });
+  return buildWindMissStats({ gameKeys: keys, replays, windDataByKey, playerNames: effectiveSelected });
+}, [viewMode, windStatsGameKeysStr, windStatsCache, effectiveSelected]);
 
 return(<div className="mk-fade-scale-in" style={{position:"fixed",inset:0,background:"var(--bg-surface-alt)",zIndex:200,display:"flex",flexDirection:"column",overflow:"hidden",overscrollBehavior:"none"}}>
 <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"calc(10px + env(safe-area-inset-top, 0px)) 20px 10px",background:"var(--bg-secondary)",flexShrink:0}}>
@@ -1113,6 +1427,10 @@ return(<div key={pd.name} style={{marginBottom:12}}>
 </div>);
 })}
 </div>
+{/* Wind miss analysis (cumulative のみ) */}
+{viewMode === "cumulative" && (
+  <WindMissSection stats={windMissStats} playersData={playersData} ready={windStatsReady} />
+)}
 </>)}
 </>)}
 </div>
